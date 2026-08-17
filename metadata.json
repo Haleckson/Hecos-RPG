@@ -1,0 +1,6 @@
+{
+  "name": "Hecos - RPG Campaign & World Codex",
+  "description": "Comprehensive World Anvil & Notion-like RPG campaign management platform for the Hecos setting based on Pathfinder 2e rules, with interactive maps, rich @mentions, codex, and timeline.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
