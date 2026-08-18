@@ -90,12 +90,12 @@ export const FeatPickerModal: React.FC<FeatPickerModalProps> = ({
     return parsedFeats.filter(({ entity, parsed, recommendedRank }) => {
       // 1. Search Query
       if (q) {
-        const matchTitle = entity.title.toLowerCase().includes(q);
-        const matchDesc = (parsed.description || '').toLowerCase().includes(q);
-        const matchTraits = (parsed.traits || []).some((t) => t.toLowerCase().includes(q));
-        const matchPrereq = (parsed.prerequisites || '').toLowerCase().includes(q);
-        const matchType = getFeatTypeLabel(parsed.featType).toLowerCase().includes(q);
-        const matchSub = (entity.subtitle || '').toLowerCase().includes(q);
+        const matchTitle = (entity?.title || '').toLowerCase().includes(q);
+        const matchDesc = (parsed?.description || '').toLowerCase().includes(q);
+        const matchTraits = (parsed?.traits || []).some((t) => (t || '').toLowerCase().includes(q));
+        const matchPrereq = (parsed?.prerequisites || '').toLowerCase().includes(q);
+        const matchType = (getFeatTypeLabel(parsed?.featType) || '').toLowerCase().includes(q);
+        const matchSub = (entity?.subtitle || '').toLowerCase().includes(q);
 
         if (!matchTitle && !matchDesc && !matchTraits && !matchPrereq && !matchType && !matchSub) {
           return false;
@@ -111,7 +111,7 @@ export const FeatPickerModal: React.FC<FeatPickerModalProps> = ({
 
       // 3. Type Filter
       if (selectedTypeFilter !== 'all') {
-        if (parsed.featType !== selectedTypeFilter) {
+        if (parsed?.featType !== selectedTypeFilter) {
           return false;
         }
       }
@@ -122,10 +122,11 @@ export const FeatPickerModal: React.FC<FeatPickerModalProps> = ({
 
   if (!isOpen) return null;
 
-  const isAlreadyAdded = (id: string, name: string) => {
+  const isAlreadyAdded = (id: string, name?: string) => {
+    const target = (name || '').trim().toLowerCase();
     return (
       alreadyAddedFeatEntityIds.includes(id) ||
-      alreadyAddedFeatNames.some((n) => n.trim().toLowerCase() === name.trim().toLowerCase())
+      (target.length > 0 && alreadyAddedFeatNames.some((n) => (n || '').trim().toLowerCase() === target))
     );
   };
 

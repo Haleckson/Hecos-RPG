@@ -11,6 +11,7 @@ import {
   Scroll,
   Crown,
   Clock,
+  Folder,
 } from 'lucide-react';
 
 interface FeatViewProps {
@@ -159,16 +160,39 @@ export const FeatView: React.FC<FeatViewProps> = ({
             </p>
           )}
 
+          {/* Subcategorias / Pastas */}
+          {((featData.subcategories && featData.subcategories.length > 0) || (entity.subcategories && entity.subcategories.length > 0) || entity.subcategory) && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-zinc-800/60">
+              <span className="text-[11px] font-mono font-bold text-zinc-500 uppercase flex items-center gap-1 mr-1">
+                <Folder className="w-3 h-3 text-amber-400" />
+                Pastas:
+              </span>
+              {(featData.subcategories || entity.subcategories || (entity.subcategory ? [entity.subcategory] : [])).map((subcat) => (
+                <button
+                  key={subcat}
+                  type="button"
+                  onClick={() => onTagClick(subcat)}
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-amber-950/60 hover:bg-amber-900/70 text-amber-300 border border-amber-600/40 transition-colors shadow-sm"
+                >
+                  <Folder className="w-3 h-3 text-amber-400" />
+                  <span>{subcat}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Traços PF2e */}
           {featData.traits && featData.traits.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-zinc-800/60">
               {featData.traits.map((trait) => (
-                <span
+                <button
                   key={trait}
-                  className="px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-[#1d1729] text-[#74b6c2] border border-[#74b6c2]/30 shadow-sm"
+                  type="button"
+                  onClick={() => onTagClick(trait)}
+                  className="px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-[#1d1729] hover:bg-[#282038] text-[#74b6c2] border border-[#74b6c2]/30 shadow-sm transition-colors cursor-pointer"
                 >
                   {trait}
-                </span>
+                </button>
               ))}
             </div>
           )}

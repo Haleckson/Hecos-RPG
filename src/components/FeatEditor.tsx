@@ -12,6 +12,7 @@ import {
   serializeFeatToHTML,
   parseFeatFromContent,
 } from '../utils/featSerializer';
+import { HecosStorage } from '../services/storage';
 import { ReferenceField } from './ReferenceField';
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { ImageUploadInput } from './ImageUploadInput';
@@ -26,6 +27,10 @@ import {
   Swords,
   Scroll,
   RotateCcw,
+  FolderPlus,
+  Folder,
+  Plus,
+  Check,
 } from 'lucide-react';
 
 interface FeatEditorProps {
@@ -88,11 +93,53 @@ export const FeatEditor: React.FC<FeatEditorProps> = ({
 
   // Parse or initialize blank structured Feat Attributes
   const [data, setData] = useState<PF2eFeatAttributes>(() => {
-    return parseFeatFromContent(entity.title, entity.content || '', entity.featData);
+    const parsed = parseFeatFromContent(entity.title, entity.content || '', entity.featData);
+    if (!parsed.subcategories || parsed.subcategories.length === 0) {
+      if (entity.subcategories && entity.subcategories.length > 0) {
+        parsed.subcategories = entity.subcategories;
+      } else if (entity.subcategory) {
+        parsed.subcategories = [entity.subcategory];
+      } else {
+        parsed.subcategories = [];
+      }
+    }
+    return parsed;
   });
 
   const [activeMainTab, setActiveMainTab] = useState<'mechanics' | 'lore'>('mechanics');
   const [customTraitInput, setCustomTraitInput] = useState('');
+  const [customSubcategoryInput, setCustomSubcategoryInput] = useState('');
+
+  // Subcategories helpers
+  const availableSubcategories = HecosStorage.getFeatSubcategories(data.featType);
+  const allOtherSubcategories = HecosStorage.getFeatSubcategories('all').filter(
+    (s) => !availableSubcategories.includes(s)
+  );
+
+  const toggleSubcategory = (subcat: string) => {
+    setData((prev) => {
+      const current = prev.subcategories || [];
+      if (current.includes(subcat)) {
+        return { ...prev, subcategories: current.filter((s) => s !== subcat) };
+      } else {
+        return { ...prev, subcategories: [...current, subcat] };
+      }
+    });
+  };
+
+  const addCustomSubcategory = () => {
+    const trimmed = customSubcategoryInput.trim();
+    if (!trimmed) return;
+    HecosStorage.addFeatSubcategory(data.featType, trimmed);
+    setData((prev) => {
+      const current = prev.subcategories || [];
+      if (!current.includes(trimmed)) {
+        return { ...prev, subcategories: [...current, trimmed] };
+      }
+      return prev;
+    });
+    setCustomSubcategoryInput('');
+  };
 
   // Update helper
   const updateField = <K extends keyof PF2eFeatAttributes>(
@@ -156,19 +203,27 @@ export const FeatEditor: React.FC<FeatEditorProps> = ({
     const finalTitle = title.trim() || 'Novo Talento';
     const serializedContent = serializeFeatToHTML(finalTitle, data);
 
+    const subcats = data.subcategories || [];
+    const updatedTagsSet = new Set(
+      tagsString
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean)
+    );
+    subcats.forEach((s) => updatedTagsSet.add(s));
+
     const updatedEntity: HecosEntity = {
       ...entity,
       title: finalTitle,
       subtitle: subtitle.trim(),
       category: 'feat',
+      subcategory: subcats[0] || entity.subcategory || '',
+      subcategories: subcats,
       summary: data.description ? data.description.substring(0, 160) : '',
       content: serializedContent,
       featData: data,
       coverImage: coverImage.trim(),
-      tags: tagsString
-        .split(',')
-        .map((t) => t.trim())
-        .filter(Boolean),
+      tags: Array.from(updatedTagsSet),
       isSecret,
       updatedAt: new Date().toISOString(),
     };
@@ -374,8 +429,9 @@ export const FeatEditor: React.FC<FeatEditorProps> = ({
                     <option value="general">Geral (General Feat)</option>
                     <option value="skill">Perícia (Skill Feat)</option>
                     <option value="class">Classe (Class Feat)</option>
-                    <option value="ancestry">Ancestralidade (Ancestry Feat)</option>
                     <option value="archetype">Arquétipo / Dedicação</option>
+                    <option value="ancestry">Ancestralidade (Ancestry Feat)</option>
+                    <option value="extras">Extras & Homebrew</option>
                     <option value="hecos">Específico de Hecos</option>
                   </select>
                 </div>
@@ -409,6 +465,106 @@ export const FeatEditor: React.FC<FeatEditorProps> = ({
                     placeholder="Ex: Guerreiro, Golen, Ladino..."
                     className="w-full px-3 py-2 rounded-lg bg-zinc-900/90 border border-zinc-700 text-zinc-200 outline-none focus:border-amber-400"
                   />
+                </div>
+              </div>
+
+              {/* Subcategorias / Pastas (Suporta múltiplas) */}
+              <div className="mt-4 pt-4 border-t border-zinc-800 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <FolderPlus className="w-4 h-4 text-amber-400" />
+                    <label className="text-xs text-zinc-300 font-bold uppercase font-mono">
+                      Subcategorias / Pastas do Talento (Pode selecionar várias)
+                    </label>
+                  </div>
+                  <span className="text-[11px] text-zinc-500 font-sans">
+                    {data.subcategories && data.subcategories.length > 0
+                      ? `${data.subcategories.length} subcategoria(s) selecionada(s)`
+                      : 'Nenhuma subcategoria selecionada'}
+                  </span>
+                </div>
+
+                {/* Subcategorias selecionadas ativas */}
+                {data.subcategories && data.subcategories.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 p-2.5 rounded-lg bg-zinc-950/60 border border-amber-500/20">
+                    {data.subcategories.map((subcat) => (
+                      <span
+                        key={subcat}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-950/80 text-amber-200 border border-amber-600/50 shadow-sm"
+                      >
+                        <Folder className="w-3 h-3 text-amber-400" />
+                        <span>{subcat}</span>
+                        <button
+                          type="button"
+                          onClick={() => toggleSubcategory(subcat)}
+                          className="hover:text-rose-300 transition-colors ml-0.5"
+                          title="Remover subcategoria"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Subcategorias sugeridas da categoria atual */}
+                <div className="space-y-1.5">
+                  <div className="text-[11px] font-bold text-zinc-400 uppercase font-mono">
+                    Subcategorias sugeridas ({data.featType}):
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {availableSubcategories.map((subcat) => {
+                      const isSelected = data.subcategories?.includes(subcat);
+                      return (
+                        <button
+                          key={subcat}
+                          type="button"
+                          onClick={() => toggleSubcategory(subcat)}
+                          className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
+                            isSelected
+                              ? 'bg-amber-500 text-black font-bold shadow-sm'
+                              : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 hover:border-zinc-700'
+                          }`}
+                        >
+                          {isSelected ? (
+                            <Check className="w-3 h-3 text-black stroke-[3]" />
+                          ) : (
+                            <Plus className="w-3 h-3 text-zinc-500" />
+                          )}
+                          <span>{subcat}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Criar nova subcategoria customizada */}
+                <div className="flex items-center gap-2 pt-2">
+                  <div className="relative flex-1 max-w-sm">
+                    <input
+                      type="text"
+                      value={customSubcategoryInput}
+                      onChange={(e) => setCustomSubcategoryInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addCustomSubcategory();
+                        }
+                      }}
+                      placeholder="Criar nova subcategoria manual..."
+                      className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-zinc-900/90 border border-zinc-700 text-zinc-200 placeholder-zinc-500 outline-none focus:border-amber-400"
+                    />
+                    <FolderPlus className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-2.5" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addCustomSubcategory}
+                    disabled={!customSubcategoryInput.trim()}
+                    className="px-3 py-1.5 rounded-lg bg-amber-950/80 hover:bg-amber-900 border border-amber-600/50 text-amber-200 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Adicionar</span>
+                  </button>
                 </div>
               </div>
             </section>

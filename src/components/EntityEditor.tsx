@@ -9,6 +9,7 @@ import {
   ShieldAlert,
   Youtube,
   Eye,
+  EyeOff,
   Edit3,
   Columns,
   Tag as TagIcon,
@@ -802,16 +803,32 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
           </div>
 
           <div className="md:col-span-1 flex items-center justify-end">
-            <label className="flex items-center gap-1.5 text-xs text-rose-300 cursor-pointer select-none" title="Marcar como nota secreta de mestre">
-              <input
-                type="checkbox"
-                checked={isSecret}
-                onChange={(e) => setIsSecret(e.target.checked)}
-                className="rounded border-zinc-700 text-rose-600 focus:ring-rose-500 bg-zinc-900"
-              />
-              <Lock className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">GM</span>
-            </label>
+            <button
+              type="button"
+              onClick={() => setIsSecret(!isSecret)}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                isSecret
+                  ? 'bg-zinc-900/90 border-zinc-700 text-zinc-400 hover:text-amber-300 hover:border-amber-500/50'
+                  : 'bg-amber-950/80 border-amber-500/60 text-amber-300 hover:text-amber-200 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
+              }`}
+              title={
+                isSecret
+                  ? 'Secreto: Apenas o GM pode ver (Clique para tornar Público)'
+                  : 'Público: Todos podem ver (Clique para tornar Secreto do GM)'
+              }
+            >
+              {isSecret ? (
+                <>
+                  <EyeOff className="w-3.5 h-3.5 text-zinc-400" />
+                  <span className="hidden sm:inline">GM</span>
+                </>
+              ) : (
+                <>
+                  <Eye className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
+                  <span className="hidden sm:inline">Público</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
 
@@ -1052,6 +1069,30 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
             title="Caixa de Eclipse Malva"
           >
             Eclipse Malva
+          </button>
+
+          {/* GM Secret Line / Block Insert Button */}
+          <button
+            type="button"
+            onClick={() => {
+              if (textareaRef.current) {
+                const start = textareaRef.current.selectionStart;
+                const end = textareaRef.current.selectionEnd;
+                const selected = content.substring(start, end);
+                if (selected.trim()) {
+                  wrapSelection('\n:::gm\n**Segredo do Mestre:** ', '\n:::\n', 'Texto confidencial');
+                } else {
+                  insertSnippet('\n:::gm\n**Segredo do Mestre:** [Escreva aqui informações confidenciais visíveis exclusivamente para o GM...]\n:::\n\n');
+                }
+              } else {
+                insertSnippet('\n:::gm\n**Segredo do Mestre:** [Escreva aqui informações confidenciais visíveis exclusivamente para o GM...]\n:::\n\n');
+              }
+            }}
+            className="flex items-center gap-1 px-2.5 py-0.5 rounded bg-amber-950/90 border border-amber-500/80 hover:bg-amber-900 text-amber-300 text-[11px] font-bold transition-all shadow-[0_0_12px_rgba(245,158,11,0.25)]"
+            title="Inserir Linha Secreta (Visível apenas para o GM independente da visibilidade da página)"
+          >
+            <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+            <span>+ Linha Secreta GM</span>
           </button>
         </div>
 

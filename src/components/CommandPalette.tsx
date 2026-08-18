@@ -60,11 +60,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     if (!q) return matchesCategory;
 
     const matchesText =
-      entity.title.toLowerCase().includes(q) ||
-      (entity.subtitle && entity.subtitle.toLowerCase().includes(q)) ||
-      (entity.summary && entity.summary.toLowerCase().includes(q)) ||
-      entity.tags.some((t) => t.toLowerCase().includes(q)) ||
-      entity.content.toLowerCase().includes(q);
+      (entity?.title || '').toLowerCase().includes(q) ||
+      (entity?.subtitle && entity.subtitle.toLowerCase().includes(q)) ||
+      (entity?.summary && entity.summary.toLowerCase().includes(q)) ||
+      (entity?.tags || []).some((t) => (t || '').toLowerCase().includes(q)) ||
+      (entity?.content || '').toLowerCase().includes(q);
 
     return matchesCategory && matchesText;
   });

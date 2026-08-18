@@ -7,6 +7,7 @@ export function getEmptyFeatData(): PF2eFeatAttributes {
   return {
     level: 1,
     featType: 'general',
+    subcategories: [],
     rarity: 'Comum',
     traits: [],
     actionCost: '1',
@@ -35,6 +36,7 @@ export function getDefaultFeatData(featName = 'Golpe do Eclipse'): PF2eFeatAttri
   return {
     level: 1,
     featType: 'class',
+    subcategories: ['Fighter (Guerreiro)', 'Guerreiro da Obsidiana'],
     rarity: 'Comum',
     traits: ['Ataque', 'Floreio', 'Marcial'],
     actionCost: '1',
@@ -80,8 +82,8 @@ export function serializeFeatToHTML(title: string, data: PF2eFeatAttributes): st
 
         <!-- TRAÇOS E RARIDADE -->
         <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
-            <span class="trait-badge rarity-${data.rarity.toLowerCase()}" style="padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase;">
-                ${data.rarity}
+            <span class="trait-badge rarity-${(data.rarity || 'comum').toLowerCase()}" style="padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase;">
+                ${data.rarity || 'Comum'}
             </span>
             <span class="trait-badge type-${data.featType}" style="padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase;">
                 ${getFeatTypeLabel(data.featType)}
@@ -241,16 +243,18 @@ export function getActionSymbol(cost: FeatActionCost): string {
 
 export function getFeatTypeLabel(type: FeatCategoryType): string {
   switch (type) {
-    case 'ancestry':
-      return 'Ancestralidade';
-    case 'class':
-      return 'Classe';
-    case 'skill':
-      return 'Perícia';
     case 'general':
       return 'Geral';
+    case 'skill':
+      return 'Perícia';
+    case 'class':
+      return 'Classe';
     case 'archetype':
       return 'Arquétipo';
+    case 'ancestry':
+      return 'Ancestralidade';
+    case 'extras':
+      return 'Extras';
     case 'hecos':
       return 'Hecos';
     default:

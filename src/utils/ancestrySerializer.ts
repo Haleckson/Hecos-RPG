@@ -72,6 +72,10 @@ export function getEmptyAncestryData(): AncestryAttributes {
     gmGuide: {
       roleplayingNpcs: '',
       themesAndConflicts: '',
+      secretLore: '',
+      adventureHooks: '',
+      trueOrigins: '',
+      gmNotes: '',
     },
   };
 }
@@ -472,6 +476,26 @@ export function serializeAncestryToHTML(title: string, data: AncestryAttributes)
             <h3 style="margin: 0 0 6px 0; color: #b19ecc; font-size: 15px; font-weight: 700;">Temas e Conflitos Sugeridos</h3>
             <p style="margin: 0; color: #d4d4d8; font-size: 14px; line-height: 1.6;">${data.gmGuide?.themesAndConflicts || '—'}</p>
           </div>
+          ${data.gmGuide?.secretLore ? `
+          <div style="padding: 12px 14px; background-color: #140d12; border: 1px solid #701a2d; border-radius: 8px;">
+            <h3 style="margin: 0 0 6px 0; color: #f43f5e; font-size: 15px; font-weight: 700;">Segredos Ancestrais e Ocultismo</h3>
+            <p style="margin: 0; color: #d4d4d8; font-size: 14px; line-height: 1.6;">${data.gmGuide.secretLore}</p>
+          </div>` : ''}
+          ${data.gmGuide?.adventureHooks ? `
+          <div style="padding: 12px 14px; background-color: #140d12; border: 1px solid #701a2d; border-radius: 8px;">
+            <h3 style="margin: 0 0 6px 0; color: #f43f5e; font-size: 15px; font-weight: 700;">Ganchos de Aventura e Encontros</h3>
+            <p style="margin: 0; color: #d4d4d8; font-size: 14px; line-height: 1.6;">${data.gmGuide.adventureHooks}</p>
+          </div>` : ''}
+          ${data.gmGuide?.trueOrigins ? `
+          <div style="padding: 12px 14px; background-color: #140d12; border: 1px solid #701a2d; border-radius: 8px;">
+            <h3 style="margin: 0 0 6px 0; color: #f43f5e; font-size: 15px; font-weight: 700;">Origens Ocultas e Facções Secretas</h3>
+            <p style="margin: 0; color: #d4d4d8; font-size: 14px; line-height: 1.6;">${data.gmGuide.trueOrigins}</p>
+          </div>` : ''}
+          ${data.gmGuide?.gmNotes ? `
+          <div style="padding: 12px 14px; background-color: #140d12; border: 1px solid #701a2d; border-radius: 8px;">
+            <h3 style="margin: 0 0 6px 0; color: #f43f5e; font-size: 15px; font-weight: 700;">Notas do Narrador</h3>
+            <p style="margin: 0; color: #d4d4d8; font-size: 14px; line-height: 1.6;">${data.gmGuide.gmNotes}</p>
+          </div>` : ''}
         </div>
     </section>
 </div>`;
@@ -654,6 +678,18 @@ export function parseAncestryFromContent(
 
   const them = extractSectionText('Temas e Conflitos');
   if (them) res.gmGuide.themesAndConflicts = them;
+
+  const secLore = extractSectionText('Segredos Ancestrais e Ocultismo') || extractSectionText('Segredos da Linhagem');
+  if (secLore) res.gmGuide.secretLore = secLore;
+
+  const advHk = extractSectionText('Ganchos de Aventura e Encontros') || extractSectionText('Ganchos de Aventura');
+  if (advHk) res.gmGuide.adventureHooks = advHk;
+
+  const tOrig = extractSectionText('Origens Ocultas e Facções Secretas') || extractSectionText('Origens Ocultas');
+  if (tOrig) res.gmGuide.trueOrigins = tOrig;
+
+  const gmNotes = extractSectionText('Notas do Narrador') || extractSectionText('Anotações do Mestre');
+  if (gmNotes) res.gmGuide.gmNotes = gmNotes;
 
   const profw = extractSectionText('Proficiências e Armas');
   if (profw) res.culturalArsenal.proficienciesAndWeapons = profw;

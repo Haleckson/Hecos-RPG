@@ -42,7 +42,7 @@ export const AncestryView: React.FC<AncestryViewProps> = ({
   onNavigate,
   onTagClick,
 }) => {
-  const [activeMainTab, setActiveMainTab] = useState<'mechanics' | 'lore'>('mechanics');
+  const [activeMainTab, setActiveMainTab] = useState<'mechanics' | 'lore' | 'gm'>('mechanics');
   const [activeFeatRank, setActiveFeatRank] = useState<1 | 5 | 9 | 13 | 17 | 'all'>('all');
   const [copiedStatblock, setCopiedStatblock] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -161,7 +161,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
-      {/* NAVEGAÇÃO DAS DUAS ABAS: MECÂNICAS & LORE */}
+      {/* NAVEGAÇÃO DAS TRÊS ABAS: MECÂNICAS, LORE & ABA GM */}
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
       <div className="flex border-b border-[#272438] bg-[#0e0d16] rounded-t-xl overflow-hidden p-1 gap-1">
         <button
@@ -174,8 +174,8 @@ IDIOMAS: ${data.languages || 'Humani'}`;
         >
           <Swords className="w-4 h-4 text-[#74b6c2]" />
           <span>Mecânicas de Jogo</span>
-          <span className="hidden sm:inline text-[10px] px-2 py-0.5 rounded-full bg-[#74b6c2]/15 text-[#74b6c2] font-mono">
-            Heranças, Arsenal & Talentos
+          <span className="hidden md:inline text-[10px] px-2 py-0.5 rounded-full bg-[#74b6c2]/15 text-[#74b6c2] font-mono">
+            Heranças & Talentos
           </span>
         </button>
 
@@ -188,9 +188,24 @@ IDIOMAS: ${data.languages || 'Humani'}`;
           }`}
         >
           <BookOpen className="w-4 h-4 text-[#b19ecc]" />
-          <span>Lore & Cenário de Hecos</span>
-          <span className="hidden sm:inline text-[10px] px-2 py-0.5 rounded-full bg-[#b19ecc]/15 text-[#b19ecc] font-mono">
-            Biologia, Cultura & Sociedade
+          <span>Lore & Cenário</span>
+          <span className="hidden md:inline text-[10px] px-2 py-0.5 rounded-full bg-[#b19ecc]/15 text-[#b19ecc] font-mono">
+            Cultura & Sociedade
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveMainTab('gm')}
+          className={`flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-lg font-bold text-xs sm:text-sm transition-all cursor-pointer ${
+            activeMainTab === 'gm'
+              ? 'bg-[#2a121d] text-[#f43f5e] border border-[#f43f5e]/50 shadow-[0_0_15px_rgba(244,63,94,0.2)]'
+              : 'text-zinc-400 hover:text-rose-300 hover:bg-[#180f18]'
+          }`}
+        >
+          <Crown className="w-4 h-4 text-[#f43f5e]" />
+          <span>Aba GM</span>
+          <span className="hidden md:inline text-[10px] px-2 py-0.5 rounded-full bg-[#f43f5e]/15 text-[#f43f5e] font-mono font-bold">
+            Segredos & Narrador
           </span>
         </button>
       </div>
@@ -332,7 +347,19 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#272438] pb-2">
                               <span className="font-bold text-zinc-100 text-sm flex items-center gap-1.5">
                                 <span className="text-[#b19ecc]">◆</span>
-                                <span>{feat.name}</span>
+                                {feat.featEntityId && onNavigate ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => onNavigate(feat.featEntityId!)}
+                                    className="hover:text-[#74b6c2] hover:underline transition-colors text-left font-bold cursor-pointer inline-flex items-center gap-1"
+                                    title="Abrir página completa do talento"
+                                  >
+                                    <span>{feat.name}</span>
+                                    <span className="text-[10px] text-[#74b6c2] opacity-70">↗</span>
+                                  </button>
+                                ) : (
+                                  <span>{feat.name}</span>
+                                )}
                               </span>
                               {feat.actions && (
                                 <PF2eActionGlyph
@@ -729,32 +756,129 @@ IDIOMAS: ${data.languages || 'Humani'}`;
               )}
             </div>
           </section>
+        </div>
+      )}
 
-          {/* GUIA DO MESTRE */}
-          <section className="p-5 rounded-xl bg-[#0f0e18] border border-[#272438] space-y-4">
-            <h3 className="text-lg font-black text-[#b19ecc] flex items-center gap-2.5 font-serif border-b border-[#272438] pb-2">
-              <Crown className="w-4 h-4 text-[#b19ecc]" />
-              <span>Guia do Mestre & Dicas de Narrativa</span>
+      {/* ═══════════════════════════════════════════════════════════════════════════ */}
+      {/* ABA DO GM (GUIA DO NARRADOR & SEGREDOS ANCESTRAIS) */}
+      {/* ═══════════════════════════════════════════════════════════════════════════ */}
+      {activeMainTab === 'gm' && (
+        <div className="space-y-6 animate-in fade-in duration-150 p-3 sm:p-5 rounded-b-2xl bg-[#0a060d] border border-t-0 border-[#3a1523]">
+          {/* GM Banner Alert */}
+          <div className="p-4 rounded-xl bg-gradient-to-r from-rose-950/80 via-purple-950/40 to-black border border-rose-600/60 shadow-[0_0_20px_rgba(244,63,94,0.15)] flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-900/60 border border-rose-500/80 flex items-center justify-center text-rose-300 shrink-0">
+                <Crown className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-rose-200 flex items-center gap-2">
+                  <span>Guia do Mestre & Segredos de Campanha</span>
+                  <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-rose-900/80 text-rose-300 border border-rose-700">
+                    Apenas GM
+                  </span>
+                </h3>
+                <p className="text-xs text-rose-200/70 mt-0.5">
+                  Informações reservadas para o narrador. Utilize para construir ganchos narrativos, encontros únicos e interpretar NPCs desta ancestralidade.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* INTERPRETAÇÃO & TEMAS */}
+          <section className="p-5 rounded-xl bg-[#110914] border border-[#3a1523] space-y-4">
+            <h3 className="text-lg font-black text-rose-300 flex items-center gap-2.5 font-serif border-b border-[#3a1523] pb-2">
+              <Feather className="w-4 h-4 text-rose-400" />
+              <span>Diretrizes de Interpretação & Conflitos</span>
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-zinc-300 leading-relaxed">
-              {data.gmGuide?.roleplayingNpcs && (
-                <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
-                    Interpretando NPCs da Espécie
-                  </h4>
-                  <RichContentRenderer content={data.gmGuide.roleplayingNpcs} onNavigate={onNavigate} />
+              <div className="p-4 rounded-xl bg-[#170c1b] border border-rose-900/40 min-w-0 break-words space-y-2">
+                <h4 className="text-xs font-bold text-rose-300 uppercase font-mono flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Interpretando NPCs da Espécie</span>
+                </h4>
+                <div className="text-sm text-zinc-300 leading-relaxed">
+                  <RichContentRenderer
+                    content={data.gmGuide?.roleplayingNpcs || 'Nenhuma diretriz de interpretação cadastrada ainda.'}
+                    onNavigate={onNavigate}
+                  />
                 </div>
-              )}
+              </div>
 
-              {data.gmGuide?.themesAndConflicts && (
-                <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
-                    Temas e Conflitos Sugeridos
-                  </h4>
-                  <RichContentRenderer content={data.gmGuide.themesAndConflicts} onNavigate={onNavigate} />
+              <div className="p-4 rounded-xl bg-[#170c1b] border border-rose-900/40 min-w-0 break-words space-y-2">
+                <h4 className="text-xs font-bold text-rose-300 uppercase font-mono flex items-center gap-1.5">
+                  <Scale className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Temas e Conflitos Sugeridos</span>
+                </h4>
+                <div className="text-sm text-zinc-300 leading-relaxed">
+                  <RichContentRenderer
+                    content={data.gmGuide?.themesAndConflicts || 'Nenhum tema narrativo específico cadastrado.'}
+                    onNavigate={onNavigate}
+                  />
                 </div>
-              )}
+              </div>
+            </div>
+          </section>
+
+          {/* SEGREDOS E GANCHOS OCULTOS */}
+          <section className="p-5 rounded-xl bg-[#110914] border border-[#3a1523] space-y-4">
+            <h3 className="text-lg font-black text-amber-300 flex items-center gap-2.5 font-serif border-b border-[#3a1523] pb-2">
+              <Eye className="w-4 h-4 text-amber-400" />
+              <span>Segredos Ancestrais & Ganchos de Campanha</span>
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-zinc-300 leading-relaxed">
+              <div className="p-4 rounded-xl bg-[#170c1b] border border-amber-900/40 min-w-0 break-words space-y-2">
+                <h4 className="text-xs font-bold text-amber-300 uppercase font-mono flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Segredos Ancestrais & Ocultismo</span>
+                </h4>
+                <div className="text-sm text-zinc-300 leading-relaxed">
+                  <RichContentRenderer
+                    content={data.gmGuide?.secretLore || 'Mistérios arcanos e segredos ocultos da linhagem não descritos publicamente.'}
+                    onNavigate={onNavigate}
+                  />
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#170c1b] border border-amber-900/40 min-w-0 break-words space-y-2">
+                <h4 className="text-xs font-bold text-amber-300 uppercase font-mono flex items-center gap-1.5">
+                  <Compass className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Ganchos de Aventura & Encontros</span>
+                </h4>
+                <div className="text-sm text-zinc-300 leading-relaxed">
+                  <RichContentRenderer
+                    content={data.gmGuide?.adventureHooks || 'Ganchos prontos para o mestre envolver personagens desta linhagem em missões e intrigas.'}
+                    onNavigate={onNavigate}
+                  />
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#170c1b] border border-purple-900/40 min-w-0 break-words space-y-2">
+                <h4 className="text-xs font-bold text-purple-300 uppercase font-mono flex items-center gap-1.5">
+                  <ShieldAlert className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Origens Ocultas & Facções Secretas</span>
+                </h4>
+                <div className="text-sm text-zinc-300 leading-relaxed">
+                  <RichContentRenderer
+                    content={data.gmGuide?.trueOrigins || 'Sociedades secretas, facções obscuras ou a verdadeira gênese proibida da espécie.'}
+                    onNavigate={onNavigate}
+                  />
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#170c1b] border border-rose-900/40 min-w-0 break-words space-y-2">
+                <h4 className="text-xs font-bold text-rose-300 uppercase font-mono flex items-center gap-1.5">
+                  <BookOpen className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Notas & Scratchpad do Narrador</span>
+                </h4>
+                <div className="text-sm text-zinc-300 leading-relaxed">
+                  <RichContentRenderer
+                    content={data.gmGuide?.gmNotes || 'Anotações livres do mestre para a campanha atual.'}
+                    onNavigate={onNavigate}
+                  />
+                </div>
+              </div>
             </div>
           </section>
         </div>

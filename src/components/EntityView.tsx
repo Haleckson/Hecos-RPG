@@ -18,6 +18,8 @@ import {
   Heart,
   Zap,
   Lock,
+  Eye,
+  EyeOff,
   Compass,
   ArrowUpRight,
   Printer
@@ -74,6 +76,36 @@ export const EntityView: React.FC<EntityViewProps> = ({
 
         {/* Action buttons on top of banner */}
         <div className="absolute top-4 right-4 flex items-center gap-2">
+          {/* Secret / Visibility Toggle with Eye Icon */}
+          <button
+            type="button"
+            onClick={() => {
+              HecosStorage.toggleEntitySecret(entity.id);
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg backdrop-blur-md border text-xs font-semibold shadow-lg transition-all ${
+              entity.isSecret
+                ? 'bg-zinc-900/90 border-zinc-700 text-zinc-400 hover:text-amber-300 hover:border-amber-500/50'
+                : 'bg-amber-950/80 border-amber-500/60 text-amber-300 hover:text-amber-200 shadow-[0_0_15px_rgba(245,158,11,0.25)]'
+            }`}
+            title={
+              entity.isSecret
+                ? 'Secreto: Apenas o GM pode ver (Clique para tornar Público)'
+                : 'Público: Todos podem ver (Clique para tornar Secreto do GM)'
+            }
+          >
+            {entity.isSecret ? (
+              <>
+                <EyeOff className="w-4 h-4 text-zinc-400" />
+                <span className="hidden sm:inline">Apenas GM</span>
+              </>
+            ) : (
+              <>
+                <Eye className="w-4 h-4 text-amber-400 fill-amber-400/20" />
+                <span className="hidden sm:inline">Público</span>
+              </>
+            )}
+          </button>
+
           <button
             onClick={() => window.print()}
             className="p-2 rounded-lg bg-black/60 backdrop-blur-md border border-zinc-700/60 hover:bg-zinc-800 text-zinc-300 transition-colors"
@@ -117,10 +149,15 @@ export const EntityView: React.FC<EntityViewProps> = ({
               {getCategoryMeta(entity.category).name.toUpperCase()}
             </span>
 
-            {entity.isSecret && (
-              <span className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold bg-rose-950/90 text-rose-300 border border-rose-700 rounded-md">
-                <Lock className="w-3 h-3 text-rose-400" />
-                <span>CONFIDENCIAL (GM ONLY)</span>
+            {entity.isSecret ? (
+              <span className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold bg-zinc-900/90 text-zinc-400 border border-zinc-700 rounded-md">
+                <EyeOff className="w-3.5 h-3.5 text-zinc-400" />
+                <span>CONFIDENCIAL (APENAS GM)</span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold bg-amber-950/70 text-amber-300 border border-amber-600/60 rounded-md shadow-sm">
+                <Eye className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
+                <span>PÚBLICO</span>
               </span>
             )}
           </div>

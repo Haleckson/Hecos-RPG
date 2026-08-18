@@ -142,11 +142,12 @@ export interface AncestryFeat {
 }
 
 export type FeatCategoryType =
-  | 'ancestry'
-  | 'class'
-  | 'skill'
   | 'general'
+  | 'skill'
+  | 'class'
   | 'archetype'
+  | 'ancestry'
+  | 'extras'
   | 'hecos';
 
 export type FeatRarity = 'Comum' | 'Incomum' | 'Raro' | 'Único';
@@ -166,6 +167,7 @@ export type FeatActionCost =
 export interface PF2eFeatAttributes {
   level: number;
   featType: FeatCategoryType;
+  subcategories?: string[];
   rarity: FeatRarity;
   traits: string[];
   actionCost: FeatActionCost;
@@ -184,6 +186,16 @@ export interface PF2eFeatAttributes {
   hecosLore?: string;
   roleplayTips?: string;
   gmNotes?: string;
+}
+
+export interface FeatCategoryFolderInfo {
+  id: FeatCategoryType;
+  name: string;
+  englishName: string;
+  description: string;
+  color: string;
+  accentColor: string;
+  subcategories: string[];
 }
 
 export interface AncestryAttributes {
@@ -259,6 +271,10 @@ export interface AncestryAttributes {
   gmGuide: {
     roleplayingNpcs: string;
     themesAndConflicts: string;
+    secretLore?: string;
+    adventureHooks?: string;
+    trueOrigins?: string;
+    gmNotes?: string;
   };
 }
 
@@ -269,6 +285,7 @@ export interface HecosEntity {
   subtitle?: string;
   category: EntityCategory;
   subcategory?: string;
+  subcategories?: string[];
   tags: string[];
   summary: string;
   content: string; // Markdown content with @mention and block support

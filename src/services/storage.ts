@@ -5,9 +5,15 @@ import {
   deleteEntityFromFirebase,
   loadEntitiesFromFirebase,
   subscribeToEntitiesRealtime,
+  subscribeToDeletedEntitiesRealtime,
   subscribeToMapsRealtime,
   syncMapToFirebase,
-  loadMapsFromFirebase
+  loadMapsFromFirebase,
+  seedDatabaseIfEmpty,
+  subscribeToFeatCategoriesRealtime,
+  syncFeatCategoriesToFirebase,
+  subscribeToSecretFoldersRealtime,
+  syncSecretFoldersToFirebase
 } from './firebase';
 
 const STORAGE_KEYS = {
@@ -16,22 +22,58 @@ const STORAGE_KEYS = {
   MAPS: 'hecos_maps_v1',
   YOUTUBE_TRACKS: 'hecos_youtube_v1',
   DRIVE_RESOURCES: 'hecos_drive_v1',
+  FEAT_CATEGORIES: 'hecos_feat_categories_v1',
   GM_MODE: 'hecos_gm_mode_v1',
   RECENT_PAGES: 'hecos_recent_pages_v1',
+  SECRET_FOLDERS: 'hecos_secret_folders_v1',
+};
+
+export const DEFAULT_FEAT_CATEGORIES_CONFIG: Record<string, string[]> = {
+  general: ['Combate', 'Defesa', 'Mobilidade', 'Sentidos & Percepção', 'Sobrevivência', 'Iniciativa', 'Utilitários'],
+  skill: ['Acrobacia', 'Arcanismo', 'Atletismo', 'Diplomacia', 'Enganação', 'Furtividade', 'Intimidação', 'Ladrongagem', 'Manufatura', 'Medicina', 'Natureza', 'Ocultismo', 'Performance', 'Religião', 'Sociedade', 'Sobrevivência'],
+  class: ['Fighter (Guerreiro)', 'Wizard (Mago)', 'Rogue (Ladino)', 'Cleric (Clérigo)', 'Champion (Campeão)', 'Barbarian (Bárbaro)', 'Bard (Bardo)', 'Druid (Druida)', 'Monk (Monge)', 'Ranger (Patrulheiro)', 'Sorcerer (Feiticeiro)', 'Thaumaturge', 'Guerreiro da Obsidiana'],
+  archetype: ['Caminhante da Penumbra', 'Cavaleiro', 'Assassino', 'Duelista', 'Médico de Batalha', 'Mestre de Armas', 'Arquimago do Eclipse', 'Sentinela do Vazio'],
+  ancestry: ['Humano', 'Elfo', 'Anão', 'Umbralis', 'Corine', 'Gnomo', 'Goblin', 'Golias', 'Meio-Elfo', 'Versátil'],
+  extras: ['Eclipse & Penumbra', 'Bênçãos do Vazio', 'Rituais de Obsidiana', 'Relíquias Vivas', 'Homebrew']
 };
 
 type EntitySubscriber = (entities: HecosEntity[]) => void;
 type MapSubscriber = (maps: InteractiveMapData[]) => void;
+type FeatCategoriesSubscriber = (config: Record<string, string[]>) => void;
 
 export class HecosStorage {
   private static entitiesCache: HecosEntity[] | null = null;
   private static mapsCache: InteractiveMapData[] | null = null;
   private static tracksCache: YouTubeAmbianceTrack[] | null = null;
   private static driveCache: GoogleDriveResource[] | null = null;
+  private static featCategoriesCache: Record<string, string[]> | null = null;
 
   private static entitySubscribers = new Set<EntitySubscriber>();
   private static mapSubscribers = new Set<MapSubscriber>();
+  private static featCategoriesSubscribers = new Set<FeatCategoriesSubscriber>();
   private static isRealtimeInitialized = false;
+
+  /**
+   * Subscribe to feat subcategories configuration
+   */
+  static subscribeFeatCategories(subscriber: FeatCategoriesSubscriber): () => void {
+    subscriber(this.getAllFeatSubcategoriesConfig());
+    this.featCategoriesSubscribers.add(subscriber);
+    return () => {
+      this.featCategoriesSubscribers.delete(subscriber);
+    };
+  }
+
+  private static notifyFeatCategoriesSubscribers(): void {
+    const config = this.getAllFeatSubcategoriesConfig();
+    this.featCategoriesSubscribers.forEach((sub) => {
+      try {
+        sub(config);
+      } catch (e) {
+        console.warn("Error notifying feat categories subscriber:", e);
+      }
+    });
+  }
 
   /**
    * Subscribe to real-time entity updates
@@ -80,13 +122,37 @@ export class HecosStorage {
   }
 
   /**
-   * Setup real-time listener with Firestore
+   * Setup real-time listeners with Firebase Realtime Database
    */
   static ensureRealtimeInitialized(): void {
     if (this.isRealtimeInitialized) return;
     this.isRealtimeInitialized = true;
 
-    // Start real-time Firestore listener for entities
+    // Seed RTDB with initial lore if completely empty
+    seedDatabaseIfEmpty(INITIAL_ENTITIES).catch(() => {});
+
+    // Listen for deleted entities in real-time from other devices
+    subscribeToDeletedEntitiesRealtime((deletedIds) => {
+      if (!deletedIds || deletedIds.length === 0) return;
+      const currentDeleted = this.getDeletedEntityIds();
+      let changed = false;
+      deletedIds.forEach((id) => {
+        if (!currentDeleted.has(id)) {
+          currentDeleted.add(id);
+          currentDeleted.add(id.toLowerCase().trim());
+          changed = true;
+        }
+      });
+      if (changed) {
+        this.saveDeletedEntityIds(currentDeleted);
+        const filtered = this.getEntities();
+        this.entitiesCache = filtered;
+        this.saveEntitiesLocal(filtered);
+        this.notifyEntitySubscribers();
+      }
+    });
+
+    // Start real-time Realtime Database listener for entities
     subscribeToEntitiesRealtime((firebaseList) => {
       if (!firebaseList || firebaseList.length === 0) return;
       const deletedIds = this.getDeletedEntityIds();
@@ -103,7 +169,7 @@ export class HecosStorage {
       firebaseList.forEach((e: any) => {
         if (e && e.id && !this.isEntityDeleted(deletedIds, e.id, e.slug, e.title)) {
           const existing = map.get(e.id);
-          // If not existing or Firebase doc is updated
+          // If not existing or Firebase RTDB node has newer update
           if (!existing || (e.updatedAt && (!existing.updatedAt || e.updatedAt > existing.updatedAt))) {
             map.set(e.id, e);
             hasNewChanges = true;
@@ -119,7 +185,7 @@ export class HecosStorage {
       }
     });
 
-    // Start real-time Firestore listener for maps
+    // Start real-time listener for maps
     subscribeToMapsRealtime((mapsList) => {
       if (!mapsList || mapsList.length === 0) return;
       const current = this.getMaps();
@@ -134,6 +200,29 @@ export class HecosStorage {
       this.mapsCache = merged;
       this.saveMaps(merged);
       this.notifyMapSubscribers();
+    });
+
+    // Start real-time listener for feat categories & subcategories
+    subscribeToFeatCategoriesRealtime((categoriesConfig) => {
+      if (!categoriesConfig || typeof categoriesConfig !== 'object') return;
+      this.featCategoriesCache = categoriesConfig;
+      try {
+        localStorage.setItem(STORAGE_KEYS.FEAT_CATEGORIES, JSON.stringify(categoriesConfig));
+      } catch (e) {
+        console.warn("Error saving categories to local:", e);
+      }
+      this.notifyFeatCategoriesSubscribers();
+    });
+
+    // Start real-time listener for secret folders
+    subscribeToSecretFoldersRealtime((secretFolders) => {
+      if (!Array.isArray(secretFolders)) return;
+      try {
+        localStorage.setItem(STORAGE_KEYS.SECRET_FOLDERS, JSON.stringify(secretFolders));
+      } catch (e) {
+        console.warn("Error saving secret folders to local:", e);
+      }
+      this.notifyEntitySubscribers();
     });
   }
 
@@ -249,7 +338,7 @@ export class HecosStorage {
   }
 
   /**
-   * Try loading from Firebase asynchronously and merge
+   * Try loading from Firebase Realtime Database asynchronously and merge
    */
   static async syncWithFirebase(): Promise<HecosEntity[]> {
     this.ensureRealtimeInitialized();
@@ -274,21 +363,24 @@ export class HecosStorage {
         this.saveEntitiesLocal(merged);
         this.notifyEntitySubscribers();
         return merged;
+      } else {
+        // If RTDB has no data, seed with local data
+        seedDatabaseIfEmpty(this.getEntities()).catch(() => {});
       }
     } catch (e) {
-      console.warn("Firebase sync error:", e);
+      console.warn("Firebase RTDB sync error:", e);
     }
     return this.getEntities();
   }
 
   static getEntityById(idOrSlug: string): HecosEntity | undefined {
-    const clean = idOrSlug.toLowerCase().trim();
+    const clean = (idOrSlug || '').toLowerCase().trim();
     return this.getEntities().find(
       (e) =>
         e.id === idOrSlug ||
         e.slug === idOrSlug ||
-        e.id.toLowerCase().trim() === clean ||
-        e.slug.toLowerCase().trim() === clean
+        (e.id && e.id.toLowerCase().trim() === clean) ||
+        (e.slug && e.slug.toLowerCase().trim() === clean)
     );
   }
 
@@ -327,7 +419,7 @@ export class HecosStorage {
     this.saveEntitiesLocal(this.entitiesCache);
     this.notifyEntitySubscribers();
 
-    // Sync to Firebase in background
+    // Sync to Firebase Realtime Database in background
     syncEntityToFirebase(updatedEntity).catch((err) => console.warn(err));
   }
 
@@ -380,7 +472,7 @@ export class HecosStorage {
     this.saveEntitiesLocal(list);
     this.notifyEntitySubscribers();
 
-    // Sync deletion to Firebase
+    // Sync deletion to Firebase Realtime Database
     deleteEntityFromFirebase(id).catch((err) => console.warn(err));
     if (ent?.id && ent.id !== id) {
       deleteEntityFromFirebase(ent.id).catch((err) => console.warn(err));
@@ -512,6 +604,314 @@ export class HecosStorage {
   }
 
   /**
+   * Feat Categories & Subcategories Management
+   */
+  static getAllFeatSubcategoriesConfig(): Record<string, string[]> {
+    if (this.featCategoriesCache) return this.featCategoriesCache;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.FEAT_CATEGORIES);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === 'object') {
+          // Merge defaults with stored custom subcategories
+          const merged: Record<string, string[]> = {};
+          const allKeys = Array.from(
+            new Set([...Object.keys(DEFAULT_FEAT_CATEGORIES_CONFIG), ...Object.keys(parsed)])
+          );
+
+          for (const key of allKeys) {
+            const defs = DEFAULT_FEAT_CATEGORIES_CONFIG[key] || [];
+            const customs = Array.isArray(parsed[key]) ? parsed[key] : [];
+            const subSet = new Set<string>();
+            defs.forEach((s) => subSet.add(s));
+            customs.forEach((s: string) => {
+              if (typeof s === 'string' && s.trim()) subSet.add(s.trim());
+            });
+            merged[key] = Array.from(subSet);
+          }
+
+          this.featCategoriesCache = merged;
+          return this.featCategoriesCache;
+        }
+      }
+    } catch (e) {
+      console.warn("Error reading feat categories from storage:", e);
+    }
+
+    // Default configuration
+    this.featCategoriesCache = { ...DEFAULT_FEAT_CATEGORIES_CONFIG };
+    this.saveAllFeatSubcategoriesConfig(this.featCategoriesCache);
+    return this.featCategoriesCache;
+  }
+
+  static getFeatSubcategories(categoryKey?: string): string[] {
+    const config = this.getAllFeatSubcategoriesConfig();
+    if (!categoryKey || categoryKey === 'all') {
+      // Return all subcategories combined
+      const all = new Set<string>();
+      Object.values(config).forEach((list) => {
+        list.forEach((sub) => all.add(sub));
+      });
+      return Array.from(all);
+    }
+    return config[categoryKey] || [];
+  }
+
+  static saveAllFeatSubcategoriesConfig(config: Record<string, string[]>): void {
+    this.featCategoriesCache = { ...config };
+    try {
+      localStorage.setItem(STORAGE_KEYS.FEAT_CATEGORIES, JSON.stringify(config));
+    } catch (e) {
+      console.warn("Error saving feat categories config:", e);
+    }
+    this.notifyFeatCategoriesSubscribers();
+    syncFeatCategoriesToFirebase(config).catch(() => {});
+  }
+
+  static addFeatSubcategory(categoryKey: string, subcategoryName: string): boolean {
+    const trimmed = subcategoryName.trim();
+    if (!trimmed || !categoryKey) return false;
+    const config = this.getAllFeatSubcategoriesConfig();
+    const list = config[categoryKey] ? [...config[categoryKey]] : [];
+    if (list.includes(trimmed)) return false;
+    list.push(trimmed);
+    config[categoryKey] = list;
+    this.saveAllFeatSubcategoriesConfig(config);
+    return true;
+  }
+
+  static renameFeatSubcategory(categoryKey: string, oldName: string, newName: string): boolean {
+    const trimmedNew = newName.trim();
+    if (!trimmedNew || !categoryKey || oldName === trimmedNew) return false;
+    const config = this.getAllFeatSubcategoriesConfig();
+    const list = config[categoryKey] ? [...config[categoryKey]] : [];
+    const idx = list.indexOf(oldName);
+    if (idx === -1) return false;
+    list[idx] = trimmedNew;
+    config[categoryKey] = list;
+    this.saveAllFeatSubcategoriesConfig(config);
+
+    // Also update all entities that had this subcategory
+    const entities = this.getEntities();
+    let changedEntities = false;
+    entities.forEach((ent) => {
+      if (ent.category === 'feat' || ent.featData) {
+        let updated = false;
+        let subcats = ent.featData?.subcategories || ent.subcategories || [];
+        if (subcats.includes(oldName)) {
+          subcats = subcats.map((s) => (s === oldName ? trimmedNew : s));
+          if (ent.featData) ent.featData.subcategories = subcats;
+          ent.subcategories = subcats;
+          updated = true;
+        }
+        if (ent.subcategory === oldName) {
+          ent.subcategory = trimmedNew;
+          updated = true;
+        }
+        if (updated) {
+          HecosStorage.saveEntity(ent);
+          changedEntities = true;
+        }
+      }
+    });
+
+    return true;
+  }
+
+  static deleteFeatSubcategory(categoryKey: string, subcategoryName: string): boolean {
+    if (!categoryKey || !subcategoryName) return false;
+    const config = this.getAllFeatSubcategoriesConfig();
+    if (!config[categoryKey]) return false;
+    config[categoryKey] = config[categoryKey].filter((s) => s !== subcategoryName);
+    this.saveAllFeatSubcategoriesConfig(config);
+
+    // Also remove from affected entities
+    const entities = this.getEntities();
+    entities.forEach((ent) => {
+      if (ent.category === 'feat' || ent.featData) {
+        let updated = false;
+        let subcats = ent.featData?.subcategories || ent.subcategories || [];
+        if (subcats.includes(subcategoryName)) {
+          subcats = subcats.filter((s) => s !== subcategoryName);
+          if (ent.featData) ent.featData.subcategories = subcats;
+          ent.subcategories = subcats;
+          updated = true;
+        }
+        if (ent.subcategory === subcategoryName) {
+          ent.subcategory = subcats[0] || '';
+          updated = true;
+        }
+        if (updated) {
+          HecosStorage.saveEntity(ent);
+        }
+      }
+    });
+
+    return true;
+  }
+
+  /**
+   * Assign or update subcategories for a given feat entity
+   */
+  static assignFeatSubcategories(featId: string, subcategories: string[]): boolean {
+    const ent = this.getEntityById(featId);
+    if (!ent) return false;
+    const cleanSubcats = Array.from(new Set(subcategories.map((s) => s.trim()).filter(Boolean)));
+    if (!ent.featData) {
+      ent.featData = {
+        level: 1,
+        featType: 'general',
+        rarity: 'Comum',
+        traits: [],
+        actionCost: '1',
+        prerequisites: '',
+        description: ent.content || ''
+      };
+    }
+    ent.featData.subcategories = cleanSubcats;
+    ent.subcategories = cleanSubcats;
+    ent.subcategory = cleanSubcats[0] || ent.subcategory || '';
+    
+    // Also add subcategories to tags if helpful
+    const currentTags = new Set(ent.tags || []);
+    cleanSubcats.forEach((s) => currentTags.add(s));
+    ent.tags = Array.from(currentTags);
+
+    this.saveEntity(ent);
+    return true;
+  }
+
+  /**
+   * Toggle a subcategory on a feat
+   */
+  static toggleFeatSubcategory(featId: string, subcategoryName: string): boolean {
+    const ent = this.getEntityById(featId);
+    if (!ent) return false;
+    const current = ent.featData?.subcategories || ent.subcategories || [];
+    const set = new Set(current);
+    if (set.has(subcategoryName)) {
+      set.delete(subcategoryName);
+    } else {
+      set.add(subcategoryName);
+    }
+    return this.assignFeatSubcategories(featId, Array.from(set));
+  }
+
+  /**
+   * Get set of secret folders / subcategories
+   */
+  static getSecretFolders(): Set<string> {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.SECRET_FOLDERS);
+      if (stored) {
+        return new Set(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.warn('Error reading secret folders:', e);
+    }
+    return new Set<string>();
+  }
+
+  /**
+   * Check if a folder/subcategory is marked secret (GM only)
+   */
+  static isFolderSecret(folderOrSubcategory: string): boolean {
+    if (!folderOrSubcategory) return false;
+    const secrets = this.getSecretFolders();
+    return secrets.has(folderOrSubcategory.trim().toLowerCase()) || secrets.has(folderOrSubcategory.trim());
+  }
+
+  /**
+   * Toggle secret state for a folder/subcategory
+   */
+  static toggleFolderSecret(folderOrSubcategory: string): boolean {
+    if (!folderOrSubcategory) return false;
+    const trimmed = folderOrSubcategory.trim();
+    const secrets = this.getSecretFolders();
+    const isSec = secrets.has(trimmed) || secrets.has(trimmed.toLowerCase());
+    if (isSec) {
+      secrets.delete(trimmed);
+      secrets.delete(trimmed.toLowerCase());
+    } else {
+      secrets.add(trimmed);
+    }
+    try {
+      localStorage.setItem(STORAGE_KEYS.SECRET_FOLDERS, JSON.stringify(Array.from(secrets)));
+    } catch (e) {
+      console.warn('Error saving secret folders:', e);
+    }
+    this.notifyEntitySubscribers();
+    syncSecretFoldersToFirebase(Array.from(secrets)).catch(() => {});
+    return !isSec;
+  }
+
+  /**
+   * Set secret state for a folder
+   */
+  static setFolderSecret(folderOrSubcategory: string, isSecret: boolean): void {
+    if (!folderOrSubcategory) return;
+    const trimmed = folderOrSubcategory.trim();
+    const secrets = this.getSecretFolders();
+    if (isSecret) {
+      secrets.add(trimmed);
+    } else {
+      secrets.delete(trimmed);
+      secrets.delete(trimmed.toLowerCase());
+    }
+    try {
+      localStorage.setItem(STORAGE_KEYS.SECRET_FOLDERS, JSON.stringify(Array.from(secrets)));
+    } catch (e) {
+      console.warn('Error saving secret folders:', e);
+    }
+    this.notifyEntitySubscribers();
+    syncSecretFoldersToFirebase(Array.from(secrets)).catch(() => {});
+  }
+
+  /**
+   * Toggle entity secret status directly
+   */
+  static toggleEntitySecret(entityId: string): boolean {
+    const ent = this.getEntityById(entityId);
+    if (!ent) return false;
+    ent.isSecret = !ent.isSecret;
+    this.saveEntity(ent);
+    return !!ent.isSecret;
+  }
+
+  /**
+   * Get GM Mode state
+   */
+  static getGmMode(): boolean {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.GM_MODE);
+      return stored === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Set GM Mode state
+   */
+  static setGmMode(enabled: boolean): void {
+    try {
+      localStorage.setItem(STORAGE_KEYS.GM_MODE, enabled ? 'true' : 'false');
+    } catch (e) {
+      console.warn('Error saving GM mode:', e);
+    }
+  }
+
+  /**
+   * Toggle GM Mode state
+   */
+  static toggleGmMode(): boolean {
+    const current = this.getGmMode();
+    const next = !current;
+    this.setGmMode(next);
+    return next;
+  }
+
+  /**
    * Tags computation
    */
   static getAllTags(): TagInfo[] {
@@ -588,5 +988,3 @@ export class HecosStorage {
     return false;
   }
 }
-
-

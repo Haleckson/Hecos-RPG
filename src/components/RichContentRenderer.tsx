@@ -1,6 +1,7 @@
 import React from 'react';
 import { renderContentWithMentions } from './MentionBadge';
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
+import { HecosStorage } from '../services/storage';
 import {
   Info,
   ShieldAlert,
@@ -8,6 +9,8 @@ import {
   Coins,
   TreePine,
   Lock,
+  EyeOff,
+  Eye,
   ChevronRight,
   CheckSquare,
   Square,
@@ -20,12 +23,14 @@ interface RichContentRendererProps {
   content: string;
   onNavigate: (entityId: string) => void;
   className?: string;
+  isGmMode?: boolean;
 }
 
 /**
  * Robust Rich Markdown and HTML Renderer for Hecos Codex
  * Supports:
  * - Notion Callouts (Cyan Info, Mauve Mystical, Bordeaux Hazard, Gold Treasure, Emerald Wild, GM Secret)
+ * - GM Secret Lines & Blocks (:::gm ... :::, [gm-secret]...[/gm-secret], <div class="gm-secret">...</div>)
  * - Accordion / Toggle lists (<details><summary>)
  * - Interactive-styled Checklists (- [ ] and - [x])
  * - Headers (H1-H4) with glowing accents and Cinzel display font
@@ -41,10 +46,13 @@ export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
   content,
   onNavigate,
   className = '',
+  isGmMode: propIsGmMode,
 }) => {
   if (!content || !content.trim()) {
     return <p className="text-zinc-500 italic text-sm">Nenhum conteúdo adicionado ainda.</p>;
   }
+
+  const effectiveGmMode = propIsGmMode !== undefined ? propIsGmMode : HecosStorage.getGmMode();
 
   // Helper to parse line-by-line blocks
   const renderBlocks = () => {
@@ -54,6 +62,112 @@ export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
 
     while (i < lines.length) {
       const line = lines[i];
+
+      // 0. GM Secret Direct Blocks (:::gm ... :::, :::segredo ... :::, [gm-secret]...[/gm-secret], <div class="gm-secret">...</div>)
+      if (
+        line.trim().startsWith(':::gm') ||
+        line.trim().startsWith(':::segredo') ||
+        line.trim().startsWith(':::secret') ||
+        line.trim().startsWith('[gm-secret]') ||
+        line.trim().startsWith('[secret-line]') ||
+        line.trim().startsWith('[segredo]') ||
+        line.includes('class="gm-secret"') ||
+        line.includes("class='gm-secret'")
+      ) {
+        let secretLines: string[] = [];
+        let j = i + 1;
+        const isTripleColon = line.trim().startsWith(':::');
+        const isTagBracket = line.trim().startsWith('[gm-secret]') || line.trim().startsWith('[secret-line]') || line.trim().startsWith('[segredo]');
+        const isHtmlDiv = line.includes('class="gm-secret"') || line.includes("class='gm-secret'");
+
+        if (isTripleColon) {
+          while (j < lines.length && !lines[j].trim().startsWith(':::')) {
+            secretLines.push(lines[j]);
+            j++;
+          }
+          if (j < lines.length) j++; // Skip closing :::
+        } else if (isTagBracket) {
+          while (
+            j < lines.length &&
+            !lines[j].includes('[/gm-secret]') &&
+            !lines[j].includes('[/secret-line]') &&
+            !lines[j].includes('[/segredo]')
+          ) {
+            secretLines.push(lines[j]);
+            j++;
+          }
+          if (j < lines.length) j++; // Skip closing tag
+        } else if (isHtmlDiv) {
+          while (j < lines.length && !lines[j].includes('</div>')) {
+            secretLines.push(lines[j]);
+            j++;
+          }
+          if (j < lines.length) j++;
+        }
+
+        const secretBody = secretLines.join('\n').trim();
+
+        // If in GM Mode, render with distinctive amber/hazard GM secret banner
+        if (effectiveGmMode) {
+          elements.push(
+            <div
+              key={`gm-secret-block-${i}`}
+              className="my-4 p-4 rounded-xl bg-[#170c18] border-2 border-amber-500/80 shadow-[0_0_20px_rgba(245,158,11,0.2)] text-sm leading-relaxed relative overflow-hidden"
+            >
+              <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-amber-500/30">
+                <div className="flex items-center gap-2 text-amber-300 font-bold text-xs uppercase tracking-wider font-mono">
+                  <EyeOff className="w-4 h-4 text-amber-400" />
+                  <span>Entrada Secreta — Visível Apenas para o GM</span>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/50 font-mono font-bold">
+                  CONFIDENCIAL GM
+                </span>
+              </div>
+              <div className="text-zinc-200 space-y-2">
+                <RichContentRenderer
+                  content={secretBody || 'Linha secreta em branco.'}
+                  onNavigate={onNavigate}
+                  isGmMode={true}
+                />
+              </div>
+            </div>
+          );
+        }
+        // If not in GM mode (Player view), it is completely omitted / hidden!
+        i = j;
+        continue;
+      }
+
+      // Single line inline secret: 🔒 [GM]: ... or [SEGREDO GM]: ... or [GM_SECRET]: ...
+      const isSingleLineSecret =
+        line.trim().startsWith('🔒 [GM]:') ||
+        line.trim().startsWith('[GM]:') ||
+        line.trim().startsWith('[SEGREDO GM]:') ||
+        line.trim().startsWith('[GM_SECRET]:');
+
+      if (isSingleLineSecret) {
+        if (effectiveGmMode) {
+          const cleanText = line
+            .replace(/^🔒?\s*\[(GM|SEGREDO GM|GM_SECRET)\]:\s*/i, '')
+            .trim();
+          elements.push(
+            <div
+              key={`gm-line-${i}`}
+              className="my-2.5 p-3 rounded-lg bg-[#190c19] border border-amber-500/60 shadow-[0_0_12px_rgba(245,158,11,0.15)] flex items-start gap-2.5 text-xs text-amber-200"
+            >
+              <EyeOff className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <span className="font-bold text-amber-400 font-mono text-[10px] uppercase block mb-0.5">
+                  [Nota Secreta GM]
+                </span>
+                <span className="text-zinc-200">{renderContentWithMentions(cleanText, onNavigate)}</span>
+              </div>
+            </div>
+          );
+        }
+        i++;
+        continue;
+      }
 
       // 1. YouTube player block: <div class="youtube-player" data-video="VIDEO_ID">Title</div>
       if (line.includes('class="youtube-player"') || line.includes("class='youtube-player'")) {

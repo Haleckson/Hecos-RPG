@@ -10,7 +10,8 @@ export type ActionGlyphType =
   | 'reaction';
 
 interface PF2eActionGlyphProps {
-  type: ActionGlyphType | string;
+  type?: ActionGlyphType | string | number;
+  action?: ActionGlyphType | string | number;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
   showTooltip?: boolean;
@@ -18,11 +19,12 @@ interface PF2eActionGlyphProps {
 
 export const PF2eActionGlyph: React.FC<PF2eActionGlyphProps> = ({
   type,
+  action,
   size = 'md',
   className = '',
   showTooltip = true,
 }) => {
-  const normalized = normalizeActionType(type);
+  const normalized = normalizeActionType(type ?? action);
   const safeSize: 'sm' | 'md' | 'lg' = size === 'sm' || size === 'lg' ? size : 'md';
 
   const sizeClasses = {
@@ -91,7 +93,7 @@ export const PF2eActionGlyph: React.FC<PF2eActionGlyphProps> = ({
         };
       default:
         return {
-          label: 'Ação',
+          label: '1 Ação',
           symbol: '◆',
           color: '#4FEFEF',
           bgColor: 'rgba(79, 239, 239, 0.15)',
@@ -116,8 +118,8 @@ export const PF2eActionGlyph: React.FC<PF2eActionGlyphProps> = ({
   );
 };
 
-function normalizeActionType(type: string): ActionGlyphType {
-  const t = type.toLowerCase().trim().replace(/_/g, '-');
+function normalizeActionType(type?: any): ActionGlyphType {
+  const t = String(type ?? '').toLowerCase().trim().replace(/_/g, '-');
   if (t === '1' || t === '1-action' || t === 'one-action' || t === 'action' || t === 'uma-acao') {
     return '1-action';
   }
@@ -144,7 +146,7 @@ function normalizeActionType(type: string): ActionGlyphType {
   ) {
     return '1-to-3-actions';
   }
-  if (t === 'free' || t === 'free-action' || t === 'acao-livre') {
+  if (t === 'free' || t === 'free-action' || t === 'acao-livre' || t === 'livre') {
     return 'free-action';
   }
   if (t === 'reaction' || t === 'reacao' || t === 'react') {

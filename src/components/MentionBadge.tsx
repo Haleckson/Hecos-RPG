@@ -15,15 +15,15 @@ export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNa
   const [isHovered, setIsHovered] = useState(false);
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
 
-  const cleanSlug = entityIdOrSlug.replace(/^@/, '').toLowerCase().trim();
+  const cleanSlug = String(entityIdOrSlug || '').replace(/^@/, '').toLowerCase().trim();
   const allEntities = HecosStorage.getEntities();
   
   // Match by id, slug, or title
   const entity = allEntities.find(
-    e => e.id.toLowerCase() === cleanSlug ||
-         e.slug.toLowerCase() === cleanSlug ||
-         e.title.toLowerCase() === cleanSlug ||
-         e.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') === cleanSlug
+    e => (e.id || '').toLowerCase() === cleanSlug ||
+         (e.slug || '').toLowerCase() === cleanSlug ||
+         (e.title || '').toLowerCase() === cleanSlug ||
+         (e.title || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') === cleanSlug
   );
 
   const handleMouseEnter = (e: React.MouseEvent) => {

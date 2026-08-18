@@ -63,7 +63,7 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
     return parseAncestryFromContent(entity.title, entity.content || '', entity.ancestryData);
   });
 
-  const [activeMainTab, setActiveMainTab] = useState<'mechanics' | 'lore'>('mechanics');
+  const [activeMainTab, setActiveMainTab] = useState<'mechanics' | 'lore' | 'gm'>('mechanics');
   const [activeFeatRank, setActiveFeatRank] = useState<1 | 5 | 9 | 13 | 17>(1);
   const [isFeatPickerOpen, setIsFeatPickerOpen] = useState(false);
 
@@ -138,7 +138,9 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
   }, [allCurrentFeats]);
 
   const alreadyAddedFeatNames = useMemo(() => {
-    return allCurrentFeats.map((f) => f.name.trim().toLowerCase()).filter(Boolean);
+    return allCurrentFeats
+      .map((f) => (f?.name || '').trim().toLowerCase())
+      .filter(Boolean);
   }, [allCurrentFeats]);
 
   const handleSelectFeatsFromModal = (
@@ -160,10 +162,11 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
       selectedList.forEach(({ entity: featEntity, parsedFeat, targetRank }) => {
         const rankKey = `rank${targetRank}` as keyof typeof newFeats;
         // Check if already in this rank
+        const targetTitle = (featEntity.title || '').trim().toLowerCase();
         const existsInRank = newFeats[rankKey].some(
           (f) =>
             (f.featEntityId && f.featEntityId === featEntity.id) ||
-            f.name.trim().toLowerCase() === featEntity.title.trim().toLowerCase()
+            ((f?.name || '').trim().toLowerCase() === targetTitle && targetTitle.length > 0)
         );
 
         if (!existsInRank) {
@@ -564,7 +567,7 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
         </div>
 
         {/* ═══════════════════════════════════════════════════════════════════════════ */}
-        {/* NAVEGAÇÃO ENTRE AS DUAS ABAS: MECÂNICAS & LORE */}
+        {/* NAVEGAÇÃO ENTRE AS TRÊS ABAS: MECÂNICAS, LORE & ABA GM */}
         {/* ═══════════════════════════════════════════════════════════════════════════ */}
         <div className="flex border-b border-zinc-800 bg-[#14121d] rounded-t-xl overflow-hidden p-1 gap-1">
           <button
@@ -578,7 +581,7 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
           >
             <Swords className="w-4 h-4 text-[#74b6c2]" />
             <span>Mecânicas de Jogo</span>
-            <span className="hidden sm:inline text-[10px] px-2 py-0.5 rounded-full bg-[#142229] text-[#74b6c2] font-mono">
+            <span className="hidden md:inline text-[10px] px-2 py-0.5 rounded-full bg-[#142229] text-[#74b6c2] font-mono">
               Heranças & Talentos
             </span>
           </button>
@@ -593,9 +596,25 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
             }`}
           >
             <BookOpen className="w-4 h-4 text-[#b19ecc]" />
-            <span>Lore & Cenário de Hecos</span>
-            <span className="hidden sm:inline text-[10px] px-2 py-0.5 rounded-full bg-[#1e172a] text-[#b19ecc] font-mono">
-              Cultura, Sociedade & Mestre
+            <span>Lore & Cenário</span>
+            <span className="hidden md:inline text-[10px] px-2 py-0.5 rounded-full bg-[#1e172a] text-[#b19ecc] font-mono">
+              Cultura & Sociedade
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveMainTab('gm')}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 font-extrabold text-xs sm:text-sm tracking-wide rounded-lg transition-all cursor-pointer ${
+              activeMainTab === 'gm'
+                ? 'bg-[#2e1320] text-[#f43f5e] border border-[#701a2d] shadow-[0_0_15px_rgba(244,63,94,0.2)]'
+                : 'text-zinc-400 hover:text-rose-300 hover:bg-[#1a0f19]'
+            }`}
+          >
+            <Crown className="w-4 h-4 text-[#f43f5e]" />
+            <span>Aba GM</span>
+            <span className="hidden md:inline text-[10px] px-2 py-0.5 rounded-full bg-[#3b1220] text-rose-300 font-mono font-bold">
+              Segredos & Narrador
             </span>
           </button>
         </div>
@@ -1337,19 +1356,45 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
                 />
               </div>
             </div>
+          </div>
+        )}
 
-            {/* GUIA DO MESTRE E NARRATIVA */}
-            <div className="p-5 sm:p-6 rounded-2xl bg-[#13111b] border border-[#493b61]/60 space-y-4">
-              <div className="flex items-center gap-2.5 pb-3 border-b border-zinc-800/80">
-                <div className="p-1.5 rounded-lg bg-[#241e33] text-[#b19ecc] border border-[#493b61]">
-                  <Crown className="w-4 h-4" />
+        {/* ═══════════════════════════════════════════════════════════════════════════ */}
+        {/* CONTEÚDO DA ABA: ABA GM (NOTAS & SEGREDOS DO MESTRE) */}
+        {/* ═══════════════════════════════════════════════════════════════════════════ */}
+        {activeMainTab === 'gm' && (
+          <div className="space-y-6">
+            <div className="p-4 rounded-xl bg-gradient-to-r from-rose-950/70 via-purple-950/40 to-black border border-rose-600/50 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-rose-900/60 border border-rose-500/80 flex items-center justify-center text-rose-300 shrink-0">
+                  <Crown className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-[#b19ecc]">
-                    Guia do Mestre & Dicas de Narrativa
+                  <h4 className="text-sm font-bold text-rose-200 flex items-center gap-2">
+                    <span>Aba do Mestre (Conteúdo Reservado e Segredos)</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-900 text-rose-300 border border-rose-700">
+                      GM ONLY
+                    </span>
+                  </h4>
+                  <p className="text-xs text-rose-200/70">
+                    Estes campos são destinados exclusivamente para a condução do Narrador. Jogadores não devem ver estas informações a menos que você as revele na mesa.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* SEÇÃO: INTERPRETAÇÃO & TEMAS */}
+            <div className="p-5 sm:p-6 rounded-2xl bg-[#13111b] border border-rose-900/40 space-y-4">
+              <div className="flex items-center gap-2.5 pb-3 border-b border-zinc-800/80">
+                <div className="p-1.5 rounded-lg bg-[#2e1320] text-rose-300 border border-rose-800">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-rose-200">
+                    Interpretação de NPCs & Temas Narrativos
                   </h3>
                   <p className="text-xs text-zinc-400">
-                    Dicas de interpretação para NPCs e ganchos dramáticos para campanhas.
+                    Como representar personagens desta espécie e temáticas sugeridas para aventuras.
                   </p>
                 </div>
               </div>
@@ -1359,8 +1404,8 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
                   label="Interpretando NPCs da Espécie"
                   value={data.gmGuide?.roleplayingNpcs || ''}
                   onChange={(val) => updateNestedField('gmGuide', 'roleplayingNpcs', val)}
-                  placeholder="Dicas de maneirismos, entonação de voz e presença física dos personagens."
-                  rows={3}
+                  placeholder="Dicas de maneirismos, postura, tom de voz e motivações comuns de NPCs desta ancestralidade..."
+                  rows={4}
                   onNavigate={onNavigate}
                 />
 
@@ -1368,8 +1413,63 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
                   label="Temas e Conflitos Sugeridos"
                   value={data.gmGuide?.themesAndConflicts || ''}
                   onChange={(val) => updateNestedField('gmGuide', 'themesAndConflicts', val)}
-                  placeholder="Quais tipos de histórias combinam melhor? Drama político, horror biológico ou exploração épica?"
-                  rows={3}
+                  placeholder="Quais tipos de histórias combinam melhor? Conflitos morais, intrigas tribais, preconceitos históricos..."
+                  rows={4}
+                  onNavigate={onNavigate}
+                />
+              </div>
+            </div>
+
+            {/* SEÇÃO: SEGREDOS & GANCHOS OCULTOS */}
+            <div className="p-5 sm:p-6 rounded-2xl bg-[#13111b] border border-amber-900/40 space-y-4">
+              <div className="flex items-center gap-2.5 pb-3 border-b border-zinc-800/80">
+                <div className="p-1.5 rounded-lg bg-[#2b1f13] text-amber-300 border border-amber-800">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-amber-200">
+                    Segredos Ancestrais & Ganchos de Campanha
+                  </h3>
+                  <p className="text-xs text-zinc-400">
+                    Mistérios ocultos, verdades não reveladas e sementes de missões para o mestre.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <ReferenceField
+                  label="Segredos Ancestrais & Ocultismo"
+                  value={data.gmGuide?.secretLore || ''}
+                  onChange={(val) => updateNestedField('gmGuide', 'secretLore', val)}
+                  placeholder="Segredos proibidos da espécie, pactos arcanos esquecidos ou maldições de sangue..."
+                  rows={4}
+                  onNavigate={onNavigate}
+                />
+
+                <ReferenceField
+                  label="Ganchos de Aventura & Encontros"
+                  value={data.gmGuide?.adventureHooks || ''}
+                  onChange={(val) => updateNestedField('gmGuide', 'adventureHooks', val)}
+                  placeholder="Ganchos de missões prontos: um ritual interrompido, um herdeiro desaparecido, relíquia ancestral..."
+                  rows={4}
+                  onNavigate={onNavigate}
+                />
+
+                <ReferenceField
+                  label="Origens Ocultas & Facções Secretas"
+                  value={data.gmGuide?.trueOrigins || ''}
+                  onChange={(val) => updateNestedField('gmGuide', 'trueOrigins', val)}
+                  placeholder="Origem real da espécie (se diferente da crença popular), facções sombrias e conspirações internas..."
+                  rows={4}
+                  onNavigate={onNavigate}
+                />
+
+                <ReferenceField
+                  label="Anotações Livres & Scratchpad do Narrador"
+                  value={data.gmGuide?.gmNotes || ''}
+                  onChange={(val) => updateNestedField('gmGuide', 'gmNotes', val)}
+                  placeholder="Ideias rápidas, estatísticas de NPCs únicos para a mesa, lembretes de trama..."
+                  rows={4}
                   onNavigate={onNavigate}
                 />
               </div>
@@ -1383,9 +1483,11 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
         isOpen={isFeatPickerOpen}
         onClose={() => setIsFeatPickerOpen(false)}
         onSelectFeats={handleSelectFeatsFromModal}
-        alreadySelectedFeatIds={alreadyAddedFeatEntityIds}
-        alreadySelectedFeatNames={alreadyAddedFeatNames}
-        initialTargetRank={activeFeatRank}
+        alreadyAddedFeatEntityIds={alreadyAddedFeatEntityIds}
+        alreadyAddedFeatNames={alreadyAddedFeatNames}
+        defaultRank={activeFeatRank}
+        ancestryName={title}
+        onNavigate={onNavigate}
       />
     </div>
   );

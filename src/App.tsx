@@ -15,6 +15,8 @@ import { AoNSearchModal } from './components/AoNSearchModal';
 import { ConfirmModal } from './components/ConfirmModal';
 import { FirebaseStatusModal } from './components/FirebaseStatusModal';
 import { NewArticleModal } from './components/NewArticleModal';
+import { FeatExplorer } from './components/FeatExplorer';
+import { FeatCategoryType } from './types';
 import { getEmptyAncestryData, serializeAncestryToHTML } from './utils/ancestrySerializer';
 import { getEmptyFeatData, serializeFeatToHTML } from './utils/featSerializer';
 import {
@@ -47,7 +49,9 @@ import {
   Check,
   Trash2,
   Radio,
-  Flame
+  Flame,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 export function App() {
@@ -187,6 +191,35 @@ export function App() {
       };
     }
 
+    setEditingEntity(newEnt);
+    setActiveView('edit');
+  };
+
+  const handleCreateFeatDirectly = (presetCategory?: FeatCategoryType, presetSubcategory?: string) => {
+    const newId = 'entity-' + Date.now();
+    const blankFeat = getEmptyFeatData();
+    if (presetCategory) {
+      blankFeat.featType = presetCategory;
+    }
+    if (presetSubcategory) {
+      blankFeat.subcategories = [presetSubcategory];
+    }
+    const newEnt: HecosEntity = {
+      id: newId,
+      slug: 'novo-talento-' + Date.now(),
+      title: 'Novo Talento',
+      subtitle: '',
+      category: 'feat',
+      subcategory: presetSubcategory || '',
+      subcategories: presetSubcategory ? [presetSubcategory] : [],
+      summary: '',
+      content: serializeFeatToHTML('Novo Talento', blankFeat),
+      featData: blankFeat,
+      tags: ['talento', 'pf2e', ...(presetSubcategory ? [presetSubcategory] : [])],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      isSecret: false,
+    };
     setEditingEntity(newEnt);
     setActiveView('edit');
   };
@@ -487,7 +520,7 @@ export function App() {
           <div
             onClick={() => setIsFirebaseModalOpen(true)}
             className="flex items-center justify-between px-3 py-2 rounded-xl bg-black/40 hover:bg-zinc-900 border border-zinc-800 hover:border-emerald-500/50 cursor-pointer transition-all group"
-            title="Ver status detalhado da conexão com Firebase Firestore"
+            title="Ver status detalhado da conexão com Firebase Realtime Database"
           >
             <div className="flex items-center gap-2">
               <span className="relative flex h-2 w-2">
@@ -501,11 +534,11 @@ export function App() {
                 )}
               </span>
               <span className="text-[11px] font-medium text-zinc-300 group-hover:text-emerald-300 transition-colors">
-                {firebaseStatus.status === 'connected' ? 'Firebase Realtime Ativo' : 'Modo Local / Offline'}
+                {firebaseStatus.status === 'connected' ? 'Realtime DB Conectado' : 'Modo Local / Offline'}
               </span>
             </div>
             <span className="text-[10px] text-zinc-500 font-mono group-hover:text-zinc-300">
-              {firebaseStatus.projectId || 'Firestore'}
+              {firebaseStatus.projectId || 'RTDB'}
             </span>
           </div>
 
@@ -514,7 +547,7 @@ export function App() {
             <button
               onClick={handleManualSync}
               className="flex items-center gap-1 hover:text-cyan-300 transition-colors"
-              title="Sincronizar com Firebase Firestore"
+              title="Sincronizar com Firebase Realtime Database"
             >
               <RefreshCw className={`w-3 h-3 ${syncStatus === 'syncing' ? 'animate-spin text-cyan-400' : ''}`} />
               <span>{syncStatus === 'synced' ? 'Sincronizado' : 'Sincronizar Cloud'}</span>
@@ -561,8 +594,28 @@ export function App() {
             </div>
           </div>
 
-          {/* Quick Utility Tools (AoN, Dice, Music, Drive, New Article) */}
+          {/* Quick Utility Tools (GM Toggle, AoN, Dice, Music, Drive, New Article) */}
           <div className="flex items-center gap-2">
+            {/* Quick GM Mode Toggle */}
+            <button
+              onClick={() => setIsGmMode(!isGmMode)}
+              className={`p-2 sm:px-3 sm:py-1.5 rounded-xl border font-bold text-xs transition-all flex items-center gap-1.5 ${
+                isGmMode
+                  ? 'bg-rose-950/80 border-rose-600/70 text-rose-200 shadow-[0_0_12px_rgba(225,29,72,0.25)]'
+                  : 'bg-[#110e19] hover:bg-[#1a1427] border-zinc-800 text-zinc-400 hover:text-zinc-200'
+              }`}
+              title={isGmMode ? 'Modo Mestre Ativo (Segredos Visíveis)' : 'Modo Jogador (Segredos Ocultos)'}
+            >
+              {isGmMode ? (
+                <Unlock className="w-3.5 h-3.5 text-rose-400" />
+              ) : (
+                <Lock className="w-3.5 h-3.5 text-zinc-500" />
+              )}
+              <span className="hidden sm:inline text-xs font-semibold">
+                {isGmMode ? 'GM' : 'Jogador'}
+              </span>
+            </button>
+
             {/* Archives of Nethys (2e.aonprd.com) Quick Reference */}
             <button
               onClick={() => setIsAoNOpen(true)}
@@ -667,140 +720,183 @@ export function App() {
             />
           )}
 
-          {/* VIEW: Category Entities Grid View (Default) */}
+          {/* VIEW: Category Entities Grid View (Default) OR FeatExplorer for Feats */}
           {activeView === 'entities' && (
-            <div className="space-y-6">
-              {/* Category Banner & Search */}
-              <div className="flex flex-wrap items-center justify-between gap-4 bg-[#09080d] p-6 rounded-2xl border border-zinc-800/80 shadow-xl">
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-black text-zinc-100">
-                    {activeSubcategory || getCategoryMeta(selectedCategoryKey).name}
-                  </h2>
-                  <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-                    {getCategoryMeta(selectedCategoryKey, activeSubcategory || undefined).description ||
-                      'Gerencie todas as entradas e vínculos cadastrados neste menu de Hecos.'}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <div className="relative flex-1 sm:w-64">
-                    <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      value={searchFilter}
-                      onChange={(e) => setSearchFilter(e.target.value)}
-                      placeholder="Filtrar por nome ou tag..."
-                      className="w-full pl-9 pr-3 py-1.5 text-xs bg-black/60 border border-zinc-800 rounded-xl text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-cyan-400"
-                    />
+            selectedCategoryKey === 'feat' || activeSubcategory === 'Talentos' ? (
+              <FeatExplorer
+                entities={entities}
+                onSelectEntity={handleNavigateEntity}
+                onEditEntity={(id) => {
+                  const ent = entities.find((e) => e.id === id || e.slug === id);
+                  if (ent) {
+                    setEditingEntity(ent);
+                    setActiveView('edit');
+                  }
+                }}
+                onCreateFeat={handleCreateFeatDirectly}
+                onDeleteEntity={handleDeleteEntity}
+                onTagClick={(tag) => {
+                  setSelectedTagFilter(tag);
+                  setActiveView('tags');
+                }}
+                isGmMode={isGmMode}
+              />
+            ) : (
+              <div className="space-y-6">
+                {/* Category Banner & Search */}
+                <div className="flex flex-wrap items-center justify-between gap-4 bg-[#09080d] p-6 rounded-2xl border border-zinc-800/80 shadow-xl">
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-black text-zinc-100">
+                      {activeSubcategory || getCategoryMeta(selectedCategoryKey).name}
+                    </h2>
+                    <p className="text-xs sm:text-sm text-zinc-400 mt-1">
+                      {getCategoryMeta(selectedCategoryKey, activeSubcategory || undefined).description ||
+                        'Gerencie todas as entradas e vínculos cadastrados neste menu de Hecos.'}
+                    </p>
                   </div>
 
-                  {selectedTagFilter && (
-                    <button
-                      onClick={() => setSelectedTagFilter(null)}
-                      className="px-2 py-1 text-xs rounded-lg bg-rose-950 text-rose-300 border border-rose-800 flex items-center gap-1"
-                    >
-                      <span>#{selectedTagFilter}</span>
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              </div>
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="relative flex-1 sm:w-64">
+                      <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={searchFilter}
+                        onChange={(e) => setSearchFilter(e.target.value)}
+                        placeholder="Filtrar por nome ou tag..."
+                        className="w-full pl-9 pr-3 py-1.5 text-xs bg-black/60 border border-zinc-800 rounded-xl text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-cyan-400"
+                      />
+                    </div>
 
-              {/* Entities Cards Grid */}
-              {categoryEntities.length === 0 ? (
-                <div className="p-12 text-center rounded-2xl bg-[#09080d] border border-zinc-800/60 space-y-3">
-                  <BookOpen className="w-8 h-8 text-zinc-600 mx-auto" />
-                  <p className="text-sm text-zinc-400">Nenhum artigo encontrado nesta categoria com os filtros atuais.</p>
-                  <button
-                    onClick={() => handleCreateNewEntity(activeSubcategory || selectedCategoryKey)}
-                    className="px-4 py-2 text-xs font-bold rounded-xl bg-cyan-500 text-zinc-950 hover:bg-cyan-400 transition-all shadow-md"
-                  >
-                    Criar Primeira Entrada em {activeSubcategory || getCategoryMeta(selectedCategoryKey).name}
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {categoryEntities.map((item) => {
-                    const isCiano = ['pc', 'spell', 'ancestry', 'rule'].includes(item.category);
-                    const isMalva = ['npc', 'item', 'flora', 'class', 'feat', 'timeline'].includes(item.category);
-
-                    return (
-                      <div
-                        key={item.id}
-                        onClick={() => handleNavigateEntity(item.id)}
-                        className="group relative flex flex-col justify-between p-5 rounded-2xl bg-[#0d0a15] hover:bg-[#140f21] border border-zinc-800/80 hover:border-cyan-500/50 transition-all duration-200 cursor-pointer shadow-lg hover:shadow-[0_0_30px_rgba(6,182,212,0.15)]"
+                    {selectedTagFilter && (
+                      <button
+                        onClick={() => setSelectedTagFilter(null)}
+                        className="px-2 py-1 text-xs rounded-lg bg-rose-950 text-rose-300 border border-rose-800 flex items-center gap-1"
                       >
-                        <div className="space-y-3">
-                          {/* Card Top Pill & Actions */}
-                          <div className="flex items-center justify-between gap-2">
-                            <span
-                              className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-md border ${
-                                isCiano
-                                  ? 'bg-cyan-950 text-cyan-300 border-cyan-800'
-                                  : isMalva
-                                  ? 'bg-purple-950 text-purple-300 border-purple-800'
-                                  : 'bg-rose-950 text-rose-300 border-rose-800'
-                              }`}
-                            >
-                              {getCategoryMeta(item.category).name} {item.statblock ? `• Nível ${item.statblock.level}` : ''}
-                            </span>
-
-                            <div className="flex items-center gap-1">
-                              {item.isSecret && (
-                                <Lock className="w-3.5 h-3.5 text-rose-400" title="Confidencial GM" />
-                              )}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteEntity(item.id);
-                                }}
-                                className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 rounded-lg hover:bg-rose-950/80 text-zinc-400 hover:text-rose-400 border border-transparent hover:border-rose-800 transition-all"
-                                title={`Excluir "${item.title}"`}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Card Title & Subtitle */}
-                          <div>
-                            <h3 className="text-base font-bold text-zinc-100 group-hover:text-cyan-300 transition-colors line-clamp-1">
-                              {item.title}
-                            </h3>
-                            {item.subtitle && (
-                              <p className="text-xs text-zinc-400 line-clamp-1 mt-0.5">
-                                {item.subtitle}
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Card Summary */}
-                          <p className="text-xs text-zinc-300 line-clamp-2 leading-relaxed">
-                            {item.summary || 'Sem resumo cadastrado.'}
-                          </p>
-                        </div>
-
-                        {/* Card Footer: Tags & Arrow */}
-                        <div className="pt-4 mt-3 border-t border-zinc-800/80 flex items-center justify-between">
-                          <div className="flex flex-wrap gap-1">
-                            {item.tags.slice(0, 2).map((t) => (
-                              <span
-                                key={t}
-                                className="text-[10px] px-1.5 py-0.5 rounded bg-black/60 text-zinc-400 border border-zinc-800"
-                              >
-                                #{t}
-                              </span>
-                            ))}
-                          </div>
-                          <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
-                        </div>
-                      </div>
-                    );
-                  })}
+                        <span>#{selectedTagFilter}</span>
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
+
+                {/* Entities Cards Grid */}
+                {categoryEntities.length === 0 ? (
+                  <div className="p-12 text-center rounded-2xl bg-[#09080d] border border-zinc-800/60 space-y-3">
+                    <BookOpen className="w-8 h-8 text-zinc-600 mx-auto" />
+                    <p className="text-sm text-zinc-400">Nenhum artigo encontrado nesta categoria com os filtros atuais.</p>
+                    <button
+                      onClick={() => handleCreateNewEntity(activeSubcategory || selectedCategoryKey)}
+                      className="px-4 py-2 text-xs font-bold rounded-xl bg-cyan-500 text-zinc-950 hover:bg-cyan-400 transition-all shadow-md"
+                    >
+                      Criar Primeira Entrada em {activeSubcategory || getCategoryMeta(selectedCategoryKey).name}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {categoryEntities.map((item) => {
+                      const isCiano = ['pc', 'spell', 'ancestry', 'rule'].includes(item.category);
+                      const isMalva = ['npc', 'item', 'flora', 'class', 'feat', 'timeline'].includes(item.category);
+
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => handleNavigateEntity(item.id)}
+                          className="group relative flex flex-col justify-between p-5 rounded-2xl bg-[#0d0a15] hover:bg-[#140f21] border border-zinc-800/80 hover:border-cyan-500/50 transition-all duration-200 cursor-pointer shadow-lg hover:shadow-[0_0_30px_rgba(6,182,212,0.15)]"
+                        >
+                          <div className="space-y-3">
+                            {/* Card Top Pill & Actions */}
+                            <div className="flex items-center justify-between gap-2">
+                              <span
+                                className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-md border ${
+                                  isCiano
+                                    ? 'bg-cyan-950 text-cyan-300 border-cyan-800'
+                                    : isMalva
+                                    ? 'bg-purple-950 text-purple-300 border-purple-800'
+                                    : 'bg-rose-950 text-rose-300 border-rose-800'
+                                }`}
+                              >
+                                {getCategoryMeta(item.category).name} {item.statblock ? `• Nível ${item.statblock.level}` : ''}
+                              </span>
+
+                              <div className="flex items-center gap-1.5">
+                                {/* Secret Visibility Toggle (Eye icon) */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    HecosStorage.toggleEntitySecret(item.id);
+                                  }}
+                                  className={`p-1.5 rounded-lg border transition-all ${
+                                    item.isSecret
+                                      ? 'bg-zinc-900/90 text-zinc-500 hover:text-amber-300 border-zinc-700 hover:border-amber-500/50'
+                                      : 'bg-amber-950/40 text-amber-400 hover:text-amber-300 border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.2)]'
+                                  }`}
+                                  title={
+                                    item.isSecret
+                                      ? 'Secreto: Apenas o GM pode ver (Clique para tornar Público)'
+                                      : 'Público: Todos podem ver (Clique para tornar Secreto do GM)'
+                                  }
+                                >
+                                  {item.isSecret ? (
+                                    <EyeOff className="w-3.5 h-3.5" />
+                                  ) : (
+                                    <Eye className="w-3.5 h-3.5 fill-amber-400/20" />
+                                  )}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteEntity(item.id);
+                                  }}
+                                  className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 rounded-lg hover:bg-rose-950/80 text-zinc-400 hover:text-rose-400 border border-transparent hover:border-rose-800 transition-all"
+                                  title={`Excluir "${item.title}"`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Card Title & Subtitle */}
+                            <div>
+                              <h3 className="text-base font-bold text-zinc-100 group-hover:text-cyan-300 transition-colors line-clamp-1">
+                                {item.title}
+                              </h3>
+                              {item.subtitle && (
+                                <p className="text-xs text-zinc-400 line-clamp-1 mt-0.5">
+                                  {item.subtitle}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Card Summary */}
+                            <p className="text-xs text-zinc-300 line-clamp-2 leading-relaxed">
+                              {item.summary || 'Sem resumo cadastrado.'}
+                            </p>
+                          </div>
+
+                          {/* Card Footer: Tags & Arrow */}
+                          <div className="pt-4 mt-3 border-t border-zinc-800/80 flex items-center justify-between">
+                            <div className="flex flex-wrap gap-1">
+                              {item.tags.slice(0, 2).map((t) => (
+                                <span
+                                  key={t}
+                                  className="text-[10px] px-1.5 py-0.5 rounded bg-black/60 text-zinc-400 border border-zinc-800"
+                                >
+                                  #{t}
+                                </span>
+                              ))}
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )
           )}
         </main>
       </div>
