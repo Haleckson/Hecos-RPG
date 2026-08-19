@@ -58,6 +58,8 @@ export const EntityView: React.FC<EntityViewProps> = ({
   const isMalva = ['npc', 'item', 'flora', 'class', 'feat', 'timeline'].includes(entity.category);
   const isBordo = ['creature', 'fauna', 'organization', 'gm_note', 'archetype', 'session'].includes(entity.category);
 
+  const isActualGm = HecosStorage.isUserGm();
+
   return (
     <div className="bg-[#09080d] text-zinc-100 rounded-2xl border border-zinc-800/80 shadow-2xl overflow-hidden">
       {/* Cover / Header Banner */}
@@ -78,14 +80,16 @@ export const EntityView: React.FC<EntityViewProps> = ({
         {/* Action buttons on top of banner */}
         <div className="absolute top-4 right-4 flex items-center gap-2">
           {/* 3-Level Granular Visibility Menu (Apenas GM, Todos, Compartilhamento Seletivo) */}
-          <VisibilityBadgeMenu
-            visibility={entity.visibility}
-            allowedUserIds={entity.allowedUserIds}
-            isSecret={entity.isSecret}
-            onChange={(newVis, newAllowed) => {
-              HecosStorage.setEntityVisibility(entity.id, newVis, newAllowed);
-            }}
-          />
+          {isActualGm && (
+            <VisibilityBadgeMenu
+              visibility={entity.visibility}
+              allowedUserIds={entity.allowedUserIds}
+              isSecret={entity.isSecret}
+              onChange={(newVis, newAllowed) => {
+                HecosStorage.setEntityVisibility(entity.id, newVis, newAllowed);
+              }}
+            />
+          )}
 
           <button
             onClick={() => window.print()}
@@ -94,25 +98,30 @@ export const EntityView: React.FC<EntityViewProps> = ({
           >
             <Printer className="w-4 h-4" />
           </button>
-          <button
-            onClick={onEdit}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-950/80 backdrop-blur-md border border-cyan-500/50 hover:bg-cyan-900 text-cyan-200 text-xs font-semibold shadow-lg transition-all"
-          >
-            <Edit3 className="w-3.5 h-3.5" />
-            <span>Editar</span>
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete?.();
-            }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-950/90 backdrop-blur-md border border-rose-600/60 hover:bg-rose-900 text-rose-200 text-xs font-semibold shadow-lg transition-all"
-            title={`Excluir "${entity.title}" do Codex`}
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Excluir</span>
-          </button>
+
+          {isActualGm && (
+            <>
+              <button
+                onClick={onEdit}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-950/80 backdrop-blur-md border border-cyan-500/50 hover:bg-cyan-900 text-cyan-200 text-xs font-semibold shadow-lg transition-all cursor-pointer"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Editar</span>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete?.();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-950/90 backdrop-blur-md border border-rose-600/60 hover:bg-rose-900 text-rose-200 text-xs font-semibold shadow-lg transition-all cursor-pointer"
+                title={`Excluir "${entity.title}" do Codex`}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Excluir</span>
+              </button>
+            </>
+          )}
         </div>
 
         {/* Title area over banner */}

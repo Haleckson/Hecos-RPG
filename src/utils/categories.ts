@@ -22,6 +22,13 @@ import {
 } from 'lucide-react';
 import { EntityCategory } from '../types';
 
+export interface CategoryGroup {
+  id: string;
+  name: string;
+  icon?: any;
+  items: CategoryDefinition[];
+}
+
 export interface CategoryDefinition {
   id: string;
   name: string;
@@ -34,6 +41,7 @@ export interface CategoryDefinition {
   isCustomView?: boolean;
   viewType?: 'entities' | 'map' | 'timeline' | 'tags';
   children?: CategoryDefinition[];
+  groups?: CategoryGroup[];
 }
 
 export const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
@@ -54,113 +62,183 @@ export const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
     color: '#cb8394', // pastel dusty rose / bordô
     accentColor: 'bordo',
     description: 'Enciclopédia viva de criaturas, feitiços, itens, locais, povos, regras e história de Hecos.',
+    groups: [
+      {
+        id: 'lore',
+        name: 'Lore',
+        items: [
+          {
+            id: 'fauna',
+            name: 'Fauna',
+            categoryKey: 'fauna',
+            subcategory: 'Fauna',
+            icon: PawPrint,
+            color: '#7eb897', // pastel sage
+            accentColor: 'bordo',
+            description: 'Animais silvestres, corvos de vidro e bestas do lago.',
+            viewType: 'entities'
+          },
+          {
+            id: 'flora',
+            name: 'Flora',
+            categoryKey: 'flora',
+            subcategory: 'Flora',
+            icon: Flower2,
+            color: '#7eb897', // pastel sage
+            accentColor: 'malva',
+            description: 'Ervas medicinais, fungos luminescentes e plantas carnívoras.',
+            viewType: 'entities'
+          },
+          {
+            id: 'locais',
+            name: 'Locais',
+            categoryKey: 'location',
+            subcategory: 'Locais',
+            icon: Compass,
+            color: '#74b6c2', // pastel slate-cyan
+            accentColor: 'ciano',
+            description: 'Geografia, santuários, cidades de obsidiana e masmorras.',
+            viewType: 'entities'
+          },
+          {
+            id: 'npc',
+            name: 'NPC',
+            categoryKey: 'npc',
+            subcategory: 'NPC',
+            icon: User,
+            color: '#b19ecc', // pastel wisteria / malva
+            accentColor: 'malva',
+            description: 'Aliados, vilões, eremitas e contatos no mundo de Hecos.',
+            viewType: 'entities'
+          },
+          {
+            id: 'organizacoes',
+            name: 'Organizações',
+            categoryKey: 'organization',
+            subcategory: 'Organizações',
+            icon: Shield,
+            color: '#cb8394', // pastel dusty rose
+            accentColor: 'bordo',
+            description: 'Guildas, ordens místicas, cultos do sol e governos.',
+            viewType: 'entities'
+          },
+          {
+            id: 'timeline',
+            name: 'Timeline',
+            categoryKey: 'timeline',
+            subcategory: 'Timeline',
+            icon: History,
+            color: '#b19ecc', // pastel wisteria
+            accentColor: 'malva',
+            description: 'História do mundo, eras cósmicas e cronologia de eventos.',
+            viewType: 'timeline'
+          }
+        ]
+      },
+      {
+        id: 'mecanicas',
+        name: 'Mecânicas',
+        items: [
+          {
+            id: 'ancestralidades',
+            name: 'Ancestralidades',
+            categoryKey: 'ancestry',
+            subcategory: 'Ancestralidades',
+            icon: Dna,
+            color: '#74b6c2', // pastel slate-cyan
+            accentColor: 'ciano',
+            description: 'Povos nativos de Hecos e suas linhagens culturais.',
+            viewType: 'entities'
+          },
+          {
+            id: 'arquetipos',
+            name: 'Arquétipos',
+            categoryKey: 'archetype',
+            subcategory: 'Arquétipos',
+            icon: Layers,
+            color: '#cb8394', // pastel dusty rose
+            accentColor: 'bordo',
+            description: 'Dedicações e caminhos de prestígio no cenário.',
+            viewType: 'entities'
+          },
+          {
+            id: 'classes',
+            name: 'Classes',
+            categoryKey: 'class',
+            subcategory: 'Classes',
+            icon: Swords,
+            color: '#b19ecc', // pastel wisteria
+            accentColor: 'malva',
+            description: 'Classes adaptadas de Pathfinder 2e e suas disciplinas.',
+            viewType: 'entities'
+          },
+          {
+            id: 'criaturas',
+            name: 'Criaturas',
+            categoryKey: 'creature',
+            subcategory: 'Criaturas',
+            icon: Skull,
+            color: '#cb8394', // pastel dusty rose
+            accentColor: 'bordo',
+            description: 'Bestiário de Hecos com statblocks no formato Pathfinder 2e.',
+            viewType: 'entities'
+          },
+          {
+            id: 'feiticos',
+            name: 'Feitiços',
+            categoryKey: 'spell',
+            subcategory: 'Feitiços',
+            icon: Sparkles,
+            color: '#74b6c2', // pastel slate-cyan
+            accentColor: 'ciano',
+            description: 'Grimório de magias arcanas, divinas, ocultas e primais.',
+            viewType: 'entities'
+          },
+          {
+            id: 'itens',
+            name: 'Itens',
+            categoryKey: 'item',
+            subcategory: 'Itens',
+            icon: Gem,
+            color: '#cca862', // pastel antique gold
+            accentColor: 'malva',
+            description: 'Artefatos do eclipse, armas rúnicas, poções e tesouros.',
+            viewType: 'entities'
+          },
+          {
+            id: 'regras',
+            name: 'Regras',
+            categoryKey: 'rule',
+            subcategory: 'Regras',
+            icon: Scroll,
+            color: '#74b6c2', // pastel slate-cyan
+            accentColor: 'ciano',
+            description: 'Regras da casa, sistema de 3 ações e mecânicas de Hecos.',
+            viewType: 'entities'
+          },
+          {
+            id: 'talentos',
+            name: 'Talentos',
+            categoryKey: 'feat',
+            subcategory: 'Talentos',
+            icon: Award,
+            color: '#cca862', // pastel antique gold
+            accentColor: 'malva',
+            description: 'Talentos de ancestralidade, classe, perícia e gerais.',
+            viewType: 'entities'
+          }
+        ]
+      }
+    ],
+    // Kept for backwards-compatibility helper methods
     children: [
-      {
-        id: 'npc',
-        name: 'NPC',
-        categoryKey: 'npc',
-        subcategory: 'NPC',
-        icon: User,
-        color: '#b19ecc', // pastel wisteria / malva
-        accentColor: 'malva',
-        description: 'Aliados, vilões, eremitas e contatos no mundo de Hecos.',
-        viewType: 'entities'
-      },
-      {
-        id: 'criaturas',
-        name: 'Criaturas',
-        categoryKey: 'creature',
-        subcategory: 'Criaturas',
-        icon: Skull,
-        color: '#cb8394', // pastel dusty rose
-        accentColor: 'bordo',
-        description: 'Bestiário de Hecos com statblocks no formato Pathfinder 2e.',
-        viewType: 'entities'
-      },
-      {
-        id: 'ancestralidades',
-        name: 'Ancestralidades',
-        categoryKey: 'ancestry',
-        subcategory: 'Ancestralidades',
-        icon: Dna,
-        color: '#74b6c2', // pastel slate-cyan
-        accentColor: 'ciano',
-        description: 'Povos nativos de Hecos e suas linhagens culturais.',
-        viewType: 'entities'
-      },
-      {
-        id: 'classes',
-        name: 'Classes',
-        categoryKey: 'class',
-        subcategory: 'Classes',
-        icon: Swords,
-        color: '#b19ecc', // pastel wisteria
-        accentColor: 'malva',
-        description: 'Classes adaptadas de Pathfinder 2e e suas disciplinas.',
-        viewType: 'entities'
-      },
-      {
-        id: 'arquetipos',
-        name: 'Arquétipos',
-        categoryKey: 'archetype',
-        subcategory: 'Arquétipos',
-        icon: Layers,
-        color: '#cb8394', // pastel dusty rose
-        accentColor: 'bordo',
-        description: 'Dedicações e caminhos de prestígio no cenário.',
-        viewType: 'entities'
-      },
-      {
-        id: 'talentos',
-        name: 'Talentos',
-        categoryKey: 'feat',
-        subcategory: 'Talentos',
-        icon: Award,
-        color: '#cca862', // pastel antique gold
-        accentColor: 'malva',
-        description: 'Talentos de ancestralidade, classe, perícia e gerais.',
-        viewType: 'entities'
-      },
-      {
-        id: 'feiticos',
-        name: 'Feitiços',
-        categoryKey: 'spell',
-        subcategory: 'Feitiços',
-        icon: Sparkles,
-        color: '#74b6c2', // pastel slate-cyan
-        accentColor: 'ciano',
-        description: 'Grimório de magias arcanas, divinas, ocultas e primais.',
-        viewType: 'entities'
-      },
-      {
-        id: 'itens',
-        name: 'Itens',
-        categoryKey: 'item',
-        subcategory: 'Itens',
-        icon: Gem,
-        color: '#cca862', // pastel antique gold
-        accentColor: 'malva',
-        description: 'Artefatos do eclipse, armas rúnicas, poções e tesouros.',
-        viewType: 'entities'
-      },
-      {
-        id: 'locais',
-        name: 'Locais',
-        categoryKey: 'location',
-        subcategory: 'Locais',
-        icon: Compass,
-        color: '#74b6c2', // pastel slate-cyan
-        accentColor: 'ciano',
-        description: 'Geografia, santuários, cidades de obsidiana e masmorras.',
-        viewType: 'entities'
-      },
       {
         id: 'fauna',
         name: 'Fauna',
         categoryKey: 'fauna',
         subcategory: 'Fauna',
         icon: PawPrint,
-        color: '#7eb897', // pastel sage
+        color: '#7eb897',
         accentColor: 'bordo',
         description: 'Animais silvestres, corvos de vidro e bestas do lago.',
         viewType: 'entities'
@@ -171,9 +249,31 @@ export const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
         categoryKey: 'flora',
         subcategory: 'Flora',
         icon: Flower2,
-        color: '#7eb897', // pastel sage
+        color: '#7eb897',
         accentColor: 'malva',
         description: 'Ervas medicinais, fungos luminescentes e plantas carnívoras.',
+        viewType: 'entities'
+      },
+      {
+        id: 'locais',
+        name: 'Locais',
+        categoryKey: 'location',
+        subcategory: 'Locais',
+        icon: Compass,
+        color: '#74b6c2',
+        accentColor: 'ciano',
+        description: 'Geografia, santuários, cidades de obsidiana e masmorras.',
+        viewType: 'entities'
+      },
+      {
+        id: 'npc',
+        name: 'NPC',
+        categoryKey: 'npc',
+        subcategory: 'NPC',
+        icon: User,
+        color: '#b19ecc',
+        accentColor: 'malva',
+        description: 'Aliados, vilões, eremitas e contatos no mundo de Hecos.',
         viewType: 'entities'
       },
       {
@@ -182,20 +282,9 @@ export const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
         categoryKey: 'organization',
         subcategory: 'Organizações',
         icon: Shield,
-        color: '#cb8394', // pastel dusty rose
+        color: '#cb8394',
         accentColor: 'bordo',
         description: 'Guildas, ordens místicas, cultos do sol e governos.',
-        viewType: 'entities'
-      },
-      {
-        id: 'regras',
-        name: 'Regras',
-        categoryKey: 'rule',
-        subcategory: 'Regras',
-        icon: Scroll,
-        color: '#74b6c2', // pastel slate-cyan
-        accentColor: 'ciano',
-        description: 'Regras da casa, sistema de 3 ações e mecânicas de Hecos.',
         viewType: 'entities'
       },
       {
@@ -204,10 +293,98 @@ export const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
         categoryKey: 'timeline',
         subcategory: 'Timeline',
         icon: History,
-        color: '#b19ecc', // pastel wisteria
+        color: '#b19ecc',
         accentColor: 'malva',
         description: 'História do mundo, eras cósmicas e cronologia de eventos.',
         viewType: 'timeline'
+      },
+      {
+        id: 'ancestralidades',
+        name: 'Ancestralidades',
+        categoryKey: 'ancestry',
+        subcategory: 'Ancestralidades',
+        icon: Dna,
+        color: '#74b6c2',
+        accentColor: 'ciano',
+        description: 'Povos nativos de Hecos e suas linhagens culturais.',
+        viewType: 'entities'
+      },
+      {
+        id: 'arquetipos',
+        name: 'Arquétipos',
+        categoryKey: 'archetype',
+        subcategory: 'Arquétipos',
+        icon: Layers,
+        color: '#cb8394',
+        accentColor: 'bordo',
+        description: 'Dedicações e caminhos de prestígio no cenário.',
+        viewType: 'entities'
+      },
+      {
+        id: 'classes',
+        name: 'Classes',
+        categoryKey: 'class',
+        subcategory: 'Classes',
+        icon: Swords,
+        color: '#b19ecc',
+        accentColor: 'malva',
+        description: 'Classes adaptadas de Pathfinder 2e e suas disciplinas.',
+        viewType: 'entities'
+      },
+      {
+        id: 'criaturas',
+        name: 'Criaturas',
+        categoryKey: 'creature',
+        subcategory: 'Criaturas',
+        icon: Skull,
+        color: '#cb8394',
+        accentColor: 'bordo',
+        description: 'Bestiário de Hecos com statblocks no formato Pathfinder 2e.',
+        viewType: 'entities'
+      },
+      {
+        id: 'feiticos',
+        name: 'Feitiços',
+        categoryKey: 'spell',
+        subcategory: 'Feitiços',
+        icon: Sparkles,
+        color: '#74b6c2',
+        accentColor: 'ciano',
+        description: 'Grimório de magias arcanas, divinas, ocultas e primais.',
+        viewType: 'entities'
+      },
+      {
+        id: 'itens',
+        name: 'Itens',
+        categoryKey: 'item',
+        subcategory: 'Itens',
+        icon: Gem,
+        color: '#cca862',
+        accentColor: 'malva',
+        description: 'Artefatos do eclipse, armas rúnicas, poções e tesouros.',
+        viewType: 'entities'
+      },
+      {
+        id: 'regras',
+        name: 'Regras',
+        categoryKey: 'rule',
+        subcategory: 'Regras',
+        icon: Scroll,
+        color: '#74b6c2',
+        accentColor: 'ciano',
+        description: 'Regras da casa, sistema de 3 ações e mecânicas de Hecos.',
+        viewType: 'entities'
+      },
+      {
+        id: 'talentos',
+        name: 'Talentos',
+        categoryKey: 'feat',
+        subcategory: 'Talentos',
+        icon: Award,
+        color: '#cca862',
+        accentColor: 'malva',
+        description: 'Talentos de ancestralidade, classe, perícia e gerais.',
+        viewType: 'entities'
       }
     ]
   },

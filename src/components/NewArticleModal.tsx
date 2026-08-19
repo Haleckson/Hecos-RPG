@@ -86,7 +86,7 @@ export const CATEGORY_OPTIONS: CategoryOption[] = [
     badge: 'Mecânica PF2e',
     description: 'Talentos gerais, perícias especiais ou talentos adicionais do sistema.',
     icon: Zap,
-    colorTheme: 'purple',
+    colorTheme: 'amber',
     suggestedTags: ['talento', 'feat', 'pf2e'],
   },
   {
@@ -104,7 +104,7 @@ export const CATEGORY_OPTIONS: CategoryOption[] = [
     badge: 'Tesouro & Relíquia',
     description: 'Armas raras, armaduras, consumíveis, artefatos mágicos e itens de sobrevivência.',
     icon: Gem,
-    colorTheme: 'purple',
+    colorTheme: 'amber',
     suggestedTags: ['item', 'equipamento', 'tesouro'],
   },
   {
@@ -122,7 +122,7 @@ export const CATEGORY_OPTIONS: CategoryOption[] = [
     badge: 'Ecossistema',
     description: 'Espécies animais, montarias, predadores e criaturas nativas dos biomas de Hecos.',
     icon: TreePine,
-    colorTheme: 'rose',
+    colorTheme: 'emerald',
     suggestedTags: ['fauna', 'animais', 'bioma'],
   },
   {
@@ -131,7 +131,7 @@ export const CATEGORY_OPTIONS: CategoryOption[] = [
     badge: 'Reagentes & Ervas',
     description: 'Plantas curativas, fungos bioluminescentes, venenos naturais e árvores sagradas.',
     icon: Flower2,
-    colorTheme: 'purple',
+    colorTheme: 'emerald',
     suggestedTags: ['flora', 'alquimia', 'ervas'],
   },
   {
@@ -220,6 +220,22 @@ export const NewArticleModal: React.FC<NewArticleModalProps> = ({
 
   const getThemeClasses = (theme: CategoryOption['colorTheme']) => {
     switch (theme) {
+      case 'amber':
+        return {
+          card: 'border-amber-500/30 hover:border-amber-400 bg-gradient-to-b from-[#18120a] to-[#0a0812] hover:shadow-[0_0_25px_rgba(245,158,11,0.2)]',
+          badge: 'bg-amber-950/80 text-amber-300 border-amber-800/80',
+          iconBg: 'bg-amber-950/60 text-amber-300 border-amber-500/40 group-hover:bg-amber-900/80 group-hover:border-amber-400',
+          title: 'group-hover:text-amber-200',
+          arrow: 'text-amber-400 group-hover:translate-x-1',
+        };
+      case 'emerald':
+        return {
+          card: 'border-emerald-500/30 hover:border-emerald-400 bg-gradient-to-b from-[#0c1611] to-[#0a0812] hover:shadow-[0_0_25px_rgba(16,185,129,0.2)]',
+          badge: 'bg-emerald-950/80 text-emerald-300 border-emerald-800/80',
+          iconBg: 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40 group-hover:bg-emerald-900/80 group-hover:border-emerald-400',
+          title: 'group-hover:text-emerald-200',
+          arrow: 'text-emerald-400 group-hover:translate-x-1',
+        };
       case 'cyan':
         return {
           card: 'border-cyan-500/30 hover:border-cyan-400 bg-gradient-to-b from-[#100f1c] to-[#0a0812] hover:shadow-[0_0_25px_rgba(6,182,212,0.2)]',

@@ -6,8 +6,10 @@ export type ActionGlyphType =
   | '3-actions'
   | '1-to-2-actions'
   | '1-to-3-actions'
+  | '2-to-3-actions'
   | 'free-action'
-  | 'reaction';
+  | 'reaction'
+  | 'passive';
 
 interface PF2eActionGlyphProps {
   type?: ActionGlyphType | string | number;
@@ -75,6 +77,14 @@ export const PF2eActionGlyph: React.FC<PF2eActionGlyphProps> = ({
           bgColor: 'rgba(211, 159, 224, 0.2)',
           borderColor: '#D39FE0',
         };
+      case '2-to-3-actions':
+        return {
+          label: '2 a 3 Ações (Variable Actions)',
+          symbol: '◆◆ a ◆◆◆',
+          color: '#D39FE0',
+          bgColor: 'rgba(211, 159, 224, 0.2)',
+          borderColor: '#D39FE0',
+        };
       case 'free-action':
         return {
           label: 'Ação Livre (Free Action)',
@@ -90,6 +100,14 @@ export const PF2eActionGlyph: React.FC<PF2eActionGlyphProps> = ({
           color: '#be123c',
           bgColor: 'rgba(190, 18, 60, 0.2)',
           borderColor: '#f43f5e',
+        };
+      case 'passive':
+        return {
+          label: 'Passiva / Efeito Contínuo',
+          symbol: '—',
+          color: '#94a3b8',
+          bgColor: 'rgba(148, 163, 184, 0.15)',
+          borderColor: '#64748b',
         };
       default:
         return {
@@ -146,11 +164,23 @@ function normalizeActionType(type?: any): ActionGlyphType {
   ) {
     return '1-to-3-actions';
   }
+  if (
+    t === '2-to-3' ||
+    t === '2-to-3-actions' ||
+    t === 'two-to-three-actions' ||
+    t === '2-a-3-acoes' ||
+    t === '2-ou-3-acoes'
+  ) {
+    return '2-to-3-actions';
+  }
   if (t === 'free' || t === 'free-action' || t === 'acao-livre' || t === 'livre') {
     return 'free-action';
   }
   if (t === 'reaction' || t === 'reacao' || t === 'react') {
     return 'reaction';
+  }
+  if (t === 'passive' || t === 'passiva' || t === 'constante' || t === 'continuo' || t === 'passivo') {
+    return 'passive';
   }
   return '1-action';
 }
@@ -283,6 +313,25 @@ function renderSvgGlyph(
         </span>
       );
 
+    case '2-to-3-actions':
+      return (
+        <span
+          className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded border border-purple-500/50 bg-purple-950/40 text-purple-300 font-mono text-[11px] leading-none"
+          style={{ verticalAlign: 'middle' }}
+        >
+          <svg width="19" height="12" viewBox="0 0 38 24" fill="none">
+            <path d="M11 2L20 12L11 22L2 12L11 2Z" fill="#D39FE0" stroke="#111" />
+            <path d="M27 2L36 12L27 22L18 12L27 2Z" fill="#D39FE0" stroke="#111" />
+          </svg>
+          <span className="text-[10px] text-purple-400 font-sans font-bold">a</span>
+          <svg width="27" height="12" viewBox="0 0 54 24" fill="none">
+            <path d="M10 2L19 12L10 22L1 12L10 2Z" fill="#D39FE0" stroke="#111" />
+            <path d="M27 2L36 12L27 22L18 12L27 2Z" fill="#D39FE0" stroke="#111" />
+            <path d="M44 2L53 12L44 22L35 12L44 2Z" fill="#D39FE0" stroke="#111" />
+          </svg>
+        </span>
+      );
+
     case 'free-action':
       return (
         <svg
@@ -334,6 +383,16 @@ function renderSvgGlyph(
             strokeLinejoin="round"
           />
         </svg>
+      );
+
+    case 'passive':
+      return (
+        <span
+          className="inline-flex items-center justify-center px-1.5 py-0.5 rounded border border-zinc-700 bg-zinc-800/80 text-zinc-300 font-mono text-[10px] uppercase font-bold"
+          style={{ verticalAlign: 'middle' }}
+        >
+          Passiva
+        </span>
       );
   }
 }

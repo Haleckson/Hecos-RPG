@@ -238,7 +238,19 @@ export const FeatEditor: React.FC<FeatEditorProps> = ({
   };
 
   return (
-    <div className="bg-[#08070d] text-zinc-100 rounded-2xl border border-zinc-800 shadow-2xl overflow-hidden flex flex-col">
+    <div className="bg-[#08070d] text-zinc-100 rounded-2xl border border-zinc-800 shadow-2xl overflow-hidden flex flex-col relative">
+      {/* Floating Save Button (Icon-only) */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <button
+          type="button"
+          onClick={handleSave}
+          className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-zinc-950 font-black shadow-[0_4px_25px_rgba(245,158,11,0.45)] hover:shadow-[0_6px_30px_rgba(245,158,11,0.7)] hover:scale-110 active:scale-95 transition-all cursor-pointer border border-white/30"
+          data-tooltip="Salvar Talento (Ctrl+S)"
+        >
+          <Save className="w-5 h-5 stroke-[2.5]" />
+        </button>
+      </div>
+
       {/* 1. TOP STICKY BAR: ACTIONS & TITLE */}
       <div className="sticky top-0 z-20 px-4 sm:px-6 py-3 bg-[#110d1c] border-b border-zinc-800 flex flex-wrap items-center justify-between gap-3 backdrop-blur-md">
         <div className="flex items-center gap-3 flex-1 min-w-[240px]">

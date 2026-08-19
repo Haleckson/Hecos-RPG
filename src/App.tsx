@@ -13,15 +13,24 @@ import { DriveModal } from './components/DriveModal';
 import { DiceRollerModal } from './components/DiceRollerModal';
 import { AoNSearchModal } from './components/AoNSearchModal';
 import { ConfirmModal } from './components/ConfirmModal';
+import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
 import { FirebaseStatusModal } from './components/FirebaseStatusModal';
 import { NewArticleModal } from './components/NewArticleModal';
 import { LoginModal } from './components/LoginModal';
 import { UserManagementModal } from './components/UserManagementModal';
 import { VisibilityBadgeMenu } from './components/VisibilityBadgeMenu';
+import { GlobalTooltip } from './components/GlobalTooltip';
+import { TrashBinModal } from './components/TrashBinModal';
 import { FeatExplorer } from './components/FeatExplorer';
-import { FeatCategoryType } from './types';
+import { SpellExplorer } from './components/SpellExplorer';
+import { ItemExplorer } from './components/ItemExplorer';
+import { SpellCreateModal } from './components/SpellCreateModal';
+import { ItemCreateModal } from './components/ItemCreateModal';
+import { FeatCategoryType, SpellCategoryType, ItemCategoryType } from './types';
 import { getEmptyAncestryData, serializeAncestryToHTML } from './utils/ancestrySerializer';
 import { getEmptyFeatData, serializeFeatToHTML } from './utils/featSerializer';
+import { getEmptySpellData, serializeSpellToHTML } from './utils/spellSerializer';
+import { getEmptyItemData, serializeItemToHTML } from './utils/itemSerializer';
 import {
   subscribeFirebaseStatus,
   getFirebaseConnectionState,
@@ -61,7 +70,9 @@ import {
   Users,
   LogOut,
   Key,
-  Crown
+  Crown,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 
 export function App() {
@@ -74,7 +85,11 @@ export function App() {
   const [editingEntity, setEditingEntity] = useState<HecosEntity | null>(null);
   const [isGmMode, setIsGmMode] = useState<boolean>(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({ 'codex': true });
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
+    'codex': true,
+    'codex-group-lore': true,
+    'codex-group-mecanicas': true
+  });
 
   // Resizable & Collapsible Sidebar State
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
@@ -147,13 +162,28 @@ export function App() {
   const [isDriveOpen, setIsDriveOpen] = useState(false);
   const [isDiceOpen, setIsDiceOpen] = useState(false);
   const [isAoNOpen, setIsAoNOpen] = useState(false);
+
+  // View Mode for Category Explorer: 'grid' vs 'compact'
+  const [entityListViewMode, setEntityListViewMode] = useState<'grid' | 'compact'>('grid');
   const [isFirebaseModalOpen, setIsFirebaseModalOpen] = useState(false);
+  const [isTrashOpen, setIsTrashOpen] = useState(false);
   const [entityToDelete, setEntityToDelete] = useState<{ id: string; title: string } | null>(null);
+
+  // Dedicated creation modals for robust PF2e entities
+  const [isSpellCreateModalOpen, setIsSpellCreateModalOpen] = useState(false);
+  const [spellModalPresetCategory, setSpellModalPresetCategory] = useState<SpellCategoryType | undefined>(undefined);
+  const [spellModalPresetSubcategory, setSpellModalPresetSubcategory] = useState<string | undefined>(undefined);
+
+  const [isItemCreateModalOpen, setIsItemCreateModalOpen] = useState(false);
+  const [itemModalPresetCategory, setItemModalPresetCategory] = useState<ItemCategoryType | undefined>(undefined);
+  const [itemModalPresetSubcategory, setItemModalPresetSubcategory] = useState<string | undefined>(undefined);
 
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced'>('idle');
   const [firebaseStatus, setFirebaseStatus] = useState(getFirebaseConnectionState());
+
+  const isActualGm = HecosStorage.isUserGm(currentUser);
 
   // Real-time subscriptions and Initial load
   useEffect(() => {
@@ -221,14 +251,30 @@ export function App() {
   };
 
   const handleCreateEntityOfCategory = (category: EntityCategory, customTitle?: string) => {
-    const newId = 'entity-' + Date.now();
-    const finalTitle = customTitle?.trim() || '';
+    if (category === 'spell') {
+      setSpellModalPresetCategory(undefined);
+      setSpellModalPresetSubcategory(undefined);
+      setIsSpellCreateModalOpen(true);
+      return;
+    }
 
-    let newEnt: HecosEntity;
+    if (category === 'item') {
+      setItemModalPresetCategory(undefined);
+      setItemModalPresetSubcategory(undefined);
+      setIsItemCreateModalOpen(true);
+      return;
+    }
+
+    if (category === 'feat') {
+      handleCreateFeatDirectly();
+      return;
+    }
 
     if (category === 'ancestry') {
+      const newId = 'entity-' + Date.now();
+      const finalTitle = customTitle?.trim() || '';
       const blankAncestry = getEmptyAncestryData();
-      newEnt = {
+      const newEnt: HecosEntity = {
         id: newId,
         slug: finalTitle
           ? finalTitle.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
@@ -244,41 +290,28 @@ export function App() {
         updatedAt: new Date().toISOString(),
         isSecret: true,
       };
-    } else if (category === 'feat') {
-      const blankFeat = getEmptyFeatData();
-      newEnt = {
-        id: newId,
-        slug: finalTitle
-          ? finalTitle.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-          : 'novo-talento-' + Date.now(),
-        title: finalTitle || 'Novo Talento',
-        subtitle: '',
-        category: 'feat',
-        summary: '',
-        content: serializeFeatToHTML(finalTitle, blankFeat),
-        featData: blankFeat,
-        tags: ['talento', 'pf2e'],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        isSecret: true,
-      };
-    } else {
-      newEnt = {
-        id: newId,
-        slug: finalTitle
-          ? finalTitle.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-          : 'novo-artigo-' + Date.now(),
-        title: finalTitle || 'Novo Artigo de Hecos',
-        subtitle: '',
-        category: category,
-        summary: '',
-        content: `### Descrição\nEscreva os detalhes de Hecos aqui.\n\nUse @ para linkar outras páginas, criaturas ou regras!`,
-        tags: [category, 'Hecos'],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        isSecret: true,
-      };
+      setEditingEntity(newEnt);
+      setActiveView('edit');
+      return;
     }
+
+    const newId = 'entity-' + Date.now();
+    const finalTitle = customTitle?.trim() || '';
+    const newEnt: HecosEntity = {
+      id: newId,
+      slug: finalTitle
+        ? finalTitle.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+        : 'novo-artigo-' + Date.now(),
+      title: finalTitle || 'Novo Artigo de Hecos',
+      subtitle: '',
+      category: category,
+      summary: '',
+      content: `### Descrição\nEscreva os detalhes de Hecos aqui.\n\nUse @ para linkar outras páginas, criaturas ou regras!`,
+      tags: [category, 'Hecos'],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      isSecret: true,
+    };
 
     setEditingEntity(newEnt);
     setActiveView('edit');
@@ -311,6 +344,18 @@ export function App() {
     };
     setEditingEntity(newEnt);
     setActiveView('edit');
+  };
+
+  const handleCreateSpellDirectly = (presetCategory?: SpellCategoryType, presetSubcategory?: string) => {
+    setSpellModalPresetCategory(presetCategory);
+    setSpellModalPresetSubcategory(presetSubcategory);
+    setIsSpellCreateModalOpen(true);
+  };
+
+  const handleCreateItemDirectly = (presetCategory?: ItemCategoryType, presetSubcategory?: string) => {
+    setItemModalPresetCategory(presetCategory);
+    setItemModalPresetSubcategory(presetSubcategory);
+    setIsItemCreateModalOpen(true);
   };
 
   const handleCreateNewEntity = (presetCategoryOrSub?: string) => {
@@ -353,14 +398,9 @@ export function App() {
 
   // Filter entities for Category view
   const categoryEntities = entities.filter((e) => {
-    // 3-Level Access Permission Check:
-    // If GM is logged in and GM mode is active, GM can see everything.
-    // Otherwise, check granular user access (GM, Public, or specific Player).
-    const isActualGm = currentUser?.role === 'gm' && isGmMode;
-    if (!isActualGm) {
-      if (!HecosStorage.canUserAccess(e.visibility, e.allowedUserIds, currentUser, e.isSecret)) {
-        return false;
-      }
+    // Check item permission using centralized hierarchical helper
+    if (!HecosStorage.canUserAccessItem(e, currentUser)) {
+      return false;
     }
 
     // Subcategory check
@@ -532,7 +572,8 @@ export function App() {
         {/* Category List Navigation */}
         <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
           {CATEGORY_DEFINITIONS.map((category) => {
-            const hasChildren = category.children && category.children.length > 0;
+            const hasGroups = category.groups && category.groups.length > 0;
+            const hasChildren = (category.children && category.children.length > 0) || hasGroups;
             const isExpanded = expandedMenus[category.id];
             const isSelected = selectedCategoryKey === category.id && !activeSubcategory;
             const Icon = category.icon;
@@ -574,63 +615,157 @@ export function App() {
                   )}
                 </div>
 
-                {/* Submenu for Codex */}
+                {/* Grouped Submenus (Lore & Mecânicas) or Direct Children for Codex */}
                 {hasChildren && isExpanded && (
-                  <div className="pl-5 space-y-0.5 pt-0.5 border-l border-zinc-800/80 ml-3.5">
-                    {category.children!.map((child) => {
-                      const isChildSelected = activeSubcategory === child.subcategory;
-                      const ChildIcon = child.icon;
-                      const subcatKey = child.subcategory || child.id;
-                      const folderPerm = HecosStorage.getFolderPermission(subcatKey);
-                      const isActualGm = currentUser?.role === 'gm' && isGmMode;
-                      const canAccess = isActualGm || HecosStorage.canUserAccess(folderPerm.visibility, folderPerm.allowedUserIds, currentUser);
+                  <div className="pl-3 space-y-1.5 pt-1 border-l border-zinc-800/80 ml-3.5">
+                    {hasGroups ? (
+                      category.groups!.map((group) => {
+                        const groupKey = `${category.id}-group-${group.id}`;
+                        const isGroupExpanded = expandedMenus[groupKey] !== false; // default open
 
-                      if (!canAccess) return null;
-
-                      return (
-                        <div
-                          key={child.id}
-                          className="flex items-center justify-between group/subcat rounded-lg hover:bg-zinc-900/50 transition-all pr-1"
-                        >
-                          <div
-                            onClick={() => {
-                              setSelectedCategoryKey(category.id);
-                              setActiveSubcategory(child.subcategory!);
-                              setSelectedEntityId(null);
-                              if (child.viewType && child.viewType !== 'entities') {
-                                setActiveView(child.viewType);
-                              } else {
-                                setActiveView('entities');
-                              }
-                              setIsSidebarOpen(false);
-                            }}
-                            className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer transition-colors ${
-                              isChildSelected
-                                ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-700/60 font-semibold'
-                                : 'text-zinc-400 hover:text-zinc-200'
-                            }`}
-                          >
-                            <span style={{ color: child.color }}>
-                              <ChildIcon className="w-3.5 h-3.5" />
-                            </span>
-                            <span className="truncate">{child.name}</span>
-                          </div>
-
-                          {/* GM Granular Folder Visibility Menu */}
-                          {currentUser?.role === 'gm' && (
-                            <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <VisibilityBadgeMenu
-                                visibility={folderPerm.visibility}
-                                allowedUserIds={folderPerm.allowedUserIds}
-                                onChange={(newVis, newAllowed) => {
-                                  HecosStorage.setFolderPermission(subcatKey, newVis, newAllowed);
-                                }}
-                              />
+                        return (
+                          <div key={group.id} className="space-y-0.5">
+                            {/* Group Header (e.g., LORE / MECÂNICAS) */}
+                            <div
+                              onClick={() => {
+                                setExpandedMenus((prev) => ({
+                                  ...prev,
+                                  [groupKey]: !isGroupExpanded
+                                }));
+                              }}
+                              className="flex items-center justify-between px-2 py-1 rounded text-[11px] font-bold tracking-wider text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40 cursor-pointer transition-colors select-none uppercase"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-purple-400/70" />
+                                <span>{group.name}</span>
+                              </div>
+                              <span className="text-zinc-500 hover:text-zinc-300">
+                                {isGroupExpanded ? (
+                                  <ChevronDown className="w-3 h-3" />
+                                ) : (
+                                  <ChevronRight className="w-3 h-3" />
+                                )}
+                              </span>
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
+
+                            {/* Group Items */}
+                            {isGroupExpanded && (
+                              <div className="pl-2 space-y-0.5 border-l border-zinc-800/60 ml-2">
+                                {group.items.map((child) => {
+                                  const isChildSelected = activeSubcategory === child.subcategory;
+                                  const ChildIcon = child.icon;
+                                  const subcatKey = child.subcategory || child.id;
+                                  const folderPerm = HecosStorage.getFolderPermission(subcatKey);
+                                  const isActualGm = currentUser?.role === 'gm';
+                                  const canAccess = isActualGm || HecosStorage.canUserAccess(folderPerm.visibility, folderPerm.allowedUserIds, currentUser);
+
+                                  if (!canAccess) return null;
+
+                                  return (
+                                    <div
+                                      key={child.id}
+                                      className="flex items-center justify-between group/subcat rounded-lg hover:bg-zinc-900/50 transition-all pr-1"
+                                    >
+                                      <div
+                                        onClick={() => {
+                                          setSelectedCategoryKey(category.id);
+                                          setActiveSubcategory(child.subcategory!);
+                                          setSelectedEntityId(null);
+                                          if (child.viewType && child.viewType !== 'entities') {
+                                            setActiveView(child.viewType);
+                                          } else {
+                                            setActiveView('entities');
+                                          }
+                                          setIsSidebarOpen(false);
+                                        }}
+                                        className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer transition-colors ${
+                                          isChildSelected
+                                            ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-700/60 font-semibold'
+                                            : 'text-zinc-400 hover:text-zinc-200'
+                                        }`}
+                                      >
+                                        <span style={{ color: child.color }}>
+                                          <ChildIcon className="w-3.5 h-3.5" />
+                                        </span>
+                                        <span className="truncate">{child.name}</span>
+                                      </div>
+
+                                      {/* GM Granular Folder Visibility Menu */}
+                                      {currentUser?.role === 'gm' && (
+                                        <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                                          <VisibilityBadgeMenu
+                                            visibility={folderPerm.visibility}
+                                            allowedUserIds={folderPerm.allowedUserIds}
+                                            onChange={(newVis, newAllowed) => {
+                                              HecosStorage.setFolderPermission(subcatKey, newVis, newAllowed);
+                                            }}
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      category.children!.map((child) => {
+                        const isChildSelected = activeSubcategory === child.subcategory;
+                        const ChildIcon = child.icon;
+                        const subcatKey = child.subcategory || child.id;
+                        const folderPerm = HecosStorage.getFolderPermission(subcatKey);
+                        const isActualGm = currentUser?.role === 'gm';
+                        const canAccess = isActualGm || HecosStorage.canUserAccess(folderPerm.visibility, folderPerm.allowedUserIds, currentUser);
+
+                        if (!canAccess) return null;
+
+                        return (
+                          <div
+                            key={child.id}
+                            className="flex items-center justify-between group/subcat rounded-lg hover:bg-zinc-900/50 transition-all pr-1"
+                          >
+                            <div
+                              onClick={() => {
+                                setSelectedCategoryKey(category.id);
+                                setActiveSubcategory(child.subcategory!);
+                                setSelectedEntityId(null);
+                                if (child.viewType && child.viewType !== 'entities') {
+                                  setActiveView(child.viewType);
+                                } else {
+                                  setActiveView('entities');
+                                }
+                                setIsSidebarOpen(false);
+                              }}
+                              className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer transition-colors ${
+                                isChildSelected
+                                  ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-700/60 font-semibold'
+                                  : 'text-zinc-400 hover:text-zinc-200'
+                              }`}
+                            >
+                              <span style={{ color: child.color }}>
+                                <ChildIcon className="w-3.5 h-3.5" />
+                              </span>
+                              <span className="truncate">{child.name}</span>
+                            </div>
+
+                            {/* GM Granular Folder Visibility Menu */}
+                            {currentUser?.role === 'gm' && (
+                              <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                                <VisibilityBadgeMenu
+                                  visibility={folderPerm.visibility}
+                                  allowedUserIds={folderPerm.allowedUserIds}
+                                  onChange={(newVis, newAllowed) => {
+                                    HecosStorage.setFolderPermission(subcatKey, newVis, newAllowed);
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                 )}
               </div>
@@ -638,26 +773,8 @@ export function App() {
           })}
         </div>
 
-        {/* GM Mode & Bottom Controls */}
+        {/* Bottom Controls */}
         <div className="p-3 bg-[#0d0b13] border-t border-zinc-800/80 space-y-2 text-xs">
-          {/* GM Secret Visibility Toggle */}
-          <button
-            onClick={() => setIsGmMode(!isGmMode)}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-bold transition-all border ${
-              isGmMode
-                ? 'bg-rose-950/60 border-rose-600/60 text-rose-200'
-                : 'bg-zinc-900 border-zinc-800 text-zinc-400'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              {isGmMode ? <Unlock className="w-4 h-4 text-rose-400" /> : <Lock className="w-4 h-4 text-zinc-500" />}
-              <span>{isGmMode ? 'Modo Mestre (GM)' : 'Modo Jogador'}</span>
-            </div>
-            <span className="text-[10px] uppercase tracking-wider font-mono">
-              {isGmMode ? 'Segredos ON' : 'Oculto'}
-            </span>
-          </button>
-
           {/* Firebase Real-time Persistence Status Badge */}
           <div
             onClick={() => setIsFirebaseModalOpen(true)}
@@ -742,46 +859,98 @@ export function App() {
               </button>
             )}
 
-            {/* Breadcrumb path */}
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-zinc-500 uppercase tracking-wider font-semibold">Hecos</span>
-              <span className="text-zinc-700">/</span>
-              <span className="text-cyan-400 font-bold">
-                {activeSubcategory || getCategoryMeta(selectedCategoryKey).name}
-              </span>
+            {/* Interactive Breadcrumb path */}
+            <div className="flex items-center gap-1.5 text-xs flex-wrap">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCategoryKey('codex');
+                  setActiveSubcategory(null);
+                  setSelectedEntityId(null);
+                  setEditingEntity(null);
+                  setActiveView('entities');
+                }}
+                className="text-zinc-400 hover:text-cyan-300 uppercase tracking-wider font-bold transition-all hover:underline cursor-pointer px-1 py-0.5 rounded hover:bg-zinc-800/60"
+                title="Página Inicial do Codex Hecos"
+              >
+                Hecos
+              </button>
+
+              <span className="text-zinc-700 select-none">/</span>
+
+              {(() => {
+                const effectiveCatKey = currentEntity ? currentEntity.category : selectedCategoryKey;
+                const catMeta = getCategoryMeta(effectiveCatKey);
+                return (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategoryKey(effectiveCatKey);
+                      setActiveSubcategory(null);
+                      setSelectedEntityId(null);
+                      setEditingEntity(null);
+                      setActiveView('entities');
+                    }}
+                    className={`font-bold transition-all hover:underline cursor-pointer px-1 py-0.5 rounded hover:bg-zinc-800/60 ${
+                      !activeSubcategory && !selectedEntityId
+                        ? 'text-cyan-300'
+                        : 'text-zinc-300 hover:text-cyan-300'
+                    }`}
+                    title={`Navegar para a categoria ${catMeta.name}`}
+                  >
+                    {catMeta.name}
+                  </button>
+                );
+              })()}
+
+              {(() => {
+                const sub = activeSubcategory || currentEntity?.subcategory;
+                if (!sub) return null;
+                return (
+                  <>
+                    <span className="text-zinc-700 select-none">/</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveSubcategory(sub);
+                        setSelectedEntityId(null);
+                        setEditingEntity(null);
+                        setActiveView('entities');
+                      }}
+                      className={`font-medium transition-all hover:underline cursor-pointer px-1 py-0.5 rounded hover:bg-zinc-800/60 ${
+                        !selectedEntityId
+                          ? 'text-amber-300 font-bold'
+                          : 'text-zinc-400 hover:text-amber-300'
+                      }`}
+                      title={`Navegar para a subcategoria ${sub}`}
+                    >
+                      {sub}
+                    </button>
+                  </>
+                );
+              })()}
+
               {selectedEntityId && currentEntity && (
                 <>
-                  <span className="text-zinc-700">/</span>
-                  <span className="text-zinc-200 font-medium truncate max-w-[150px] sm:max-w-[250px]">
+                  <span className="text-zinc-700 select-none">/</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingEntity(null);
+                      setActiveView('view');
+                    }}
+                    className="text-zinc-100 font-bold truncate max-w-[150px] sm:max-w-[280px] hover:text-cyan-300 transition-colors cursor-pointer px-1 py-0.5 rounded hover:bg-zinc-800/60"
+                    title={`Visualizar ${currentEntity.title}`}
+                  >
                     {currentEntity.title}
-                  </span>
+                  </button>
                 </>
               )}
             </div>
           </div>
 
-          {/* Quick Utility Tools (GM Toggle, AoN, Dice, Music, Drive, New Article) */}
+          {/* Quick Utility Tools (AoN, Dice, Music, Drive, New Article) */}
           <div className="flex items-center gap-2">
-            {/* Quick GM Mode Toggle */}
-            <button
-              onClick={() => setIsGmMode(!isGmMode)}
-              className={`p-2 sm:px-3 sm:py-1.5 rounded-xl border font-bold text-xs transition-all flex items-center gap-1.5 ${
-                isGmMode
-                  ? 'bg-rose-950/80 border-rose-600/70 text-rose-200 shadow-[0_0_12px_rgba(225,29,72,0.25)]'
-                  : 'bg-[#110e19] hover:bg-[#1a1427] border-zinc-800 text-zinc-400 hover:text-zinc-200'
-              }`}
-              title={isGmMode ? 'Modo Mestre Ativo (Segredos Visíveis)' : 'Modo Jogador (Segredos Ocultos)'}
-            >
-              {isGmMode ? (
-                <Unlock className="w-3.5 h-3.5 text-rose-400" />
-              ) : (
-                <Lock className="w-3.5 h-3.5 text-zinc-500" />
-              )}
-              <span className="hidden sm:inline text-xs font-semibold">
-                {isGmMode ? 'GM' : 'Jogador'}
-              </span>
-            </button>
-
             {/* Archives of Nethys (2e.aonprd.com) Quick Reference */}
             <button
               onClick={() => setIsAoNOpen(true)}
@@ -814,15 +983,26 @@ export function App() {
             {currentUser ? (
               <div className="flex items-center gap-1.5">
                 {currentUser.role === 'gm' && (
-                  <button
-                    type="button"
-                    onClick={() => setIsUserManagementModalOpen(true)}
-                    className="p-2 sm:px-2.5 sm:py-1.5 rounded-xl bg-amber-950/60 hover:bg-amber-900/80 border border-amber-500/50 text-amber-300 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:shadow-[0_0_12px_rgba(245,158,11,0.25)]"
-                    title="Gerenciar Jogadores e Senhas (Apenas GM)"
-                  >
-                    <Users className="w-3.5 h-3.5 text-amber-400" />
-                    <span className="hidden xl:inline">Jogadores</span>
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setIsTrashOpen(true)}
+                      className="p-2 sm:px-2.5 sm:py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900/80 border border-rose-600/50 text-rose-300 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:shadow-[0_0_12px_rgba(225,29,72,0.25)]"
+                      title="Lixeira do Sistema (Restaurar ou Excluir Definitivamente)"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                      <span className="hidden xl:inline">Lixeira</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsUserManagementModalOpen(true)}
+                      className="p-2 sm:px-2.5 sm:py-1.5 rounded-xl bg-amber-950/60 hover:bg-amber-900/80 border border-amber-500/50 text-amber-300 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:shadow-[0_0_12px_rgba(245,158,11,0.25)]"
+                      title="Gerenciar Jogadores e Senhas (Apenas GM)"
+                    >
+                      <Users className="w-3.5 h-3.5 text-amber-400" />
+                      <span className="hidden xl:inline">Jogadores</span>
+                    </button>
+                  </>
                 )}
 
                 <button
@@ -868,13 +1048,15 @@ export function App() {
             </button>
 
             {/* Create New Entity Button */}
-            <button
-              onClick={() => handleCreateNewEntity(activeSubcategory || selectedCategoryKey)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-zinc-950 text-xs font-extrabold shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all cursor-pointer"
-            >
-              <Plus className="w-4 h-4 stroke-[3]" />
-              <span className="hidden sm:inline">Novo Artigo</span>
-            </button>
+            {isActualGm && (
+              <button
+                onClick={() => handleCreateNewEntity(activeSubcategory || selectedCategoryKey)}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-zinc-950 text-xs font-extrabold shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all cursor-pointer"
+              >
+                <Plus className="w-4 h-4 stroke-[3]" />
+                <span className="hidden sm:inline">Novo Artigo</span>
+              </button>
+            )}
           </div>
         </header>
 
@@ -920,8 +1102,8 @@ export function App() {
             />
           )}
 
-          {/* VIEW: Notion & PF2e Entity Editor */}
-          {activeView === 'edit' && editingEntity && (
+          {/* VIEW: Notion & PF2e Entity Editor (GM Only) */}
+          {activeView === 'edit' && editingEntity && isActualGm && (
             <EntityEditor
               entity={editingEntity}
               onSave={handleSaveEntity}
@@ -934,7 +1116,7 @@ export function App() {
             />
           )}
 
-          {/* VIEW: Category Entities Grid View (Default) OR FeatExplorer for Feats */}
+          {/* VIEW: Category Entities Grid View (Default) OR Custom Explorers for Feats, Spells, Items */}
           {activeView === 'entities' && (
             selectedCategoryKey === 'feat' || activeSubcategory === 'Talentos' ? (
               <FeatExplorer
@@ -948,6 +1130,44 @@ export function App() {
                   }
                 }}
                 onCreateFeat={handleCreateFeatDirectly}
+                onDeleteEntity={handleDeleteEntity}
+                onTagClick={(tag) => {
+                  setSelectedTagFilter(tag);
+                  setActiveView('tags');
+                }}
+                isGmMode={isGmMode}
+              />
+            ) : selectedCategoryKey === 'spell' || activeSubcategory === 'Feitiços' ? (
+              <SpellExplorer
+                entities={entities}
+                onSelectEntity={handleNavigateEntity}
+                onEditEntity={(id) => {
+                  const ent = entities.find((e) => e.id === id || e.slug === id);
+                  if (ent) {
+                    setEditingEntity(ent);
+                    setActiveView('edit');
+                  }
+                }}
+                onCreateSpell={handleCreateSpellDirectly}
+                onDeleteEntity={handleDeleteEntity}
+                onTagClick={(tag) => {
+                  setSelectedTagFilter(tag);
+                  setActiveView('tags');
+                }}
+                isGmMode={isGmMode}
+              />
+            ) : selectedCategoryKey === 'item' || activeSubcategory === 'Itens' ? (
+              <ItemExplorer
+                entities={entities}
+                onSelectEntity={handleNavigateEntity}
+                onEditEntity={(id) => {
+                  const ent = entities.find((e) => e.id === id || e.slug === id);
+                  if (ent) {
+                    setEditingEntity(ent);
+                    setActiveView('edit');
+                  }
+                }}
+                onCreateItem={handleCreateItemDirectly}
                 onDeleteEntity={handleDeleteEntity}
                 onTagClick={(tag) => {
                   setSelectedTagFilter(tag);
@@ -970,6 +1190,34 @@ export function App() {
                   </div>
 
                   <div className="flex items-center gap-2 w-full sm:w-auto">
+                    {/* View Mode Toggle: Grid vs Compact List */}
+                    <div className="flex items-center bg-black/50 border border-zinc-800 p-0.5 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => setEntityListViewMode('grid')}
+                        className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                          entityListViewMode === 'grid'
+                            ? 'bg-zinc-800 text-cyan-300 shadow-sm'
+                            : 'text-zinc-500 hover:text-zinc-300'
+                        }`}
+                        title="Visualização em Grade"
+                      >
+                        <LayoutGrid className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEntityListViewMode('compact')}
+                        className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                          entityListViewMode === 'compact'
+                            ? 'bg-zinc-800 text-cyan-300 shadow-sm'
+                            : 'text-zinc-500 hover:text-zinc-300'
+                        }`}
+                        title="Visualização Compacta Minimalista"
+                      >
+                        <List className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
                     <div className="relative flex-1 sm:w-64">
                       <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
@@ -993,19 +1241,121 @@ export function App() {
                   </div>
                 </div>
 
-                {/* Entities Cards Grid */}
+                {/* Entities Cards Grid OR Compact Table */}
                 {categoryEntities.length === 0 ? (
                   <div className="p-12 text-center rounded-2xl bg-[#09080d] border border-zinc-800/60 space-y-3">
                     <BookOpen className="w-8 h-8 text-zinc-600 mx-auto" />
                     <p className="text-sm text-zinc-400">Nenhum artigo encontrado nesta categoria com os filtros atuais.</p>
-                    <button
-                      onClick={() => handleCreateNewEntity(activeSubcategory || selectedCategoryKey)}
-                      className="px-4 py-2 text-xs font-bold rounded-xl bg-cyan-500 text-zinc-950 hover:bg-cyan-400 transition-all shadow-md"
-                    >
-                      Criar Primeira Entrada em {activeSubcategory || getCategoryMeta(selectedCategoryKey).name}
-                    </button>
+                    {isActualGm && (
+                      <button
+                        onClick={() => handleCreateNewEntity(activeSubcategory || selectedCategoryKey)}
+                        className="px-4 py-2 text-xs font-bold rounded-xl bg-cyan-500 text-zinc-950 hover:bg-cyan-400 transition-all shadow-md cursor-pointer"
+                      >
+                        Criar Primeira Entrada em {activeSubcategory || getCategoryMeta(selectedCategoryKey).name}
+                      </button>
+                    )}
+                  </div>
+                ) : entityListViewMode === 'compact' ? (
+                  /* COMPACT MINIMALIST TABLE VIEW */
+                  <div className="bg-[#09080e] rounded-2xl border border-zinc-800/80 overflow-hidden shadow-xl">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-[#120f1c] border-b border-zinc-800 text-zinc-400 uppercase font-mono text-[10px]">
+                          <tr>
+                            <th className="py-2.5 px-4">Nome / Título</th>
+                            <th className="py-2.5 px-3">Categoria</th>
+                            <th className="py-2.5 px-3">Tags</th>
+                            <th className="py-2.5 px-3">Atualizado</th>
+                            <th className="py-2.5 px-3 text-right">Ações</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-800/60">
+                          {categoryEntities.map((item) => {
+                            const isCiano = ['pc', 'spell', 'ancestry', 'rule'].includes(item.category);
+                            const isMalva = ['npc', 'item', 'flora', 'class', 'feat', 'timeline'].includes(item.category);
+
+                            return (
+                              <tr
+                                key={item.id}
+                                onClick={() => handleNavigateEntity(item.id)}
+                                className="hover:bg-zinc-900/50 transition-colors cursor-pointer group"
+                              >
+                                <td className="py-2.5 px-4 font-bold text-zinc-200 group-hover:text-cyan-300 transition-colors">
+                                  <div className="flex items-center gap-2">
+                                    <span>{item.title}</span>
+                                    {item.subtitle && (
+                                      <span className="text-zinc-500 font-normal text-[11px] truncate max-w-xs">
+                                        ({item.subtitle})
+                                      </span>
+                                    )}
+                                    {item.isSecret && (
+                                      <span className="text-[9px] px-1 py-0.2 rounded bg-rose-950 text-rose-300 border border-rose-800 font-mono">
+                                        GM
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="py-2.5 px-3 text-zinc-400 font-mono text-[11px]">
+                                  <span
+                                    className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded border ${
+                                      isCiano
+                                        ? 'bg-cyan-950 text-cyan-300 border-cyan-800'
+                                        : isMalva
+                                        ? 'bg-purple-950 text-purple-300 border-purple-800'
+                                        : 'bg-rose-950 text-rose-300 border-rose-800'
+                                    }`}
+                                  >
+                                    {getCategoryMeta(item.category).name}
+                                  </span>
+                                </td>
+                                <td className="py-2.5 px-3">
+                                  <div className="flex items-center gap-1 flex-wrap">
+                                    {item.tags.slice(0, 3).map((t, tIdx) => (
+                                      <span
+                                        key={`${item.id}-tbltag-${t}-${tIdx}`}
+                                        className="text-[10px] px-1.5 py-0.2 rounded bg-black/40 text-zinc-400 border border-zinc-800"
+                                      >
+                                        #{t}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </td>
+                                <td className="py-2.5 px-3 text-zinc-500 font-mono text-[10px]">
+                                  {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('pt-BR') : '—'}
+                                </td>
+                                <td className="py-2.5 px-3 text-right" onClick={(e) => e.stopPropagation()}>
+                                  {isActualGm ? (
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      <VisibilityBadgeMenu
+                                        visibility={item.visibility}
+                                        allowedUserIds={item.allowedUserIds}
+                                        isSecret={item.isSecret}
+                                        onChange={(newVis, newAllowed) => {
+                                          HecosStorage.setEntityVisibility(item.id, newVis, newAllowed);
+                                        }}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteEntity(item.id)}
+                                        className="p-1 rounded bg-zinc-800/80 hover:bg-rose-950 text-zinc-400 hover:text-rose-300 transition-colors cursor-pointer"
+                                        title="Excluir"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[11px] text-zinc-500 font-mono">Leitura</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 ) : (
+                  /* STANDARD CARDS GRID VIEW */
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {categoryEntities.map((item) => {
                       const isCiano = ['pc', 'spell', 'ancestry', 'rule'].includes(item.category);
@@ -1032,31 +1382,33 @@ export function App() {
                                 {getCategoryMeta(item.category).name} {item.statblock ? `• Nível ${item.statblock.level}` : ''}
                               </span>
 
-                              <div className="flex items-center gap-1.5">
-                                {/* 3-Level Granular Visibility Menu */}
-                                <div onClick={(e) => e.stopPropagation()}>
-                                  <VisibilityBadgeMenu
-                                    visibility={item.visibility}
-                                    allowedUserIds={item.allowedUserIds}
-                                    isSecret={item.isSecret}
-                                    onChange={(newVis, newAllowed) => {
-                                      HecosStorage.setEntityVisibility(item.id, newVis, newAllowed);
-                                    }}
-                                  />
-                                </div>
+                              {isActualGm && (
+                                <div className="flex items-center gap-1.5">
+                                  {/* 3-Level Granular Visibility Menu */}
+                                  <div onClick={(e) => e.stopPropagation()}>
+                                    <VisibilityBadgeMenu
+                                      visibility={item.visibility}
+                                      allowedUserIds={item.allowedUserIds}
+                                      isSecret={item.isSecret}
+                                      onChange={(newVis, newAllowed) => {
+                                        HecosStorage.setEntityVisibility(item.id, newVis, newAllowed);
+                                      }}
+                                    />
+                                  </div>
 
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteEntity(item.id);
-                                  }}
-                                  className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 rounded-lg hover:bg-rose-950/80 text-zinc-400 hover:text-rose-400 border border-transparent hover:border-rose-800 transition-all"
-                                  title={`Excluir "${item.title}"`}
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteEntity(item.id);
+                                    }}
+                                    className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 rounded-lg hover:bg-rose-950/80 text-zinc-400 hover:text-rose-400 border border-transparent hover:border-rose-800 transition-all cursor-pointer"
+                                    title={`Excluir "${item.title}"`}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              )}
                             </div>
 
                             {/* Card Title & Subtitle */}
@@ -1080,9 +1432,9 @@ export function App() {
                           {/* Card Footer: Tags & Arrow */}
                           <div className="pt-4 mt-3 border-t border-zinc-800/80 flex items-center justify-between">
                             <div className="flex flex-wrap gap-1">
-                              {item.tags.slice(0, 2).map((t) => (
+                              {item.tags.slice(0, 2).map((t, tIdx) => (
                                 <span
-                                  key={t}
+                                  key={`${item.id}-crdtag-${t}-${tIdx}`}
                                   className="text-[10px] px-1.5 py-0.5 rounded bg-black/60 text-zinc-400 border border-zinc-800"
                                 >
                                   #{t}
@@ -1129,12 +1481,13 @@ export function App() {
         onClose={() => setIsAoNOpen(false)}
       />
 
-      <ConfirmModal
+      {/* Confirm Delete Modal (Moves to Lixeira / Trash by default) */}
+      <ConfirmDeleteModal
         isOpen={!!entityToDelete}
-        title="Excluir Entrada do Codex"
-        message={`Tem certeza de que deseja excluir permanentemente ${entityToDelete?.title} de Hecos?\n\nEsta ação removerá o artigo e seus dados do sistema.`}
-        confirmLabel="Excluir Definitivamente"
-        cancelLabel="Cancelar"
+        itemName={entityToDelete?.title || ''}
+        itemType="Artigo"
+        isPermanent={false}
+        confirmLabel="Mover para Lixeira"
         onConfirm={confirmDeleteEntity}
         onCancel={() => setEntityToDelete(null)}
       />
@@ -1143,6 +1496,32 @@ export function App() {
         isOpen={isNewArticleModalOpen}
         onClose={() => setIsNewArticleModalOpen(false)}
         onCreate={handleCreateEntityOfCategory}
+      />
+
+      {/* Robust PF2e Spell Creation Modal */}
+      <SpellCreateModal
+        isOpen={isSpellCreateModalOpen}
+        onClose={() => setIsSpellCreateModalOpen(false)}
+        presetCategory={spellModalPresetCategory}
+        presetSubcategory={spellModalPresetSubcategory}
+        onSave={(newSpellEntity) => {
+          refreshEntities();
+          handleNavigateEntity(newSpellEntity.id);
+          setIsSpellCreateModalOpen(false);
+        }}
+      />
+
+      {/* Robust PF2e Item Creation Modal */}
+      <ItemCreateModal
+        isOpen={isItemCreateModalOpen}
+        onClose={() => setIsItemCreateModalOpen(false)}
+        presetCategory={itemModalPresetCategory}
+        presetSubcategory={itemModalPresetSubcategory}
+        onSave={(newItemEntity) => {
+          refreshEntities();
+          handleNavigateEntity(newItemEntity.id);
+          setIsItemCreateModalOpen(false);
+        }}
       />
 
       <FirebaseStatusModal
@@ -1160,6 +1539,18 @@ export function App() {
         isOpen={isUserManagementModalOpen}
         onClose={() => setIsUserManagementModalOpen(false)}
       />
+
+      <TrashBinModal
+        isOpen={isTrashOpen}
+        onClose={() => setIsTrashOpen(false)}
+        onRestoreEntity={(id) => {
+          refreshEntities();
+          handleNavigateEntity(id);
+        }}
+      />
+
+      {/* Global Tooltip that overlays all windows with highest z-index */}
+      <GlobalTooltip />
     </div>
   );
 }

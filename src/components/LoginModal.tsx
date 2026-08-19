@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HecosStorage, INITIAL_ADMIN_USER } from '../services/storage';
+import { HecosStorage } from '../services/storage';
 import { HecosUser } from '../types';
 import {
   Lock,
@@ -9,7 +9,6 @@ import {
   LogOut,
   AlertCircle,
   X,
-  Sparkles,
   Users,
   CheckCircle2
 } from 'lucide-react';
@@ -66,12 +65,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setTimeout(() => {
       setSuccessMsg(null);
     }, 1500);
-  };
-
-  const handleFillAdminDemo = () => {
-    setUsername(INITIAL_ADMIN_USER.username);
-    setPassword(INITIAL_ADMIN_USER.password || '159753');
-    setError(null);
   };
 
   return (
@@ -183,7 +176,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Ex: Henrick(GM) ou nome do jogador"
+                  placeholder="Nome de usuário ou jogador"
                   required
                   className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/90 border border-zinc-700 text-zinc-100 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all placeholder:text-zinc-500"
                 />
@@ -210,26 +203,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 <ShieldCheck className="w-4 h-4" />
                 Entrar no Sistema
               </button>
-
-              {/* GM Default Credentials Helper */}
-              <div className="pt-2 border-t border-zinc-800/80">
-                <button
-                  type="button"
-                  onClick={handleFillAdminDemo}
-                  className="w-full p-2.5 rounded-xl bg-amber-950/30 hover:bg-amber-950/50 border border-amber-600/30 text-amber-300 text-xs flex items-center justify-between transition-all cursor-pointer text-left"
-                >
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-                    <div>
-                      <div className="font-semibold text-amber-200">Acesso Mestre GM</div>
-                      <div className="text-[11px] text-amber-400/80">Preencher Henrick(GM) / 159753</div>
-                    </div>
-                  </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold uppercase">
-                    Auto-Fill
-                  </span>
-                </button>
-              </div>
             </form>
           )}
         </div>

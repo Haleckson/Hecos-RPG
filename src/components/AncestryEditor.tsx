@@ -110,11 +110,47 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
     });
   };
 
+  const updateHeritageVisibility = (index: number, newVis: ItemVisibility, newAllowed: string[]) => {
+    setData((prev) => {
+      const list = [...(prev.heritages || [])];
+      list[index] = {
+        ...list[index],
+        visibility: newVis,
+        allowedUserIds: newAllowed,
+      };
+      return { ...prev, heritages: list };
+    });
+  };
+
   const removeHeritage = (index: number) => {
     setData((prev) => {
       const list = [...(prev.heritages || [])];
       list.splice(index, 1);
       return { ...prev, heritages: list };
+    });
+  };
+
+  const updateFeatVisibility = (
+    rank: 1 | 5 | 9 | 13 | 17,
+    index: number,
+    newVis: ItemVisibility,
+    newAllowed: string[]
+  ) => {
+    setData((prev) => {
+      const key = `rank${rank}` as keyof typeof prev.feats;
+      const list = [...(prev.feats?.[key] || [])];
+      list[index] = {
+        ...list[index],
+        visibility: newVis,
+        allowedUserIds: newAllowed,
+      };
+      return {
+        ...prev,
+        feats: {
+          ...prev.feats,
+          [key]: list,
+        },
+      };
     });
   };
 
@@ -174,6 +210,7 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
 
         if (!existsInRank) {
           const actionCost = (parsedFeat.actionCost || '1') as 'passive' | '1' | '2' | '3' | 'reaction' | 'free';
+          const featPerm = HecosStorage.getEntityPermission(featEntity.id);
           const newFeat: AncestryFeat = {
             id: `feat-${targetRank}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
             featEntityId: featEntity.id,
@@ -181,6 +218,8 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
             name: featEntity.title || 'Talento Sem Nome',
             rank: targetRank,
             actions: actionCost,
+            visibility: featPerm.visibility || featEntity.visibility || 'all',
+            allowedUserIds: featPerm.allowedUserIds || featEntity.allowedUserIds || [],
             traits:
               parsedFeat.traits && parsedFeat.traits.length > 0
                 ? parsedFeat.traits
@@ -353,16 +392,15 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
 
   return (
     <div className="bg-[#0c0b12] text-zinc-100 rounded-2xl border border-zinc-800/90 shadow-2xl overflow-hidden space-y-6 max-w-full relative">
-      {/* Floating Save Button */}
-      <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2">
+      {/* Floating Save Button (Icon-only) */}
+      <div className="fixed bottom-6 right-6 z-50">
         <button
           type="button"
           onClick={handleSave}
-          className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-[#74b6c2] to-[#b19ecc] hover:from-[#88cbd7] hover:to-[#c4b3dc] text-zinc-950 font-black text-sm shadow-[0_4px_25px_rgba(116,182,194,0.4)] hover:shadow-[0_4px_30px_rgba(116,182,194,0.6)] hover:scale-105 active:scale-95 transition-all cursor-pointer border border-white/20"
-          title="Salvar Ancestralidade (Ctrl+S)"
+          className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-r from-[#74b6c2] to-[#b19ecc] hover:from-[#88cbd7] hover:to-[#c4b3dc] text-zinc-950 font-black shadow-[0_4px_25px_rgba(116,182,194,0.45)] hover:shadow-[0_6px_30px_rgba(116,182,194,0.7)] hover:scale-110 active:scale-95 transition-all cursor-pointer border border-white/30"
+          data-tooltip="Salvar Ancestralidade (Ctrl+S)"
         >
           <Save className="w-5 h-5 stroke-[2.5]" />
-          <span>Salvar Artigo</span>
         </button>
       </div>
 
@@ -416,6 +454,18 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
             <span>Salvar</span>
           </button>
         </div>
+      </div>
+
+      {/* Floating Save Button (Icon-only) */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <button
+          type="button"
+          onClick={handleSave}
+          className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-r from-[#74b6c2] to-[#b19ecc] hover:scale-110 active:scale-95 text-zinc-950 shadow-[0_4px_25px_rgba(116,182,194,0.45)] hover:shadow-[0_6px_30px_rgba(116,182,194,0.7)] transition-all cursor-pointer border border-white/30"
+          data-tooltip="Salvar Ancestralidade (Ctrl+S)"
+        >
+          <Save className="w-5 h-5 stroke-[2.5]" />
+        </button>
       </div>
 
       <div className="p-4 sm:p-6 md:p-8 space-y-6">
@@ -715,14 +765,23 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
                           placeholder="Nome da Herança (ex: Herança das Brumas)"
                           className="flex-1 px-3 py-1.5 rounded-lg bg-[#14121d] border border-[#493b61] focus:border-[#b19ecc] text-sm font-bold text-[#b19ecc] placeholder-zinc-600 outline-none"
                         />
-                        <button
-                          type="button"
-                          onClick={() => removeHeritage(idx)}
-                          className="p-1.5 rounded-lg bg-[#24131a] text-[#cb8394] hover:bg-[#351a24] border border-[#522934] text-xs transition-colors cursor-pointer"
-                          title="Remover esta Herança"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <VisibilityBadgeMenu
+                            visibility={heritage.visibility || 'all'}
+                            allowedUserIds={heritage.allowedUserIds || []}
+                            onChange={(newVis, newAllowed) =>
+                              updateHeritageVisibility(idx, newVis, newAllowed)
+                            }
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeHeritage(idx)}
+                            className="p-1.5 rounded-lg bg-[#24131a] text-[#cb8394] hover:bg-[#351a24] border border-[#522934] text-xs transition-colors cursor-pointer"
+                            title="Remover esta Herança"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
 
                       <ReferenceField
@@ -918,14 +977,24 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
                           </select>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => removeFeat(activeFeatRank, idx)}
-                          className="p-1.5 rounded-lg bg-[#24131a] text-[#cb8394] hover:bg-[#351a24] border border-[#522934] text-xs transition-colors cursor-pointer"
-                          title="Remover talento"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <VisibilityBadgeMenu
+                            visibility={feat.visibility || 'all'}
+                            allowedUserIds={feat.allowedUserIds || []}
+                            onChange={(newVis, newAllowed) =>
+                              updateFeatVisibility(activeFeatRank, idx, newVis, newAllowed)
+                            }
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() => removeFeat(activeFeatRank, idx)}
+                            className="p-1.5 rounded-lg bg-[#24131a] text-[#cb8394] hover:bg-[#351a24] border border-[#522934] text-xs transition-colors cursor-pointer"
+                            title="Remover talento"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

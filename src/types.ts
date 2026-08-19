@@ -29,18 +29,87 @@ export interface PF2eAction {
   description: string;
 }
 
-export interface PF2eSpellSlot {
-  rank: number;
+export type SpellTradition = 'arcano' | 'divino' | 'oculto' | 'primal' | 'outras';
+
+export type SpellCategoryType =
+  | 'all'
+  | 'arcane'
+  | 'divine'
+  | 'occult'
+  | 'primal'
+  | 'focus'
+  | 'ritual'
+  | 'extras';
+
+export interface PF2eSpellAttributes {
+  rank: number; // 0 = Truque / Cantrip, 1-10
   traditions: string[];
+  spellType?: 'spell' | 'focus' | 'ritual' | 'other' | 'cantrip';
+  subcategories?: string[];
   castTime: string;
   range?: string;
   area?: string;
   targets?: string;
   duration?: string;
   savingThrow?: string;
+  rarity?: 'Comum' | 'Incomum' | 'Raro' | 'Único';
   traits: string[];
   description: string;
   heightened?: string;
+  criticalSuccess?: string;
+  success?: string;
+  failure?: string;
+  criticalFailure?: string;
+  hecosLore?: string;
+  gmNotes?: string;
+}
+
+export type ItemCategoryType =
+  | 'all'
+  | 'weapons'
+  | 'armor'
+  | 'consumables'
+  | 'alchemical'
+  | 'magical'
+  | 'artifacts'
+  | 'gear'
+  | 'extras';
+
+export interface PF2eItemAttributes {
+  level: number;
+  itemType?: ItemCategoryType;
+  subcategories?: string[];
+  price?: string;
+  bulk?: string;
+  hands?: string;
+  rarity?: 'Comum' | 'Incomum' | 'Raro' | 'Único';
+  usage?: string;
+  activation?: string;
+  activationAction?: string;
+  activationTrigger?: string;
+  activationRequirement?: string;
+  activationFrequency?: string;
+  activationEffect?: string;
+  traits: string[];
+  hardness?: number;
+  hp?: number;
+  brokenThreshold?: number;
+  damage?: string;
+  damageType?: string;
+  weaponGroup?: string;
+  weaponRange?: string;
+  reload?: string;
+  armorBonus?: number;
+  dexCap?: number;
+  checkPenalty?: number;
+  speedPenalty?: string;
+  strengthReq?: number;
+  craftFormula?: string;
+  craftRequirements?: string;
+  specialProperties?: string;
+  description?: string;
+  hecosLore?: string;
+  gmNotes?: string;
 }
 
 export interface PF2eStatblock {
@@ -79,15 +148,7 @@ export interface PF2eStatblock {
   specialAbilities?: { name: string; description: string }[];
 }
 
-export interface ItemAttributes {
-  level: number;
-  price?: string;
-  bulk?: string;
-  rarity: 'Comum' | 'Incomum' | 'Raro' | 'Único';
-  usage?: string;
-  activation?: string;
-  traits: string[];
-}
+export interface ItemAttributes extends PF2eItemAttributes {}
 
 export interface LocationAttributes {
   settlementType?: string;
@@ -127,6 +188,8 @@ export interface AncestryHeritage {
   id: string;
   name: string;
   description: string;
+  visibility?: ItemVisibility;
+  allowedUserIds?: string[];
 }
 
 export interface AncestryFeat {
@@ -139,6 +202,8 @@ export interface AncestryFeat {
   description: string;
   featEntityId?: string;
   slug?: string;
+  visibility?: ItemVisibility;
+  allowedUserIds?: string[];
 }
 
 export type FeatCategoryType =
@@ -326,7 +391,7 @@ export interface HecosEntity {
   sessionData?: SessionAttributes;
   timelineData?: TimelineEventAttributes;
   gmNoteData?: GMNoteAttributes;
-  spellData?: PF2eSpellSlot;
+  spellData?: PF2eSpellAttributes;
 }
 
 export interface MapPin {
@@ -379,4 +444,11 @@ export interface TagInfo {
   name: string;
   count: number;
   category?: string;
+}
+
+export interface TrashedEntity {
+  entity: HecosEntity;
+  deletedAt: string;
+  deletedBy?: string;
+  originalCategory: string;
 }

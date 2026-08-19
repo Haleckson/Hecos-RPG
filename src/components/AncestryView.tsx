@@ -67,10 +67,39 @@ export const AncestryView: React.FC<AncestryViewProps> = ({
     });
   }, []);
 
+  // Current user and role
+  const currentUser = HecosStorage.getCurrentUser();
+  const isActualGm = currentUser?.role === 'gm' || isGmMode;
+
   // Structured Ancestry Data parsed from entity.ancestryData or content
   const data: AncestryAttributes = useMemo(() => {
     return parseAncestryFromContent(entity.title, entity.content || '', entity.ancestryData);
   }, [entity.title, entity.content, entity.ancestryData]);
+
+  // Filter heritages hierarchically based on user permissions
+  const visibleHeritages = useMemo(() => {
+    const list = data.heritages || [];
+    if (isActualGm) return list;
+    return list.filter((h) => HecosStorage.canUserAccessItem(h, currentUser));
+  }, [data.heritages, isActualGm, currentUser]);
+
+  // Filter feats hierarchically based on user permissions (including linked feat entities)
+  const getVisibleFeatsByRank = (rank: 1 | 5 | 9 | 13 | 17) => {
+    const key = `rank${rank}` as keyof typeof data.feats;
+    const list = data.feats?.[key] || [];
+    if (isActualGm) return list;
+    return list.filter((f) => HecosStorage.canUserAccessItem(f, currentUser));
+  };
+
+  const totalFeatsCount = useMemo(() => {
+    return (
+      getVisibleFeatsByRank(1).length +
+      getVisibleFeatsByRank(5).length +
+      getVisibleFeatsByRank(9).length +
+      getVisibleFeatsByRank(13).length +
+      getVisibleFeatsByRank(17).length
+    );
+  }, [data.feats, isActualGm, currentUser]);
 
   // GM Scratchpad / Notes State
   const initialGmText = useMemo(() => {
@@ -134,21 +163,6 @@ IDIOMAS: ${data.languages || 'Humani'}`;
     setTimeout(() => setCopiedStatblock(false), 2000);
   };
 
-  const getFeatsByRank = (rank: 1 | 5 | 9 | 13 | 17) => {
-    const key = `rank${rank}` as keyof typeof data.feats;
-    return data.feats?.[key] || [];
-  };
-
-  const totalFeatsCount = useMemo(() => {
-    return (
-      (data.feats?.rank1?.length || 0) +
-      (data.feats?.rank5?.length || 0) +
-      (data.feats?.rank9?.length || 0) +
-      (data.feats?.rank13?.length || 0) +
-      (data.feats?.rank17?.length || 0)
-    );
-  }, [data.feats]);
-
   return (
     <div className="space-y-6 text-zinc-100 font-sans w-full max-w-full overflow-hidden">
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
@@ -183,27 +197,28 @@ IDIOMAS: ${data.languages || 'Humani'}`;
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* 3-Level Granular Visibility Menu (Apenas GM, Todos, Compartilhamento Seletivo) */}
-            <VisibilityBadgeMenu
-              visibility={entity.visibility}
-              allowedUserIds={entity.allowedUserIds}
-              isSecret={entity.isSecret}
-              onChange={(newVis, newAllowed) => {
-                HecosStorage.setEntityVisibility(entity.id, newVis, newAllowed);
-              }}
-            />
+              {isActualGm && (
+                <VisibilityBadgeMenu
+                  visibility={entity.visibility}
+                  allowedUserIds={entity.allowedUserIds}
+                  isSecret={entity.isSecret}
+                  onChange={(newVis, newAllowed) => {
+                    HecosStorage.setEntityVisibility(entity.id, newVis, newAllowed);
+                  }}
+                />
+              )}
 
-            {onEdit && (
-              <button
-                type="button"
-                onClick={() => onEdit('mechanics')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-500/40 text-cyan-200 text-xs font-semibold transition-all cursor-pointer shadow-sm hover:shadow-[0_0_12px_rgba(6,182,212,0.3)]"
-                title="Editar Cabeçalho e Atributos da Ancestralidade"
-              >
-                <Edit3 className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Editar</span>
-              </button>
-            )}
+              {isActualGm && onEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit('mechanics')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-500/40 text-cyan-200 text-xs font-semibold transition-all cursor-pointer shadow-sm hover:shadow-[0_0_12px_rgba(6,182,212,0.3)]"
+                  title="Editar Cabeçalho e Atributos da Ancestralidade"
+                >
+                  <Edit3 className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Editar</span>
+                </button>
+              )}
 
             <button
               type="button"
@@ -387,16 +402,29 @@ IDIOMAS: ${data.languages || 'Humani'}`;
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-              {data.heritages && data.heritages.length > 0 ? (
-                data.heritages.map((h, i) => (
+              {visibleHeritages && visibleHeritages.length > 0 ? (
+                visibleHeritages.map((h, i) => (
                   <div
                     key={h.id || i}
                     className="p-4 rounded-xl bg-[#131120] border border-[#272438] hover:border-[#74b6c2]/50 transition-all space-y-2 min-w-0 break-words"
                   >
-                    <h4 className="text-base font-bold text-[#b19ecc] font-serif flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-[#74b6c2] shrink-0" />
-                      <span>{h.name}</span>
-                    </h4>
+                    <div className="flex items-center justify-between gap-2">
+                      <h4 className="text-base font-bold text-[#b19ecc] font-serif flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-[#74b6c2] shrink-0" />
+                        <span>{h.name}</span>
+                      </h4>
+                      {isActualGm && h.visibility && h.visibility !== 'all' && (
+                        <span
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded border font-mono ${
+                            h.visibility === 'gm'
+                              ? 'bg-rose-950/80 text-rose-300 border-rose-600/50'
+                              : 'bg-purple-950/80 text-purple-300 border-purple-600/50'
+                          }`}
+                        >
+                          {h.visibility === 'gm' ? 'Apenas GM' : 'Compartilhado'}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-sm text-zinc-300 leading-relaxed min-w-0 break-words">
                       <RichContentRenderer content={h.description} onNavigate={onNavigate} />
                     </div>
@@ -404,7 +432,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                 ))
               ) : (
                 <p className="text-xs text-zinc-500 col-span-2 italic py-2">
-                  Nenhuma herança específica cadastrada ainda.
+                  Nenhuma herança disponível com as permissões atuais.
                 </p>
               )}
             </div>
@@ -417,7 +445,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                 <Shield className="w-4 h-4 text-[#b19ecc]" />
                 <span>Arsenal Cultural & Equipamentos Tradicionais</span>
               </h3>
-              {onEdit && (
+              {isActualGm && onEdit && (
                 <button
                   type="button"
                   onClick={() => onEdit('mechanics')}
@@ -464,7 +492,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                   <Zap className="w-4 h-4 text-[#74b6c2]" />
                   <span>Talentos de Ancestralidade</span>
                 </h3>
-                {onEdit && (
+                {isActualGm && onEdit && (
                   <button
                     type="button"
                     onClick={() => onEdit('mechanics')}
@@ -500,7 +528,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                         : 'text-zinc-400 hover:text-zinc-200'
                     }`}
                   >
-                    Rank {r} ({getFeatsByRank(r).length})
+                    Rank {r} ({getVisibleFeatsByRank(r).length})
                   </button>
                 ))}
               </div>
@@ -511,11 +539,11 @@ IDIOMAS: ${data.languages || 'Humani'}`;
               {([1, 5, 9, 13, 17] as const)
                 .filter((r) => activeFeatRank === 'all' || activeFeatRank === r)
                 .map((r) => {
-                  const feats = getFeatsByRank(r);
+                  const feats = getVisibleFeatsByRank(r);
                   if (feats.length === 0 && activeFeatRank !== 'all') {
                     return (
                       <div key={r} className="text-center py-6 text-xs text-zinc-500">
-                        Nenhum talento cadastrado no Rank {r}.
+                        Nenhum talento disponível no Rank {r} com as permissões atuais.
                       </div>
                     );
                   }
@@ -536,22 +564,41 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                             className="p-4 rounded-xl bg-[#131120] border border-[#272438] hover:border-[#74b6c2]/40 transition-all space-y-2 min-w-0 break-words"
                           >
                             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#272438] pb-2">
-                              <span className="font-bold text-zinc-100 text-sm flex items-center gap-1.5">
-                                <span className="text-[#b19ecc]">◆</span>
-                                {feat.featEntityId && onNavigate ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => onNavigate(feat.featEntityId!)}
-                                    className="hover:text-[#74b6c2] hover:underline transition-colors text-left font-bold cursor-pointer inline-flex items-center gap-1"
-                                    title="Abrir página completa do talento"
-                                  >
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-bold text-zinc-100 text-sm flex items-center gap-1.5">
+                                  <span className="text-[#b19ecc]">◆</span>
+                                  {feat.featEntityId && onNavigate ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => onNavigate(feat.featEntityId!)}
+                                      className="hover:text-[#74b6c2] hover:underline transition-colors text-left font-bold cursor-pointer inline-flex items-center gap-1"
+                                      title="Abrir página completa do talento"
+                                    >
+                                      <span>{feat.name}</span>
+                                      <ExternalLink className="w-3 h-3 text-[#74b6c2] opacity-70" />
+                                    </button>
+                                  ) : (
                                     <span>{feat.name}</span>
-                                    <ExternalLink className="w-3 h-3 text-[#74b6c2] opacity-70" />
-                                  </button>
-                                ) : (
-                                  <span>{feat.name}</span>
-                                )}
-                              </span>
+                                  )}
+                                </span>
+                                {(() => {
+                                  const eff = HecosStorage.getEffectiveItemPermission(feat);
+                                  if (isActualGm && eff.visibility && eff.visibility !== 'all') {
+                                    return (
+                                      <span
+                                        className={`text-[9px] font-bold px-1.5 py-0.2 rounded border font-mono ${
+                                          eff.visibility === 'gm'
+                                            ? 'bg-rose-950/80 text-rose-300 border-rose-600/50'
+                                            : 'bg-purple-950/80 text-purple-300 border-purple-600/50'
+                                        }`}
+                                      >
+                                        {eff.visibility === 'gm' ? 'Apenas GM' : 'Compartilhado'}
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                              </div>
                               {feat.actions && (
                                 <PF2eActionGlyph
                                   action={
@@ -612,7 +659,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                 <Dna className="w-4 h-4 text-[#b19ecc]" />
                 <span>Fisiologia & Anatomia Detalhada</span>
               </h3>
-              {onEdit && (
+              {isActualGm && onEdit && (
                 <button
                   type="button"
                   onClick={() => onEdit('lore')}
@@ -681,7 +728,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                 <Compass className="w-4 h-4 text-[#74b6c2]" />
                 <span>Identidade, Psicologia & Mentalidade</span>
               </h3>
-              {onEdit && (
+              {isActualGm && onEdit && (
                 <button
                   type="button"
                   onClick={() => onEdit('lore')}
@@ -758,7 +805,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                 <Feather className="w-4 h-4 text-[#b19ecc]" />
                 <span>Cultura, Tradições & Cotidiano</span>
               </h3>
-              {onEdit && (
+              {isActualGm && onEdit && (
                 <button
                   type="button"
                   onClick={() => onEdit('lore')}
@@ -834,7 +881,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                 <Users className="w-4 h-4 text-[#74b6c2]" />
                 <span>Sociedade, Política & Economia</span>
               </h3>
-              {onEdit && (
+              {isActualGm && onEdit && (
                 <button
                   type="button"
                   onClick={() => onEdit('lore')}
@@ -892,7 +939,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                 <Globe className="w-4 h-4 text-[#b19ecc]" />
                 <span>Espiritualidade & Relações no Mundo</span>
               </h3>
-              {onEdit && (
+              {isActualGm && onEdit && (
                 <button
                   type="button"
                   onClick={() => onEdit('lore')}

@@ -1,4 +1,4 @@
-import { HecosEntity, InteractiveMapData, YouTubeAmbianceTrack, GoogleDriveResource, TagInfo, HecosUser, FolderPermission, ItemVisibility } from '../types';
+import { HecosEntity, InteractiveMapData, YouTubeAmbianceTrack, GoogleDriveResource, TagInfo, HecosUser, FolderPermission, ItemVisibility, TrashedEntity } from '../types';
 import { INITIAL_ENTITIES, INITIAL_MAPS, INITIAL_YOUTUBE_TRACKS, INITIAL_DRIVE_RESOURCES } from '../data/initialHecosData';
 import {
   syncEntityToFirebase,
@@ -27,10 +27,13 @@ import {
 const STORAGE_KEYS = {
   ENTITIES: 'hecos_entities_v1',
   DELETED_ENTITIES: 'hecos_deleted_entities_v1',
+  TRASH: 'hecos_trash_entities_v1',
   MAPS: 'hecos_maps_v1',
   YOUTUBE_TRACKS: 'hecos_youtube_v1',
   DRIVE_RESOURCES: 'hecos_drive_v1',
   FEAT_CATEGORIES: 'hecos_feat_categories_v1',
+  SPELL_CATEGORIES: 'hecos_spell_categories_v1',
+  ITEM_CATEGORIES: 'hecos_item_categories_v1',
   GM_MODE: 'hecos_gm_mode_v1',
   RECENT_PAGES: 'hecos_recent_pages_v1',
   SECRET_FOLDERS: 'hecos_secret_folders_v1',
@@ -42,7 +45,7 @@ const STORAGE_KEYS = {
 
 export const INITIAL_ADMIN_USER: HecosUser = {
   id: 'gm_henrick',
-  username: 'Henrick(GM)',
+  username: 'Henrick',
   password: '159753',
   name: 'Henrick (GM)',
   role: 'gm',
@@ -58,6 +61,29 @@ export const DEFAULT_FEAT_CATEGORIES_CONFIG: Record<string, string[]> = {
   extras: ['Eclipse & Penumbra', 'Bênçãos do Vazio', 'Rituais de Obsidiana', 'Relíquias Vivas', 'Homebrew']
 };
 
+export const DEFAULT_SPELL_CATEGORIES_CONFIG: Record<string, string[]> = {
+  all: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo'],
+  arcane: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Evocação', 'Transmutação', 'Ilusão', 'Abjuração'],
+  divine: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Cura', 'Necromancia', 'Proteção & Bênção'],
+  occult: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Adivinhação', 'Encantamento', 'Mente & Sombras'],
+  primal: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Elemental (Fogo/Gelo/Terra/Ar)', 'Metamorfose', 'Plantas & Animais'],
+  focus: ['Bruxo', 'Clérigo', 'Druida', 'Feiticeiro', 'Mago', 'Monge', 'Oráculo', 'Campeão', 'Bardo', 'Domínios Divinos'],
+  ritual: ['Rituais de Nível 1-3', 'Rituais de Nível 4-6', 'Rituais de Nível 7-9', 'Rituais de 10º Círculo', 'Grandes Rituais de Hecos'],
+  extras: ['Magias do Eclipse', 'Feitiços de Obsidiana', 'Trama da Penumbra', 'Homebrew & Variantes']
+};
+
+export const DEFAULT_ITEM_CATEGORIES_CONFIG: Record<string, string[]> = {
+  all: ['Nível 0-4', 'Nível 5-9', 'Nível 10-14', 'Nível 15-20', 'Artefatos Lendários'],
+  weapons: ['Armas Simples', 'Armas Marciais', 'Armas Avançadas', 'Armas Rúnicas', 'Armas de Fogo', 'Armas Naturais'],
+  armor: ['Armaduras Leves', 'Armaduras Médias', 'Armaduras Pesadas', 'Escudos Reforçados', 'Vestes de Explorador', 'Runas Fundamentais'],
+  consumables: ['Poções & Elixires', 'Pergaminhos', 'Talismãs & Amuletos', 'Óleos Mágicos', 'Munições Especiais'],
+  alchemical: ['Bombas Alquímicas', 'Venenos & Toxinas', 'Itens Medicinais', 'Ferramentas de Alquimia'],
+  magical: ['Varinhas & Cajados', 'Anéis Mágicos', 'Mantos & Vestimentas', 'Itens de Investigação', 'Itens Investidos'],
+  artifacts: ['Relíquias do Eclipse', 'Artefatos da Era dos Deuses', 'Armas Celestiais', 'Relíquias de Obsidiana'],
+  gear: ['Kits de Aventura', 'Ferramentas de Perícia', 'Instrumentos Musicais', 'Livros & Grimórios', 'Equipamento Geral'],
+  extras: ['Itens de Hecos', 'Materiais Especiais (Vidro Estelar, Adamante)', 'Tesouros de Sessão', 'Homebrew']
+};
+
 type EntitySubscriber = (entities: HecosEntity[]) => void;
 type MapSubscriber = (maps: InteractiveMapData[]) => void;
 type FeatCategoriesSubscriber = (config: Record<string, string[]>) => void;
@@ -71,6 +97,7 @@ export class HecosStorage {
   private static usersCache: HecosUser[] | null = null;
   private static currentUserCache: HecosUser | null = null;
   private static folderPermissionsCache: Record<string, FolderPermission> | null = null;
+  private static trashCache: TrashedEntity[] | null = null;
 
   private static entitySubscribers = new Set<EntitySubscriber>();
   private static mapSubscribers = new Set<MapSubscriber>();
@@ -78,6 +105,7 @@ export class HecosStorage {
   private static userSubscribers = new Set<(user: HecosUser | null) => void>();
   private static usersListSubscribers = new Set<(users: HecosUser[]) => void>();
   private static folderPermissionsSubscribers = new Set<(perms: Record<string, FolderPermission>) => void>();
+  private static trashSubscribers = new Set<(trash: TrashedEntity[]) => void>();
   private static isRealtimeInitialized = false;
 
   /**
@@ -502,7 +530,12 @@ export class HecosStorage {
     syncEntityToFirebase(updatedEntity).catch((err) => console.warn(err));
   }
 
-  static deleteEntity(id: string): void {
+  static deleteEntity(id: string, permanent: boolean = false): void {
+    if (!permanent) {
+      this.moveToTrash(id);
+      return;
+    }
+
     const cleanId = id.toLowerCase().trim();
     const ent = this.getEntityById(id);
     const deletedIds = this.getDeletedEntityIds();
@@ -562,6 +595,144 @@ export class HecosStorage {
     if (initMatch?.id && initMatch.id !== id) {
       deleteEntityFromFirebase(initMatch.id).catch((err) => console.warn(err));
     }
+  }
+
+  /**
+   * --- TRASH & RECYCLE BIN SUBSYSTEM ---
+   */
+  static getTrashedEntities(): TrashedEntity[] {
+    if (this.trashCache) return this.trashCache;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.TRASH);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          this.trashCache = parsed;
+          return this.trashCache;
+        }
+      }
+    } catch (e) {
+      console.warn("Error reading trash from localStorage:", e);
+    }
+    this.trashCache = [];
+    return this.trashCache;
+  }
+
+  private static saveTrashLocal(trash: TrashedEntity[]): void {
+    this.trashCache = [...trash];
+    try {
+      localStorage.setItem(STORAGE_KEYS.TRASH, JSON.stringify(trash));
+    } catch (e) {
+      console.warn("Error saving trash to localStorage:", e);
+    }
+    this.notifyTrashSubscribers();
+  }
+
+  static subscribeTrash(subscriber: (trash: TrashedEntity[]) => void): () => void {
+    subscriber(this.getTrashedEntities());
+    this.trashSubscribers.add(subscriber);
+    return () => {
+      this.trashSubscribers.delete(subscriber);
+    };
+  }
+
+  private static notifyTrashSubscribers(): void {
+    const list = this.getTrashedEntities();
+    this.trashSubscribers.forEach((sub) => {
+      try {
+        sub(list);
+      } catch (err) {
+        console.warn("Error in trash subscriber:", err);
+      }
+    });
+  }
+
+  /**
+   * Moves an entity to the Trash bin instead of hard deleting it.
+   */
+  static moveToTrash(id: string): boolean {
+    const entity = this.getEntityById(id);
+    if (!entity) return false;
+
+    const currentUser = this.getCurrentUser();
+    const trashedItem: TrashedEntity = {
+      entity: { ...entity },
+      deletedAt: new Date().toISOString(),
+      deletedBy: currentUser?.name || 'Mestre (GM)',
+      originalCategory: entity.category,
+    };
+
+    // 1. Add to Trash list
+    const currentTrash = this.getTrashedEntities().filter((t) => t.entity.id !== entity.id);
+    currentTrash.unshift(trashedItem);
+    this.saveTrashLocal(currentTrash);
+
+    // 2. Remove from active entities list (without adding to permanent blacklist)
+    const list = this.getEntities().filter((e) => e.id !== entity.id && e.slug !== entity.slug);
+    this.entitiesCache = list;
+    this.saveEntitiesLocal(list);
+    this.notifyEntitySubscribers();
+
+    // 3. Sync deletion to Firebase so other clients don't see it active
+    deleteEntityFromFirebase(entity.id).catch((err) => console.warn(err));
+
+    return true;
+  }
+
+  /**
+   * Restores an entity from the trash back to active entities.
+   */
+  static restoreFromTrash(entityId: string): HecosEntity | null {
+    const trash = this.getTrashedEntities();
+    const itemIndex = trash.findIndex((t) => t.entity.id === entityId);
+    if (itemIndex === -1) return null;
+
+    const [trashed] = trash.splice(itemIndex, 1);
+    this.saveTrashLocal(trash);
+
+    // Remove from deleted ids if it was flagged
+    const deletedIds = this.getDeletedEntityIds();
+    deletedIds.delete(trashed.entity.id);
+    deletedIds.delete(trashed.entity.id.toLowerCase().trim());
+    if (trashed.entity.slug) {
+      deletedIds.delete(trashed.entity.slug);
+      deletedIds.delete(trashed.entity.slug.toLowerCase().trim());
+    }
+    if (trashed.entity.title) {
+      deletedIds.delete(trashed.entity.title);
+      deletedIds.delete(trashed.entity.title.toLowerCase().trim());
+    }
+    this.saveDeletedEntityIds(deletedIds);
+
+    // Add back to active entities
+    const restoredEntity: HecosEntity = {
+      ...trashed.entity,
+      updatedAt: new Date().toISOString(),
+    };
+    this.saveEntity(restoredEntity);
+
+    return restoredEntity;
+  }
+
+  /**
+   * Permanently deletes a single item from the trash.
+   */
+  static permanentlyDeleteFromTrash(entityId: string): void {
+    const trash = this.getTrashedEntities().filter((t) => t.entity.id !== entityId);
+    this.saveTrashLocal(trash);
+    // Hard delete from database and add to blacklist
+    this.deleteEntity(entityId, true);
+  }
+
+  /**
+   * Empties the entire trash bin permanently.
+   */
+  static emptyTrash(): void {
+    const trash = this.getTrashedEntities();
+    trash.forEach((t) => {
+      this.deleteEntity(t.entity.id, true);
+    });
+    this.saveTrashLocal([]);
   }
 
   private static saveEntitiesLocal(entities: HecosEntity[]) {
@@ -877,6 +1048,228 @@ export class HecosStorage {
   }
 
   /**
+   * Spell Subcategories & Folders Configuration
+   */
+  static getAllSpellSubcategoriesConfig(): Record<string, string[]> {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.SPELL_CATEGORIES);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch (e) {
+      console.warn("Error reading spell categories config:", e);
+    }
+    return DEFAULT_SPELL_CATEGORIES_CONFIG;
+  }
+
+  static saveAllSpellSubcategoriesConfig(config: Record<string, string[]>): void {
+    try {
+      localStorage.setItem(STORAGE_KEYS.SPELL_CATEGORIES, JSON.stringify(config));
+    } catch (e) {
+      console.warn("Error saving spell categories config:", e);
+    }
+    this.notifyEntitySubscribers();
+  }
+
+  static addSpellSubcategory(categoryKey: string, subcategoryName: string): boolean {
+    const trimmed = subcategoryName.trim();
+    if (!trimmed || !categoryKey) return false;
+    const config = this.getAllSpellSubcategoriesConfig();
+    const list = config[categoryKey] ? [...config[categoryKey]] : [];
+    if (list.includes(trimmed)) return false;
+    list.push(trimmed);
+    config[categoryKey] = list;
+    this.saveAllSpellSubcategoriesConfig(config);
+    return true;
+  }
+
+  static renameSpellSubcategory(categoryKey: string, oldName: string, newName: string): boolean {
+    const trimmedNew = newName.trim();
+    if (!trimmedNew || !categoryKey || oldName === trimmedNew) return false;
+    const config = this.getAllSpellSubcategoriesConfig();
+    const list = config[categoryKey] ? [...config[categoryKey]] : [];
+    const idx = list.indexOf(oldName);
+    if (idx === -1) return false;
+    list[idx] = trimmedNew;
+    config[categoryKey] = list;
+    this.saveAllSpellSubcategoriesConfig(config);
+
+    const entities = this.getEntities();
+    entities.forEach((ent) => {
+      if (ent.category === 'spell') {
+        let updated = false;
+        let subcats = ent.subcategories || [];
+        if (subcats.includes(oldName)) {
+          subcats = subcats.map((s) => (s === oldName ? trimmedNew : s));
+          ent.subcategories = subcats;
+          updated = true;
+        }
+        if (ent.subcategory === oldName) {
+          ent.subcategory = trimmedNew;
+          updated = true;
+        }
+        if (updated) {
+          HecosStorage.saveEntity(ent);
+        }
+      }
+    });
+    return true;
+  }
+
+  static deleteSpellSubcategory(categoryKey: string, subcategoryName: string): boolean {
+    if (!categoryKey || !subcategoryName) return false;
+    const config = this.getAllSpellSubcategoriesConfig();
+    if (!config[categoryKey]) return false;
+    config[categoryKey] = config[categoryKey].filter((s) => s !== subcategoryName);
+    this.saveAllSpellSubcategoriesConfig(config);
+
+    const entities = this.getEntities();
+    entities.forEach((ent) => {
+      if (ent.category === 'spell') {
+        let updated = false;
+        let subcats = ent.subcategories || [];
+        if (subcats.includes(subcategoryName)) {
+          subcats = subcats.filter((s) => s !== subcategoryName);
+          ent.subcategories = subcats;
+          updated = true;
+        }
+        if (ent.subcategory === subcategoryName) {
+          ent.subcategory = subcats[0] || '';
+          updated = true;
+        }
+        if (updated) {
+          HecosStorage.saveEntity(ent);
+        }
+      }
+    });
+    return true;
+  }
+
+  static assignSpellSubcategories(spellId: string, subcategories: string[]): boolean {
+    const ent = this.getEntityById(spellId);
+    if (!ent) return false;
+    const cleanSubcats = Array.from(new Set(subcategories.map((s) => s.trim()).filter(Boolean)));
+    ent.subcategories = cleanSubcats;
+    ent.subcategory = cleanSubcats[0] || ent.subcategory || '';
+    const currentTags = new Set(ent.tags || []);
+    cleanSubcats.forEach((s) => currentTags.add(s));
+    ent.tags = Array.from(currentTags);
+    this.saveEntity(ent);
+    return true;
+  }
+
+  /**
+   * Item Subcategories & Folders Configuration
+   */
+  static getAllItemSubcategoriesConfig(): Record<string, string[]> {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.ITEM_CATEGORIES);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch (e) {
+      console.warn("Error reading item categories config:", e);
+    }
+    return DEFAULT_ITEM_CATEGORIES_CONFIG;
+  }
+
+  static saveAllItemSubcategoriesConfig(config: Record<string, string[]>): void {
+    try {
+      localStorage.setItem(STORAGE_KEYS.ITEM_CATEGORIES, JSON.stringify(config));
+    } catch (e) {
+      console.warn("Error saving item categories config:", e);
+    }
+    this.notifyEntitySubscribers();
+  }
+
+  static addItemSubcategory(categoryKey: string, subcategoryName: string): boolean {
+    const trimmed = subcategoryName.trim();
+    if (!trimmed || !categoryKey) return false;
+    const config = this.getAllItemSubcategoriesConfig();
+    const list = config[categoryKey] ? [...config[categoryKey]] : [];
+    if (list.includes(trimmed)) return false;
+    list.push(trimmed);
+    config[categoryKey] = list;
+    this.saveAllItemSubcategoriesConfig(config);
+    return true;
+  }
+
+  static renameItemSubcategory(categoryKey: string, oldName: string, newName: string): boolean {
+    const trimmedNew = newName.trim();
+    if (!trimmedNew || !categoryKey || oldName === trimmedNew) return false;
+    const config = this.getAllItemSubcategoriesConfig();
+    const list = config[categoryKey] ? [...config[categoryKey]] : [];
+    const idx = list.indexOf(oldName);
+    if (idx === -1) return false;
+    list[idx] = trimmedNew;
+    config[categoryKey] = list;
+    this.saveAllItemSubcategoriesConfig(config);
+
+    const entities = this.getEntities();
+    entities.forEach((ent) => {
+      if (ent.category === 'item') {
+        let updated = false;
+        let subcats = ent.subcategories || [];
+        if (subcats.includes(oldName)) {
+          subcats = subcats.map((s) => (s === oldName ? trimmedNew : s));
+          ent.subcategories = subcats;
+          updated = true;
+        }
+        if (ent.subcategory === oldName) {
+          ent.subcategory = trimmedNew;
+          updated = true;
+        }
+        if (updated) {
+          HecosStorage.saveEntity(ent);
+        }
+      }
+    });
+    return true;
+  }
+
+  static deleteItemSubcategory(categoryKey: string, subcategoryName: string): boolean {
+    if (!categoryKey || !subcategoryName) return false;
+    const config = this.getAllItemSubcategoriesConfig();
+    if (!config[categoryKey]) return false;
+    config[categoryKey] = config[categoryKey].filter((s) => s !== subcategoryName);
+    this.saveAllItemSubcategoriesConfig(config);
+
+    const entities = this.getEntities();
+    entities.forEach((ent) => {
+      if (ent.category === 'item') {
+        let updated = false;
+        let subcats = ent.subcategories || [];
+        if (subcats.includes(subcategoryName)) {
+          subcats = subcats.filter((s) => s !== subcategoryName);
+          ent.subcategories = subcats;
+          updated = true;
+        }
+        if (ent.subcategory === subcategoryName) {
+          ent.subcategory = subcats[0] || '';
+          updated = true;
+        }
+        if (updated) {
+          HecosStorage.saveEntity(ent);
+        }
+      }
+    });
+    return true;
+  }
+
+  static assignItemSubcategories(itemId: string, subcategories: string[]): boolean {
+    const ent = this.getEntityById(itemId);
+    if (!ent) return false;
+    const cleanSubcats = Array.from(new Set(subcategories.map((s) => s.trim()).filter(Boolean)));
+    ent.subcategories = cleanSubcats;
+    ent.subcategory = cleanSubcats[0] || ent.subcategory || '';
+    const currentTags = new Set(ent.tags || []);
+    cleanSubcats.forEach((s) => currentTags.add(s));
+    ent.tags = Array.from(currentTags);
+    this.saveEntity(ent);
+    return true;
+  }
+
+  /**
    * Get set of revealed/public folders / subcategories
    */
   static getPublicFolders(): Set<string> {
@@ -1071,6 +1464,26 @@ export class HecosStorage {
     });
   }
 
+  static getEntityPermission(entityId: string): FolderPermission {
+    const ent = this.getEntityById(entityId);
+    if (!ent) return { folderId: entityId, visibility: 'gm', allowedUserIds: [] };
+    const effectiveVis = ent.visibility || (ent.isSecret === false ? 'all' : 'gm');
+    return {
+      folderId: entityId,
+      visibility: effectiveVis,
+      allowedUserIds: ent.allowedUserIds || []
+    };
+  }
+
+  static setEntityPermission(entityId: string, visibility: ItemVisibility, allowedUserIds: string[] = []): void {
+    const ent = this.getEntityById(entityId);
+    if (!ent) return;
+    ent.visibility = visibility;
+    ent.allowedUserIds = allowedUserIds;
+    ent.isSecret = visibility === 'gm';
+    this.saveEntity(ent);
+  }
+
   /**
    * Check if an item (entity or folder) is accessible to the specified or current user
    */
@@ -1119,6 +1532,74 @@ export class HecosStorage {
   }
 
   /**
+   * Resolve live effective permission for any item, trait, feat, spell, heritage or linked entity.
+   * If the item references a unique standalone entity (by featEntityId or entityId), it synchronizes with that source entity.
+   */
+  static getEffectiveItemPermission(item: {
+    visibility?: ItemVisibility;
+    allowedUserIds?: string[];
+    featEntityId?: string;
+    entityId?: string;
+    id?: string;
+  }): { visibility: ItemVisibility; allowedUserIds: string[]; sourceEntity?: HecosEntity } {
+    const linkedId = item.featEntityId || item.entityId;
+    if (linkedId) {
+      const source = this.getEntityById(linkedId);
+      if (source) {
+        const perm = this.getEntityPermission(source.id);
+        return {
+          visibility: perm.visibility,
+          allowedUserIds: perm.allowedUserIds,
+          sourceEntity: source,
+        };
+      }
+    }
+    return {
+      visibility: item.visibility || 'all',
+      allowedUserIds: item.allowedUserIds || [],
+    };
+  }
+
+  /**
+   * Check if a referenced item/feat/spell/heritage is accessible, checking both its own rules and any source entity link.
+   */
+  static canUserAccessItem(
+    item: {
+      visibility?: ItemVisibility;
+      allowedUserIds?: string[];
+      featEntityId?: string;
+      entityId?: string;
+      isSecret?: boolean;
+    },
+    currentUser?: HecosUser | null
+  ): boolean {
+    const user = currentUser !== undefined ? currentUser : this.getCurrentUser();
+    if (user && user.role === 'gm') {
+      return true;
+    }
+    const eff = this.getEffectiveItemPermission(item);
+    // If the source entity is not accessible to this user, block access
+    if (!this.canUserAccess(eff.visibility, eff.allowedUserIds, user)) {
+      return false;
+    }
+    // If the local item also specifies its own visibility, check that too
+    if (item.visibility && item.visibility !== 'all') {
+      if (!this.canUserAccess(item.visibility, item.allowedUserIds, user, item.isSecret)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Helper to check if current user is an authenticated GM (has edit rights).
+   */
+  static isUserGm(currentUser?: HecosUser | null): boolean {
+    const user = currentUser !== undefined ? currentUser : this.getCurrentUser();
+    return Boolean(user && user.role === 'gm');
+  }
+
+  /**
    * User & Authentication System
    */
   static getUsers(): HecosUser[] {
@@ -1126,9 +1607,16 @@ export class HecosStorage {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.USERS);
       if (stored) {
-        const parsed = JSON.parse(stored);
+        let parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const hasAdmin = parsed.some((u) => u.username === INITIAL_ADMIN_USER.username);
+          // Normalize any previous admin record
+          parsed = parsed.map((u: HecosUser) => {
+            if (u.id === INITIAL_ADMIN_USER.id || u.username.toLowerCase() === 'henrick(gm)' || u.username.toLowerCase() === 'henrick') {
+              return { ...u, username: 'Henrick', role: 'gm', name: u.name || 'Henrick (GM)' };
+            }
+            return u;
+          });
+          const hasAdmin = parsed.some((u: HecosUser) => u.username.toLowerCase() === 'henrick');
           if (!hasAdmin) {
             parsed.unshift(INITIAL_ADMIN_USER);
           }
@@ -1240,7 +1728,12 @@ export class HecosStorage {
 
     const allUsers = this.getUsers();
     const found = allUsers.find(
-      (u) => u.username.toLowerCase() === cleanUser.toLowerCase()
+      (u) =>
+        u.username.toLowerCase() === cleanUser.toLowerCase() ||
+        (u.role === 'gm' &&
+          (cleanUser.toLowerCase() === 'henrick' ||
+            cleanUser.toLowerCase() === 'henrick(gm)' ||
+            cleanUser.toLowerCase() === 'henrick (gm)'))
     );
 
     if (!found) {

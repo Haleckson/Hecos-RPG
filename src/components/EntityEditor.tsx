@@ -678,10 +678,22 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
 
   return (
     <div
-      className={`flex flex-col bg-[#08070d] text-zinc-100 rounded-2xl border border-zinc-800/90 shadow-2xl overflow-hidden transition-all duration-200 ${
+      className={`flex flex-col bg-[#08070d] text-zinc-100 rounded-2xl border border-zinc-800/90 shadow-2xl overflow-hidden transition-all duration-200 relative ${
         isFullscreen ? 'fixed inset-3 z-50 rounded-xl' : 'h-full min-h-[750px]'
       }`}
     >
+      {/* Floating Save Button (Icon-only) */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <button
+          type="button"
+          onClick={handleSave}
+          className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-r from-cyan-500 to-cyan-400 hover:from-cyan-400 hover:to-cyan-300 text-zinc-950 font-black shadow-[0_4px_25px_rgba(6,182,212,0.45)] hover:shadow-[0_6px_30px_rgba(6,182,212,0.7)] hover:scale-110 active:scale-95 transition-all cursor-pointer border border-white/30"
+          data-tooltip="Salvar no Codex (Ctrl+S)"
+        >
+          <Save className="w-5 h-5 stroke-[2.5]" />
+        </button>
+      </div>
+
       {/* Top Main Navigation & Save Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-[#110d1c] border-b border-zinc-800">
         <div className="flex items-center gap-2.5">

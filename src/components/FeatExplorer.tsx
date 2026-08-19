@@ -151,7 +151,9 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
   isGmMode,
 }) => {
   const [internalGmMode, setInternalGmMode] = useState<boolean>(() => HecosStorage.getGmMode());
-  const effectiveGmMode = isGmMode !== undefined ? isGmMode : internalGmMode;
+  const currentUser = HecosStorage.getCurrentUser();
+  const isActualGm = HecosStorage.isUserGm(currentUser);
+  const effectiveGmMode = isActualGm;
 
   // Navigation and Filter States
   const [selectedMainCategory, setSelectedMainCategory] = useState<FeatCategoryType | 'all'>('all');
@@ -249,9 +251,9 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
       const featType = getEntityFeatType(ent, featData);
       const entitySubcats = getEntitySubcategories(ent, featData);
 
-      // 0. Filter Secret Feats when not in GM mode
-      if (!effectiveGmMode) {
-        if (ent.isSecret) return false;
+      // 0. Permission check:
+      if (!isActualGm) {
+        if (!HecosStorage.canUserAccessItem(ent, currentUser)) return false;
         if (entitySubcats.length > 0 && entitySubcats.every((s) => HecosStorage.isFolderSecret(s))) {
           return false;
         }
@@ -505,30 +507,32 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
         </div>
 
         {/* Action buttons */}
-        <div className="flex items-center gap-2 relative z-10 shrink-0">
-          <button
-            type="button"
-            onClick={() => setIsManageSubcategoriesModalOpen(true)}
-            className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-300 hover:text-amber-300 text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
-            title="Gerenciar estrutura de pastas e subcategorias"
-          >
-            <Settings className="w-3.5 h-3.5 text-amber-400" />
-            <span>Gerenciar Pastas</span>
-          </button>
+        {isActualGm && (
+          <div className="flex items-center gap-2 relative z-10 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsManageSubcategoriesModalOpen(true)}
+              className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-300 hover:text-amber-300 text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+              title="Gerenciar estrutura de pastas e subcategorias"
+            >
+              <Settings className="w-3.5 h-3.5 text-amber-400" />
+              <span>Gerenciar Pastas</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              const targetCat = selectedMainCategory === 'all' ? 'class' : selectedMainCategory;
-              const targetSub = selectedSubcategory === 'all' || selectedSubcategory === '__none__' ? undefined : selectedSubcategory;
-              onCreateFeat(targetCat, targetSub);
-            }}
-            className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-black transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer"
-          >
-            <Plus className="w-4 h-4 stroke-[3]" />
-            <span>Novo Talento</span>
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => {
+                const targetCat = selectedMainCategory === 'all' ? 'class' : selectedMainCategory;
+                const targetSub = selectedSubcategory === 'all' || selectedSubcategory === '__none__' ? undefined : selectedSubcategory;
+                onCreateFeat(targetCat, targetSub);
+              }}
+              className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-black transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" />
+              <span>Novo Talento</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 2. CATEGORY SEGMENTED TABS (Compact, Horizontal) */}
@@ -1051,44 +1055,46 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                      {/* 3-Level Granular Visibility Menu */}
-                      <div onClick={(e) => e.stopPropagation()}>
-                        <VisibilityBadgeMenu
-                          visibility={ent.visibility}
-                          allowedUserIds={ent.allowedUserIds}
-                          isSecret={ent.isSecret}
-                          onChange={(newVis, newAllowed) => {
-                            HecosStorage.setEntityVisibility(ent.id, newVis, newAllowed);
-                          }}
-                        />
-                      </div>
+                    {isActualGm && (
+                      <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                        {/* 3-Level Granular Visibility Menu */}
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <VisibilityBadgeMenu
+                            visibility={ent.visibility}
+                            allowedUserIds={ent.allowedUserIds}
+                            isSecret={ent.isSecret}
+                            onChange={(newVis, newAllowed) => {
+                              HecosStorage.setEntityVisibility(ent.id, newVis, newAllowed);
+                            }}
+                          />
+                        </div>
 
-                      <button
-                        type="button"
-                        onClick={() => openAssignModal(ent)}
-                        className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-amber-300 transition-colors"
-                        title="Organizar Pastas / Subcategorias deste talento"
-                      >
-                        <Folder className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onEditEntity(ent.id)}
-                        className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-cyan-300 transition-colors"
-                        title="Editar Talento"
-                      >
-                        <Edit className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDeleteEntity(ent.id)}
-                        className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-rose-400 transition-colors"
-                        title="Excluir Talento"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                        <button
+                          type="button"
+                          onClick={() => openAssignModal(ent)}
+                          className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-amber-300 transition-colors"
+                          title="Organizar Pastas / Subcategorias deste talento"
+                        >
+                          <Folder className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onEditEntity(ent.id)}
+                          className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-cyan-300 transition-colors"
+                          title="Editar Talento"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDeleteEntity(ent.id)}
+                          className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-rose-400 transition-colors"
+                          title="Excluir Talento"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Title & Action Glyph */}
@@ -1307,46 +1313,44 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
 
                       {/* Actions */}
                       <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1.5">
-                          {/* Secret Visibility Toggle */}
-                          <button
-                            type="button"
-                            onClick={() => HecosStorage.toggleEntitySecret(ent.id)}
-                            className={`p-1.5 rounded-lg border transition-all ${
-                              ent.isSecret
-                                ? 'bg-zinc-900/90 text-zinc-500 hover:text-amber-300 border-zinc-700 hover:border-amber-500/50'
-                                : 'bg-amber-950/40 text-amber-400 hover:text-amber-300 border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.2)]'
-                            }`}
-                            title={
-                              ent.isSecret
-                                ? 'Secreto: Apenas o GM pode ver (Clique para tornar Público)'
-                                : 'Público: Todos podem ver (Clique para tornar Secreto do GM)'
-                            }
-                          >
-                            {ent.isSecret ? (
-                              <EyeOff className="w-3.5 h-3.5" />
-                            ) : (
-                              <Eye className="w-3.5 h-3.5 fill-amber-400/20" />
-                            )}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => onEditEntity(ent.id)}
-                            className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-cyan-300"
-                            title="Editar Talento"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onDeleteEntity(ent.id)}
-                            className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-rose-400"
-                            title="Excluir Talento"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                        {isActualGm ? (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <VisibilityBadgeMenu
+                              visibility={ent.visibility}
+                              allowedUserIds={ent.allowedUserIds}
+                              isSecret={ent.isSecret}
+                              onChange={(newVis, newAllowed) => {
+                                HecosStorage.setEntityVisibility(ent.id, newVis, newAllowed);
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => openAssignModal(ent)}
+                              className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-amber-300"
+                              title="Organizar Pastas"
+                            >
+                              <Folder className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onEditEntity(ent.id)}
+                              className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-cyan-300"
+                              title="Editar Talento"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onDeleteEntity(ent.id)}
+                              className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-rose-400"
+                              title="Excluir Talento"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-zinc-500 font-mono">Leitura</span>
+                        )}
                       </td>
                     </tr>
                   );
