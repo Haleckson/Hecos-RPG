@@ -6,6 +6,7 @@ import { renderContentWithMentions } from './MentionBadge';
 import { RichContentRenderer } from './RichContentRenderer';
 import { AncestryView } from './AncestryView';
 import { FeatView } from './FeatView';
+import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import {
   Edit3,
   Trash2,
@@ -76,35 +77,15 @@ export const EntityView: React.FC<EntityViewProps> = ({
 
         {/* Action buttons on top of banner */}
         <div className="absolute top-4 right-4 flex items-center gap-2">
-          {/* Secret / Visibility Toggle with Eye Icon */}
-          <button
-            type="button"
-            onClick={() => {
-              HecosStorage.toggleEntitySecret(entity.id);
+          {/* 3-Level Granular Visibility Menu (Apenas GM, Todos, Compartilhamento Seletivo) */}
+          <VisibilityBadgeMenu
+            visibility={entity.visibility}
+            allowedUserIds={entity.allowedUserIds}
+            isSecret={entity.isSecret}
+            onChange={(newVis, newAllowed) => {
+              HecosStorage.setEntityVisibility(entity.id, newVis, newAllowed);
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg backdrop-blur-md border text-xs font-semibold shadow-lg transition-all ${
-              entity.isSecret
-                ? 'bg-zinc-900/90 border-zinc-700 text-zinc-400 hover:text-amber-300 hover:border-amber-500/50'
-                : 'bg-amber-950/80 border-amber-500/60 text-amber-300 hover:text-amber-200 shadow-[0_0_15px_rgba(245,158,11,0.25)]'
-            }`}
-            title={
-              entity.isSecret
-                ? 'Secreto: Apenas o GM pode ver (Clique para tornar Público)'
-                : 'Público: Todos podem ver (Clique para tornar Secreto do GM)'
-            }
-          >
-            {entity.isSecret ? (
-              <>
-                <EyeOff className="w-4 h-4 text-zinc-400" />
-                <span className="hidden sm:inline">Apenas GM</span>
-              </>
-            ) : (
-              <>
-                <Eye className="w-4 h-4 text-amber-400 fill-amber-400/20" />
-                <span className="hidden sm:inline">Público</span>
-              </>
-            )}
-          </button>
+          />
 
           <button
             onClick={() => window.print()}
@@ -201,7 +182,7 @@ export const EntityView: React.FC<EntityViewProps> = ({
       <div className="p-6 sm:p-8 space-y-6">
         {/* Specialized Views for Ancestry and Feat */}
         {entity.category === 'ancestry' ? (
-          <AncestryView entity={entity} onNavigate={onNavigate} onTagClick={onTagClick} />
+          <AncestryView entity={entity} onEdit={onEdit} onNavigate={onNavigate} onTagClick={onTagClick} />
         ) : entity.category === 'feat' ? (
           <FeatView
             entity={entity}

@@ -278,6 +278,26 @@ export interface AncestryAttributes {
   };
 }
 
+export type ItemVisibility = 'gm' | 'all' | 'custom';
+
+export type UserRole = 'gm' | 'player';
+
+export interface HecosUser {
+  id: string;
+  username: string;
+  password?: string;
+  name: string;
+  role: UserRole;
+  avatar?: string;
+  createdAt: string;
+}
+
+export interface FolderPermission {
+  folderId: string;
+  visibility: ItemVisibility;
+  allowedUserIds?: string[];
+}
+
 export interface HecosEntity {
   id: string;
   slug: string;
@@ -292,6 +312,8 @@ export interface HecosEntity {
   coverImage?: string;
   icon?: string;
   isSecret?: boolean;
+  visibility?: ItemVisibility;
+  allowedUserIds?: string[];
   createdAt: string;
   updatedAt: string;
 

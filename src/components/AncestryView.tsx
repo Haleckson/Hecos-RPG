@@ -1,9 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { HecosEntity, AncestryAttributes } from '../types';
 import { RichContentRenderer } from './RichContentRenderer';
 import { renderContentWithMentions } from './MentionBadge';
-import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
-import { parseAncestryFromContent } from '../utils/ancestrySerializer';
+import { PF2eActionGlyph } from './PF2eActionGlyph';
+import { parseAncestryFromContent, serializeAncestryToHTML } from '../utils/ancestrySerializer';
+import { HecosStorage } from '../services/storage';
+import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import {
   Swords,
   Dna,
@@ -27,18 +29,27 @@ import {
   ShieldAlert,
   Globe,
   Users,
-  Feather
+  Feather,
+  Edit3,
+  Lock,
+  Save,
+  FileText,
+  AlertTriangle,
+  ExternalLink,
+  Code,
+  Flame
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
 
 interface AncestryViewProps {
   entity: HecosEntity;
+  onEdit?: (initialTab?: 'mechanics' | 'lore' | 'gm') => void;
   onNavigate: (id: string) => void;
   onTagClick: (tag: string) => void;
 }
 
 export const AncestryView: React.FC<AncestryViewProps> = ({
   entity,
+  onEdit,
   onNavigate,
   onTagClick,
 }) => {
@@ -46,11 +57,69 @@ export const AncestryView: React.FC<AncestryViewProps> = ({
   const [activeFeatRank, setActiveFeatRank] = useState<1 | 5 | 9 | 13 | 17 | 'all'>('all');
   const [copiedStatblock, setCopiedStatblock] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Real-time GM mode tracking
+  const [isGmMode, setIsGmMode] = useState<boolean>(() => HecosStorage.getGmMode());
+
+  useEffect(() => {
+    return HecosStorage.subscribeEntities(() => {
+      setIsGmMode(HecosStorage.getGmMode());
+    });
+  }, []);
 
   // Structured Ancestry Data parsed from entity.ancestryData or content
   const data: AncestryAttributes = useMemo(() => {
     return parseAncestryFromContent(entity.title, entity.content || '', entity.ancestryData);
   }, [entity.title, entity.content, entity.ancestryData]);
+
+  // GM Scratchpad / Notes State
+  const initialGmText = useMemo(() => {
+    if (data.gmGuide?.gmNotes) return data.gmGuide.gmNotes;
+    const pieces: string[] = [];
+    if (data.gmGuide?.roleplayingNpcs) pieces.push(`### Diretrizes de Interpretação & NPCs\n${data.gmGuide.roleplayingNpcs}`);
+    if (data.gmGuide?.themesAndConflicts) pieces.push(`### Temas & Conflitos\n${data.gmGuide.themesAndConflicts}`);
+    if (data.gmGuide?.secretLore) pieces.push(`### Segredos Ocultos\n${data.gmGuide.secretLore}`);
+    if (data.gmGuide?.adventureHooks) pieces.push(`### Ganchos de Aventura\n${data.gmGuide.adventureHooks}`);
+    if (data.gmGuide?.trueOrigins) pieces.push(`### Origens Secretas\n${data.gmGuide.trueOrigins}`);
+    return pieces.join('\n\n');
+  }, [data.gmGuide]);
+
+  const [gmNotesText, setGmNotesText] = useState(initialGmText);
+  const [isGmSaving, setIsGmSaving] = useState(false);
+  const [gmSaveSuccess, setGmSaveSuccess] = useState(false);
+  const [gmEditorMode, setGmEditorMode] = useState<'edit' | 'preview'>('edit');
+
+  useEffect(() => {
+    setGmNotesText(initialGmText);
+  }, [initialGmText]);
+
+  // If user exits GM mode while on the GM tab, automatically switch to mechanics
+  useEffect(() => {
+    if (!isGmMode && activeMainTab === 'gm') {
+      setActiveMainTab('mechanics');
+    }
+  }, [isGmMode, activeMainTab]);
+
+  const handleSaveGmNotes = () => {
+    setIsGmSaving(true);
+    const currentData = { ...data };
+    currentData.gmGuide = {
+      ...currentData.gmGuide,
+      gmNotes: gmNotesText,
+    };
+
+    const updatedEntity: HecosEntity = {
+      ...entity,
+      ancestryData: currentData,
+      content: serializeAncestryToHTML(entity.title, currentData),
+      updatedAt: new Date().toISOString(),
+    };
+
+    HecosStorage.saveEntity(updatedEntity);
+    setIsGmSaving(false);
+    setGmSaveSuccess(true);
+    setTimeout(() => setGmSaveSuccess(false), 2500);
+  };
 
   const copyStatblockText = () => {
     const text = `=== ${entity.title.toUpperCase()} ===
@@ -70,15 +139,40 @@ IDIOMAS: ${data.languages || 'Humani'}`;
     return data.feats?.[key] || [];
   };
 
+  const totalFeatsCount = useMemo(() => {
+    return (
+      (data.feats?.rank1?.length || 0) +
+      (data.feats?.rank5?.length || 0) +
+      (data.feats?.rank9?.length || 0) +
+      (data.feats?.rank13?.length || 0) +
+      (data.feats?.rank17?.length || 0)
+    );
+  }, [data.feats]);
+
   return (
     <div className="space-y-6 text-zinc-100 font-sans w-full max-w-full overflow-hidden">
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
-      {/* CABEÇALHO DA ANCESTRALIDADE (ESTRUTURA PF2E HECOS) */}
+      {/* CABEÇALHO DA ANCESTRALIDADE (ESTILIZADO, CONCISO & MODERNO PF2E) */}
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
-      <div className="p-4 sm:p-6 rounded-2xl bg-[#0f0e17] border border-[#2d3a42] shadow-sm relative overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[#2d3a42]/70">
+      <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-b from-[#110e1c] to-[#0a0910] border border-[#272338] shadow-xl relative overflow-hidden group">
+        {/* Subtle accent corner glow */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-[#74b6c2]/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#b19ecc]/5 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="flex flex-wrap items-start justify-between gap-4 pb-4 border-b border-zinc-800/80">
           <div className="min-w-0 flex-1">
-            <h2 className="text-2xl sm:text-3xl font-black text-[#74b6c2] tracking-tight font-serif break-words">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#18262b] text-[#74b6c2] border border-[#74b6c2]/30 font-mono">
+                Ancestralidade PF2e
+              </span>
+              {entity.isSecret && (
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-950/80 text-rose-300 border border-rose-600/40 flex items-center gap-1">
+                  <Lock className="w-3 h-3" /> Secreto GM
+                </span>
+              )}
+            </div>
+
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-zinc-100 via-cyan-100 to-[#74b6c2] tracking-tight font-serif break-words">
               {entity.title || '[NOME DA ANCESTRALIDADE]'}
             </h2>
             {entity.subtitle && (
@@ -89,10 +183,33 @@ IDIOMAS: ${data.languages || 'Humani'}`;
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {/* 3-Level Granular Visibility Menu (Apenas GM, Todos, Compartilhamento Seletivo) */}
+            <VisibilityBadgeMenu
+              visibility={entity.visibility}
+              allowedUserIds={entity.allowedUserIds}
+              isSecret={entity.isSecret}
+              onChange={(newVis, newAllowed) => {
+                HecosStorage.setEntityVisibility(entity.id, newVis, newAllowed);
+              }}
+            />
+
+            {onEdit && (
+              <button
+                type="button"
+                onClick={() => onEdit('mechanics')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-500/40 text-cyan-200 text-xs font-semibold transition-all cursor-pointer shadow-sm hover:shadow-[0_0_12px_rgba(6,182,212,0.3)]"
+                title="Editar Cabeçalho e Atributos da Ancestralidade"
+              >
+                <Edit3 className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Editar</span>
+              </button>
+            )}
+
             <button
+              type="button"
               onClick={copyStatblockText}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#141220] hover:bg-[#1a172c] border border-[#74b6c2]/40 text-[#74b6c2] text-xs font-semibold transition-colors cursor-pointer"
-              title="Copiar cabeçalho da ficha"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#141220] hover:bg-[#1c1830] border border-[#272338] hover:border-[#74b6c2]/50 text-zinc-300 hover:text-cyan-300 text-xs font-semibold transition-all cursor-pointer"
+              title="Copiar cabeçalho da ficha para a área de transferência"
             >
               {copiedStatblock ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copiedStatblock ? 'Copiado!' : 'Copiar Ficha'}</span>
@@ -100,60 +217,90 @@ IDIOMAS: ${data.languages || 'Humani'}`;
           </div>
         </div>
 
-        {/* 2-Column Table */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 gap-x-6 pt-4 text-sm">
-          {/* Row 1: HP & TAMANHO */}
-          <div className="flex items-baseline gap-2 min-w-0 break-words leading-relaxed">
-            <span className="font-bold text-[#cb8394] shrink-0">🩸 HP:</span>
-            <span className="text-zinc-200 flex-1 min-w-0">
-              {renderContentWithMentions(data.hp || '8 PV', onNavigate)}
+        {/* Compact, High-Craft PF2e Stats Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-4">
+          {/* Card 1: HP */}
+          <div className="p-3 rounded-xl bg-[#130f1d]/80 border border-rose-900/30 hover:border-rose-600/40 transition-colors flex flex-col justify-between">
+            <span className="text-[11px] font-bold text-rose-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+              <Heart className="w-3.5 h-3.5 text-rose-400 fill-rose-400/20" />
+              <span>Pontos de Vida</span>
             </span>
-          </div>
-          <div className="flex items-baseline gap-2 md:border-l md:border-[#2d3a42]/60 md:pl-5 min-w-0 break-words leading-relaxed">
-            <span className="font-bold text-[#74b6c2] shrink-0">📏 TAMANHO:</span>
-            <span className="text-zinc-200 flex-1 min-w-0">
-              {renderContentWithMentions(data.size || 'Médio', onNavigate)}
+            <span className="text-base sm:text-lg font-bold text-zinc-100 mt-1">
+              {data.hp || '8 PV'}
             </span>
           </div>
 
-          {/* Row 2: VELOCIDADE & SENTIDOS */}
-          <div className="flex items-baseline gap-2 min-w-0 break-words leading-relaxed">
-            <span className="font-bold text-[#b19ecc] shrink-0">🏃 VELOCIDADE:</span>
-            <span className="text-zinc-200 flex-1 min-w-0">
-              {renderContentWithMentions(data.speed || '25 pés (≈ 7,5 m)', onNavigate)}
+          {/* Card 2: Tamanho */}
+          <div className="p-3 rounded-xl bg-[#0f141a]/80 border border-cyan-900/30 hover:border-cyan-600/40 transition-colors flex flex-col justify-between">
+            <span className="text-[11px] font-bold text-cyan-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+              <Scale className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Tamanho</span>
             </span>
-          </div>
-          <div className="flex items-baseline gap-2 md:border-l md:border-[#2d3a42]/60 md:pl-5 min-w-0 break-words leading-relaxed">
-            <span className="font-bold text-[#74b6c2] shrink-0">👁️ SENTIDOS:</span>
-            <span className="text-[#88c5d0] font-medium flex-1 min-w-0">
-              {renderContentWithMentions(data.senses || 'Visão na Penumbra', onNavigate)}
+            <span className="text-base sm:text-lg font-bold text-zinc-100 mt-1">
+              {data.size || 'Médio'}
             </span>
           </div>
 
-          {/* Row 3: ATRIBUTOS & TRAÇOS */}
-          <div className="flex items-baseline gap-2 min-w-0 break-words leading-relaxed">
-            <span className="font-bold text-[#cfb284] shrink-0">🧠 ATRIBUTOS:</span>
-            <span className="text-zinc-200 font-mono text-xs sm:text-sm flex-1 min-w-0">
+          {/* Card 3: Velocidade */}
+          <div className="p-3 rounded-xl bg-[#14101e]/80 border border-purple-900/30 hover:border-purple-600/40 transition-colors flex flex-col justify-between">
+            <span className="text-[11px] font-bold text-purple-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 text-purple-400" />
+              <span>Velocidade</span>
+            </span>
+            <span className="text-base sm:text-lg font-bold text-zinc-100 mt-1">
+              {data.speed || '25 pés (≈ 7,5 m)'}
+            </span>
+          </div>
+
+          {/* Card 4: Sentidos */}
+          <div className="p-3 rounded-xl bg-[#0f141a]/80 border border-cyan-900/30 hover:border-cyan-600/40 transition-colors flex flex-col justify-between">
+            <span className="text-[11px] font-bold text-[#88c5d0] uppercase tracking-wider font-mono flex items-center gap-1.5">
+              <Eye className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Sentidos</span>
+            </span>
+            <span className="text-sm sm:text-base font-bold text-[#88c5d0] mt-1 truncate" title={data.senses || 'Visão na Penumbra'}>
+              {data.senses || 'Visão na Penumbra'}
+            </span>
+          </div>
+        </div>
+
+        {/* Row 2: Secondary Attributes in clean bar */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-2.5">
+          {/* Atributos */}
+          <div className="p-3 rounded-xl bg-[#14121a]/90 border border-amber-900/30 flex items-start gap-2.5">
+            <span className="text-amber-400 font-bold text-xs shrink-0 font-mono mt-0.5">🧠 Modificadores:</span>
+            <span className="text-xs sm:text-sm font-semibold text-amber-200 font-mono flex-1">
               {renderContentWithMentions(data.attributes || '+2 Des, +2 Int, +2 Livre, -2 For', onNavigate)}
             </span>
           </div>
-          <div className="flex items-baseline gap-2 md:border-l md:border-[#2d3a42]/60 md:pl-5 min-w-0 break-words leading-relaxed">
-            <span className="font-bold text-[#b19ecc] shrink-0">🏷️ TRAÇOS:</span>
-            <span className="text-zinc-200 flex-1 min-w-0">
-              {renderContentWithMentions(data.traits || 'Humanoide', onNavigate)}
-            </span>
-          </div>
 
-          {/* Row 4: INATO & IDIOMAS */}
-          <div className="flex items-baseline gap-2 min-w-0 break-words leading-relaxed">
-            <span className="font-bold text-[#74b6c2] shrink-0">🛠️ INATO:</span>
-            <span className="text-zinc-200 flex-1 min-w-0">
+          {/* Traços */}
+          <div className="p-3 rounded-xl bg-[#14121a]/90 border border-purple-900/30 flex items-start gap-2.5">
+            <span className="text-purple-300 font-bold text-xs shrink-0 font-mono mt-0.5">🏷️ Traços:</span>
+            <div className="flex flex-wrap gap-1.5 flex-1">
+              {(data.traits || 'Humanoide').split(',').map((t, idx) => (
+                <span
+                  key={idx}
+                  className="text-[11px] px-2 py-0.5 rounded-md bg-[#251e33] text-[#b19ecc] border border-[#b19ecc]/30 font-mono font-semibold"
+                >
+                  {t.trim()}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Row 3: Inato & Idiomas */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-2.5 text-xs text-zinc-300">
+          <div className="p-2.5 rounded-lg bg-[#0e0c16] border border-zinc-800/80 flex items-baseline gap-2">
+            <span className="text-cyan-400 font-bold font-mono shrink-0">🛠️ Inato:</span>
+            <span className="text-zinc-300 flex-1 truncate" title={data.innate || '—'}>
               {renderContentWithMentions(data.innate || '—', onNavigate)}
             </span>
           </div>
-          <div className="flex items-baseline gap-2 md:border-l md:border-[#2d3a42]/60 md:pl-5 min-w-0 break-words leading-relaxed">
-            <span className="font-bold text-[#b19ecc] shrink-0">🗣️ IDIOMAS:</span>
-            <span className="text-zinc-200 flex-1 min-w-0">
+          <div className="p-2.5 rounded-lg bg-[#0e0c16] border border-zinc-800/80 flex items-baseline gap-2">
+            <span className="text-[#b19ecc] font-bold font-mono shrink-0">🗣️ Idiomas:</span>
+            <span className="text-zinc-300 flex-1 truncate" title={data.languages || 'Humani'}>
               {renderContentWithMentions(data.languages || 'Humani', onNavigate)}
             </span>
           </div>
@@ -161,66 +308,83 @@ IDIOMAS: ${data.languages || 'Humani'}`;
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
-      {/* NAVEGAÇÃO DAS TRÊS ABAS: MECÂNICAS, LORE & ABA GM */}
+      {/* NAVEGAÇÃO DAS ABAS (MECÂNICAS, LORE, GM) */}
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
-      <div className="flex border-b border-[#272438] bg-[#0e0d16] rounded-t-xl overflow-hidden p-1 gap-1">
+      <div className="flex items-center border-b border-[#272438] bg-[#0c0b14] rounded-t-2xl p-1.5 gap-1.5 shadow-lg">
+        {/* Tab 1: Mecânicas */}
         <button
+          type="button"
           onClick={() => setActiveMainTab('mechanics')}
-          className={`flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-lg font-bold text-xs sm:text-sm transition-all cursor-pointer ${
+          className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer ${
             activeMainTab === 'mechanics'
-              ? 'bg-[#18262b] text-[#74b6c2] border border-[#74b6c2]/40'
+              ? 'bg-[#18262b] text-[#74b6c2] border border-[#74b6c2]/50 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
               : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#141220]'
           }`}
         >
           <Swords className="w-4 h-4 text-[#74b6c2]" />
-          <span>Mecânicas de Jogo</span>
-          <span className="hidden md:inline text-[10px] px-2 py-0.5 rounded-full bg-[#74b6c2]/15 text-[#74b6c2] font-mono">
-            Heranças & Talentos
+          <span>Mecânicas</span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#74b6c2]/20 text-[#74b6c2] font-mono">
+            {totalFeatsCount + (data.heritages?.length || 0)}
           </span>
         </button>
 
+        {/* Tab 2: Lore */}
         <button
+          type="button"
           onClick={() => setActiveMainTab('lore')}
-          className={`flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-lg font-bold text-xs sm:text-sm transition-all cursor-pointer ${
+          className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer ${
             activeMainTab === 'lore'
-              ? 'bg-[#251e33] text-[#b19ecc] border border-[#b19ecc]/40'
+              ? 'bg-[#251e33] text-[#b19ecc] border border-[#b19ecc]/50 shadow-[0_0_15px_rgba(177,158,204,0.15)]'
               : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#141220]'
           }`}
         >
           <BookOpen className="w-4 h-4 text-[#b19ecc]" />
-          <span>Lore & Cenário</span>
-          <span className="hidden md:inline text-[10px] px-2 py-0.5 rounded-full bg-[#b19ecc]/15 text-[#b19ecc] font-mono">
-            Cultura & Sociedade
-          </span>
+          <span>Lore</span>
         </button>
 
-        <button
-          onClick={() => setActiveMainTab('gm')}
-          className={`flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-lg font-bold text-xs sm:text-sm transition-all cursor-pointer ${
-            activeMainTab === 'gm'
-              ? 'bg-[#2a121d] text-[#f43f5e] border border-[#f43f5e]/50 shadow-[0_0_15px_rgba(244,63,94,0.2)]'
-              : 'text-zinc-400 hover:text-rose-300 hover:bg-[#180f18]'
-          }`}
-        >
-          <Crown className="w-4 h-4 text-[#f43f5e]" />
-          <span>Aba GM</span>
-          <span className="hidden md:inline text-[10px] px-2 py-0.5 rounded-full bg-[#f43f5e]/15 text-[#f43f5e] font-mono font-bold">
-            Segredos & Narrador
-          </span>
-        </button>
+        {/* Tab 3: GM (Apenas visível para o Mestre!) */}
+        {isGmMode && (
+          <button
+            type="button"
+            onClick={() => setActiveMainTab('gm')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer ${
+              activeMainTab === 'gm'
+                ? 'bg-rose-950/80 text-rose-200 border border-rose-500/70 shadow-[0_0_20px_rgba(244,63,94,0.3)]'
+                : 'text-rose-400/80 hover:text-rose-200 hover:bg-rose-950/30'
+            }`}
+          >
+            <Crown className="w-4 h-4 text-rose-400" />
+            <span>GM</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-mono font-bold">
+              Segredos
+            </span>
+          </button>
+        )}
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
       {/* ABA DE MECÂNICAS */}
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
       {activeMainTab === 'mechanics' && (
-        <div className="space-y-6 animate-in fade-in duration-150 p-3 sm:p-5 rounded-b-2xl bg-[#0a0910] border border-t-0 border-[#272438]">
+        <div className="space-y-6 animate-in fade-in duration-150 p-4 sm:p-6 rounded-b-2xl bg-[#09080e] border border-t-0 border-[#272438]">
           {/* HERANÇAS DE LINHAGEM */}
-          <section className="p-5 rounded-xl bg-[#0f0e18] border border-[#272438] space-y-4">
-            <h3 className="text-lg font-black text-[#74b6c2] flex items-center gap-2.5 font-serif border-b border-[#272438] pb-2">
-              <Sparkles className="w-4 h-4 text-[#74b6c2]" />
-              <span>Heranças de Linhagem</span>
-            </h3>
+          <section className="p-5 rounded-2xl bg-[#0f0e18] border border-[#272438] space-y-4">
+            <div className="flex items-center justify-between border-b border-[#272438] pb-3">
+              <h3 className="text-lg font-black text-[#74b6c2] flex items-center gap-2.5 font-serif">
+                <Sparkles className="w-4 h-4 text-[#74b6c2]" />
+                <span>Heranças de Linhagem</span>
+              </h3>
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit('mechanics')}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-cyan-300 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <Edit3 className="w-3 h-3" />
+                  <span>Editar Heranças</span>
+                </button>
+              )}
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
               {data.heritages && data.heritages.length > 0 ? (
@@ -239,19 +403,31 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                   </div>
                 ))
               ) : (
-                <p className="text-xs text-zinc-500 col-span-2 italic">
-                  Nenhuma herança específica cadastrada.
+                <p className="text-xs text-zinc-500 col-span-2 italic py-2">
+                  Nenhuma herança específica cadastrada ainda.
                 </p>
               )}
             </div>
           </section>
 
           {/* ARSENAL CULTURAL E EQUIPAMENTOS */}
-          <section className="p-5 rounded-xl bg-[#0f0e18] border border-[#272438] space-y-4">
-            <h3 className="text-lg font-black text-[#b19ecc] flex items-center gap-2.5 font-serif border-b border-[#272438] pb-2">
-              <Shield className="w-4 h-4 text-[#b19ecc]" />
-              <span>Arsenal Cultural & Equipamentos Tradicionais</span>
-            </h3>
+          <section className="p-5 rounded-2xl bg-[#0f0e18] border border-[#272438] space-y-4">
+            <div className="flex items-center justify-between border-b border-[#272438] pb-3">
+              <h3 className="text-lg font-black text-[#b19ecc] flex items-center gap-2.5 font-serif">
+                <Shield className="w-4 h-4 text-[#b19ecc]" />
+                <span>Arsenal Cultural & Equipamentos Tradicionais</span>
+              </h3>
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit('mechanics')}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-purple-300 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <Edit3 className="w-3 h-3" />
+                  <span>Editar Arsenal</span>
+                </button>
+              )}
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
               <div className="space-y-2 p-4 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
@@ -281,16 +457,29 @@ IDIOMAS: ${data.languages || 'Humani'}`;
           </section>
 
           {/* TALENTOS DE ANCESTRALIDADE */}
-          <section className="p-5 rounded-xl bg-[#0f0e18] border border-[#272438] space-y-4">
+          <section className="p-5 rounded-2xl bg-[#0f0e18] border border-[#272438] space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#272438] pb-3">
-              <h3 className="text-lg font-black text-[#74b6c2] flex items-center gap-2.5 font-serif">
-                <Zap className="w-4 h-4 text-[#74b6c2]" />
-                <span>Talentos de Ancestralidade</span>
-              </h3>
+              <div className="flex items-center gap-3">
+                <h3 className="text-lg font-black text-[#74b6c2] flex items-center gap-2.5 font-serif">
+                  <Zap className="w-4 h-4 text-[#74b6c2]" />
+                  <span>Talentos de Ancestralidade</span>
+                </h3>
+                {onEdit && (
+                  <button
+                    type="button"
+                    onClick={() => onEdit('mechanics')}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-cyan-300 text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    <Edit3 className="w-3 h-3" />
+                    <span>Editar Talentos</span>
+                  </button>
+                )}
+              </div>
 
               {/* Filter Tabs by Rank */}
               <div className="flex flex-wrap items-center gap-1 bg-[#131120] p-1 rounded-xl border border-[#272438] text-xs">
                 <button
+                  type="button"
                   onClick={() => setActiveFeatRank('all')}
                   className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                     activeFeatRank === 'all'
@@ -298,11 +487,12 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                       : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
-                  Todos os Ranks
+                  Todos ({totalFeatsCount})
                 </button>
                 {([1, 5, 9, 13, 17] as const).map((r) => (
                   <button
                     key={r}
+                    type="button"
                     onClick={() => setActiveFeatRank(r)}
                     className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                       activeFeatRank === r
@@ -334,8 +524,9 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                   return (
                     <div key={r} className="space-y-3">
                       {activeFeatRank === 'all' && (
-                        <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-[#74b6c2] px-2 py-1 bg-[#18262b] rounded border-l-2 border-[#74b6c2]">
-                          Talentos de Rank {r}
+                        <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-[#74b6c2] px-2.5 py-1 bg-[#18262b] rounded-lg border-l-4 border-[#74b6c2] flex items-center justify-between">
+                          <span>Talentos de Rank {r}</span>
+                          <span className="text-[10px] text-zinc-400">{feats.length} talento(s)</span>
                         </h4>
                       )}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -355,7 +546,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                                     title="Abrir página completa do talento"
                                   >
                                     <span>{feat.name}</span>
-                                    <span className="text-[10px] text-[#74b6c2] opacity-70">↗</span>
+                                    <ExternalLink className="w-3 h-3 text-[#74b6c2] opacity-70" />
                                   </button>
                                 ) : (
                                   <span>{feat.name}</span>
@@ -413,13 +604,25 @@ IDIOMAS: ${data.languages || 'Humani'}`;
       {/* ABA DE LORE & CENÁRIO */}
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
       {activeMainTab === 'lore' && (
-        <div className="space-y-6 animate-in fade-in duration-150 p-3 sm:p-5 rounded-b-2xl bg-[#0a0910] border border-t-0 border-[#272438]">
+        <div className="space-y-6 animate-in fade-in duration-150 p-4 sm:p-6 rounded-b-2xl bg-[#09080e] border border-t-0 border-[#272438]">
           {/* FISIOLOGIA & ANATOMIA */}
-          <section className="p-5 rounded-xl bg-[#0f0e18] border border-[#272438] space-y-4">
-            <h3 className="text-lg font-black text-[#b19ecc] flex items-center gap-2.5 font-serif border-b border-[#272438] pb-2">
-              <Dna className="w-4 h-4 text-[#b19ecc]" />
-              <span>Fisiologia & Anatomia Detalhada</span>
-            </h3>
+          <section className="p-5 rounded-2xl bg-[#0f0e18] border border-[#272438] space-y-4">
+            <div className="flex items-center justify-between border-b border-[#272438] pb-3">
+              <h3 className="text-lg font-black text-[#b19ecc] flex items-center gap-2.5 font-serif">
+                <Dna className="w-4 h-4 text-[#b19ecc]" />
+                <span>Fisiologia & Anatomia Detalhada</span>
+              </h3>
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit('lore')}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-purple-300 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <Edit3 className="w-3 h-3" />
+                  <span>Editar Lore</span>
+                </button>
+              )}
+            </div>
 
             <div className="space-y-4 text-sm text-zinc-300 leading-relaxed">
               {data.physiology?.physicalDescription && (
@@ -451,7 +654,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
                 {data.physiology?.lifeCycle && (
-                  <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
+                  <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
                     <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
                       Ciclo de Vida e Envelhecimento
                     </h4>
@@ -460,7 +663,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                 )}
 
                 {data.physiology?.dietAndMetabolism && (
-                  <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
+                  <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
                     <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
                       Dieta e Metabolismo
                     </h4>
@@ -472,15 +675,27 @@ IDIOMAS: ${data.languages || 'Humani'}`;
           </section>
 
           {/* IDENTIDADE & PSICOLOGIA */}
-          <section className="p-5 rounded-xl bg-[#0f0e18] border border-[#272438] space-y-4">
-            <h3 className="text-lg font-black text-[#74b6c2] flex items-center gap-2.5 font-serif border-b border-[#272438] pb-2">
-              <Compass className="w-4 h-4 text-[#74b6c2]" />
-              <span>Identidade, Psicologia & Mentalidade</span>
-            </h3>
+          <section className="p-5 rounded-2xl bg-[#0f0e18] border border-[#272438] space-y-4">
+            <div className="flex items-center justify-between border-b border-[#272438] pb-3">
+              <h3 className="text-lg font-black text-[#74b6c2] flex items-center gap-2.5 font-serif">
+                <Compass className="w-4 h-4 text-[#74b6c2]" />
+                <span>Identidade, Psicologia & Mentalidade</span>
+              </h3>
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit('lore')}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-cyan-300 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <Edit3 className="w-3 h-3" />
+                  <span>Editar Identidade</span>
+                </button>
+              )}
+            </div>
 
             <div className="space-y-4 text-sm text-zinc-300 leading-relaxed">
               {data.identity?.narrativeHook && (
-                <div className="p-3 rounded-xl bg-[#18262b] border border-[#2d3a42] text-[#88c5d0] font-medium italic min-w-0 break-words">
+                <div className="p-4 rounded-xl bg-[#18262b] border border-[#2d3a42] text-[#88c5d0] font-medium italic min-w-0 break-words">
                   "{data.identity.narrativeHook}"
                 </div>
               )}
@@ -496,7 +711,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {data.identity?.creationMyth && (
-                  <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
+                  <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
                     <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
                       Mito da Criação
                     </h4>
@@ -505,7 +720,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                 )}
 
                 {data.identity?.epicsAndFigures && (
-                  <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
+                  <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
                     <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
                       Épicos e Figuras Históricas
                     </h4>
@@ -516,7 +731,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {data.identity?.purpose && (
-                  <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
+                  <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
                     <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
                       Propósito Existencial
                     </h4>
@@ -525,7 +740,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                 )}
 
                 {data.identity?.theAdventurer && (
-                  <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
+                  <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
                     <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
                       O Aventureiro
                     </h4>
@@ -537,15 +752,27 @@ IDIOMAS: ${data.languages || 'Humani'}`;
           </section>
 
           {/* CULTURA & COTIDIANO */}
-          <section className="p-5 rounded-xl bg-[#0f0e18] border border-[#272438] space-y-4">
-            <h3 className="text-lg font-black text-[#b19ecc] flex items-center gap-2.5 font-serif border-b border-[#272438] pb-2">
-              <Feather className="w-4 h-4 text-[#b19ecc]" />
-              <span>Cultura, Tradições & Cotidiano</span>
-            </h3>
+          <section className="p-5 rounded-2xl bg-[#0f0e18] border border-[#272438] space-y-4">
+            <div className="flex items-center justify-between border-b border-[#272438] pb-3">
+              <h3 className="text-lg font-black text-[#b19ecc] flex items-center gap-2.5 font-serif">
+                <Feather className="w-4 h-4 text-[#b19ecc]" />
+                <span>Cultura, Tradições & Cotidiano</span>
+              </h3>
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit('lore')}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-purple-300 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <Edit3 className="w-3 h-3" />
+                  <span>Editar Cultura</span>
+                </button>
+              )}
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-zinc-300 leading-relaxed">
               {data.culture?.etiquetteAndCustoms && (
-                <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
+                <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
                   <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
                     Etiqueta e Costumes
                   </h4>
@@ -554,7 +781,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
               )}
 
               {data.culture?.namesAndMeanings && (
-                <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
+                <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
                   <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
                     Nomes e Significados
                   </h4>
@@ -563,16 +790,16 @@ IDIOMAS: ${data.languages || 'Humani'}`;
               )}
 
               {data.culture?.clothingAndFashion && (
-                <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
+                <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
                   <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
-                    Vestuário e Moda
+                    Vestimenta e Estética
                   </h4>
                   <RichContentRenderer content={data.culture.clothingAndFashion} onNavigate={onNavigate} />
                 </div>
               )}
 
               {data.culture?.artisticExpressions && (
-                <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
+                <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
                   <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
                     Expressões Artísticas
                   </h4>
@@ -581,18 +808,18 @@ IDIOMAS: ${data.languages || 'Humani'}`;
               )}
 
               {data.culture?.gastronomy && (
-                <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
+                <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
                   <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
-                    Gastronomia
+                    Gastronomia Tradicional
                   </h4>
                   <RichContentRenderer content={data.culture.gastronomy} onNavigate={onNavigate} />
                 </div>
               )}
 
               {data.culture?.leisureAndSports && (
-                <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
+                <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
                   <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
-                    Lazer e Esportes
+                    Lazer e Competições
                   </h4>
                   <RichContentRenderer content={data.culture.leisureAndSports} onNavigate={onNavigate} />
                 </div>
@@ -600,72 +827,47 @@ IDIOMAS: ${data.languages || 'Humani'}`;
             </div>
           </section>
 
-          {/* ESPIRITUALIDADE */}
-          <section className="p-5 rounded-xl bg-[#0f0e18] border border-[#272438] space-y-4">
-            <h3 className="text-lg font-black text-[#74b6c2] flex items-center gap-2.5 font-serif border-b border-[#272438] pb-2">
-              <Sparkles className="w-4 h-4 text-[#74b6c2]" />
-              <span>Espiritualidade, Crenças & Misticismo</span>
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-zinc-300 leading-relaxed">
-              {data.spirituality?.nativePantheon && (
-                <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
-                    O Panteão Nativo
-                  </h4>
-                  <RichContentRenderer content={data.spirituality.nativePantheon} onNavigate={onNavigate} />
-                </div>
-              )}
-
-              {data.spirituality?.funeraryPractices && (
-                <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
-                    Práticas Funerárias
-                  </h4>
-                  <RichContentRenderer content={data.spirituality.funeraryPractices} onNavigate={onNavigate} />
-                </div>
-              )}
-
-              {data.spirituality?.magicalConnection && (
-                <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
-                    Conexão Mágica
-                  </h4>
-                  <RichContentRenderer content={data.spirituality.magicalConnection} onNavigate={onNavigate} />
-                </div>
+          {/* SOCIEDADE & ORGANIZAÇÃO */}
+          <section className="p-5 rounded-2xl bg-[#0f0e18] border border-[#272438] space-y-4">
+            <div className="flex items-center justify-between border-b border-[#272438] pb-3">
+              <h3 className="text-lg font-black text-[#74b6c2] flex items-center gap-2.5 font-serif">
+                <Users className="w-4 h-4 text-[#74b6c2]" />
+                <span>Sociedade, Política & Economia</span>
+              </h3>
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit('lore')}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-cyan-300 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <Edit3 className="w-3 h-3" />
+                  <span>Editar Sociedade</span>
+                </button>
               )}
             </div>
-          </section>
-
-          {/* SOCIEDADE, LEIS E ECONOMIA */}
-          <section className="p-5 rounded-xl bg-[#0f0e18] border border-[#272438] space-y-4">
-            <h3 className="text-lg font-black text-[#b19ecc] flex items-center gap-2.5 font-serif border-b border-[#272438] pb-2">
-              <Scale className="w-4 h-4 text-[#b19ecc]" />
-              <span>Estrutura Social, Leis & Economia</span>
-            </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-zinc-300 leading-relaxed">
               {data.society?.socialStructure && (
-                <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
-                    Estrutura Social e Família
+                <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
+                  <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
+                    Estrutura Social
                   </h4>
                   <RichContentRenderer content={data.society.socialStructure} onNavigate={onNavigate} />
                 </div>
               )}
 
               {data.society?.lawsAndTaboos && (
-                <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
-                    Leis, Ética e Tabus
+                <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
+                  <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
+                    Leis, Justiça e Tabus
                   </h4>
                   <RichContentRenderer content={data.society.lawsAndTaboos} onNavigate={onNavigate} />
                 </div>
               )}
 
               {data.society?.economyAndTrade && (
-                <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
+                <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
+                  <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
                     Economia e Comércio
                   </h4>
                   <RichContentRenderer content={data.society.economyAndTrade} onNavigate={onNavigate} />
@@ -673,8 +875,8 @@ IDIOMAS: ${data.languages || 'Humani'}`;
               )}
 
               {data.society?.educationAndRites && (
-                <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
+                <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
+                  <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
                     Educação e Ritos de Passagem
                   </h4>
                   <RichContentRenderer content={data.society.educationAndRites} onNavigate={onNavigate} />
@@ -683,207 +885,226 @@ IDIOMAS: ${data.languages || 'Humani'}`;
             </div>
           </section>
 
-          {/* GUERRA E TÁTICAS */}
-          <section className="p-5 rounded-xl bg-[#0f0e18] border border-[#272438] space-y-4">
-            <h3 className="text-lg font-black text-[#cb8394] flex items-center gap-2.5 font-serif border-b border-[#272438] pb-2">
-              <ShieldAlert className="w-4 h-4 text-[#cb8394]" />
-              <span>Guerra & Táticas Militares</span>
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-zinc-300 leading-relaxed">
-              {data.warfare?.nativeFightingStyles && (
-                <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#cb8394] uppercase font-mono mb-1">
-                    Estilos de Luta Nativos
-                  </h4>
-                  <RichContentRenderer content={data.warfare.nativeFightingStyles} onNavigate={onNavigate} />
-                </div>
-              )}
-
-              {data.warfare?.militaryOrganization && (
-                <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#cb8394] uppercase font-mono mb-1">
-                    Organização Militar
-                  </h4>
-                  <RichContentRenderer content={data.warfare.militaryOrganization} onNavigate={onNavigate} />
-                </div>
-              )}
-
-              {data.warfare?.defenseEngineering && (
-                <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#cb8394] uppercase font-mono mb-1">
-                    Engenharia de Defesa
-                  </h4>
-                  <RichContentRenderer content={data.warfare.defenseEngineering} onNavigate={onNavigate} />
-                </div>
+          {/* ESPIRITUALIDADE & MUNDO */}
+          <section className="p-5 rounded-2xl bg-[#0f0e18] border border-[#272438] space-y-4">
+            <div className="flex items-center justify-between border-b border-[#272438] pb-3">
+              <h3 className="text-lg font-black text-[#b19ecc] flex items-center gap-2.5 font-serif">
+                <Globe className="w-4 h-4 text-[#b19ecc]" />
+                <span>Espiritualidade & Relações no Mundo</span>
+              </h3>
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit('lore')}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-purple-300 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <Edit3 className="w-3 h-3" />
+                  <span>Editar Relações</span>
+                </button>
               )}
             </div>
-          </section>
 
-          {/* NO MUNDO DE HECOS */}
-          <section className="p-5 rounded-xl bg-[#0f0e18] border border-[#272438] space-y-4">
-            <h3 className="text-lg font-black text-[#74b6c2] flex items-center gap-2.5 font-serif border-b border-[#272438] pb-2">
-              <Globe className="w-4 h-4 text-[#74b6c2]" />
-              <span>A Linhagem no Mundo de Hecos</span>
-            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-zinc-300 leading-relaxed">
+              {data.spirituality?.nativePantheon && (
+                <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
+                  <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
+                    Panteão e Divindades Nativas
+                  </h4>
+                  <RichContentRenderer content={data.spirituality.nativePantheon} onNavigate={onNavigate} />
+                </div>
+              )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-zinc-300 leading-relaxed">
+              {data.spirituality?.funeraryPractices && (
+                <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
+                  <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
+                    Práticas Funerárias e Pós-Vida
+                  </h4>
+                  <RichContentRenderer content={data.spirituality.funeraryPractices} onNavigate={onNavigate} />
+                </div>
+              )}
+
               {data.world?.geographicalDistribution && (
-                <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
+                <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
                   <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
-                    Distribuição Geográfica
+                    Distribuição Geográfica em Hecos
                   </h4>
                   <RichContentRenderer content={data.world.geographicalDistribution} onNavigate={onNavigate} />
                 </div>
               )}
 
               {data.world?.diplomaticRelations && (
-                <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
+                <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
                   <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
                     Relações Diplomáticas
                   </h4>
                   <RichContentRenderer content={data.world.diplomaticRelations} onNavigate={onNavigate} />
                 </div>
               )}
-
-              {data.world?.externalPerspective && (
-                <div className="p-3 rounded-lg bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
-                    Perspectiva Externa
-                  </h4>
-                  <RichContentRenderer content={data.world.externalPerspective} onNavigate={onNavigate} />
-                </div>
-              )}
             </div>
           </section>
         </div>
       )}
 
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
-      {/* ABA DO GM (GUIA DO NARRADOR & SEGREDOS ANCESTRAIS) */}
+      {/* ABA DO GM (EXCLUSIVA DO MESTRE: GRANDE EDITOR DE TEXTO & NOTAS AVULSAS) */}
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
-      {activeMainTab === 'gm' && (
-        <div className="space-y-6 animate-in fade-in duration-150 p-3 sm:p-5 rounded-b-2xl bg-[#0a060d] border border-t-0 border-[#3a1523]">
-          {/* GM Banner Alert */}
-          <div className="p-4 rounded-xl bg-gradient-to-r from-rose-950/80 via-purple-950/40 to-black border border-rose-600/60 shadow-[0_0_20px_rgba(244,63,94,0.15)] flex items-center justify-between gap-4">
+      {isGmMode && activeMainTab === 'gm' && (
+        <div className="space-y-6 animate-in fade-in duration-150 p-4 sm:p-6 rounded-b-2xl bg-[#0e0710] border border-t-0 border-rose-900/60 shadow-2xl">
+          {/* GM Header & Scratchpad Controls */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-950/60 via-[#150a17] to-amber-950/40 border border-rose-600/50 flex flex-wrap items-center justify-between gap-3 shadow-lg">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-900/60 border border-rose-500/80 flex items-center justify-center text-rose-300 shrink-0">
+              <div className="p-2.5 rounded-xl bg-rose-600/20 border border-rose-500/50 text-rose-400">
                 <Crown className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-rose-200 flex items-center gap-2">
-                  <span>Guia do Mestre & Segredos de Campanha</span>
-                  <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-rose-900/80 text-rose-300 border border-rose-700">
+                <h3 className="text-base sm:text-lg font-black text-rose-100 font-serif flex items-center gap-2">
+                  <span>Caderno de Anotações do Mestre</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-900/80 text-rose-300 font-mono border border-rose-700/50">
                     Apenas GM
                   </span>
                 </h3>
-                <p className="text-xs text-rose-200/70 mt-0.5">
-                  Informações reservadas para o narrador. Utilize para construir ganchos narrativos, encontros únicos e interpretar NPCs desta ancestralidade.
+                <p className="text-xs text-rose-300/80">
+                  Espaço livre e confidencial para anotações, segredos, ganchos de campanha e NPCs.
                 </p>
               </div>
             </div>
+
+            <div className="flex items-center gap-2">
+              {/* Toggle Mode: Edit vs Preview */}
+              <div className="flex bg-black/50 p-1 rounded-xl border border-rose-900/40 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setGmEditorMode('edit')}
+                  className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                    gmEditorMode === 'edit'
+                      ? 'bg-rose-900 text-rose-100 border border-rose-600/60'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  Editor
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGmEditorMode('preview')}
+                  className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                    gmEditorMode === 'preview'
+                      ? 'bg-rose-900 text-rose-100 border border-rose-600/60'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  Visualizar
+                </button>
+              </div>
+
+              {/* Save Button */}
+              <button
+                type="button"
+                onClick={handleSaveGmNotes}
+                disabled={isGmSaving}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-bold text-xs shadow-lg shadow-rose-900/40 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isGmSaving ? (
+                  <span>Salvando...</span>
+                ) : gmSaveSuccess ? (
+                  <>
+                    <Check className="w-4 h-4 text-emerald-300" />
+                    <span>Salvo!</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span>Salvar Notas</span>
+                  </>
+                )}
+              </button>
+
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit('gm')}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-rose-300 text-xs font-semibold transition-colors cursor-pointer"
+                  title="Abrir no editor estruturado completo"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Editor Geral</span>
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* INTERPRETAÇÃO & TEMAS */}
-          <section className="p-5 rounded-xl bg-[#110914] border border-[#3a1523] space-y-4">
-            <h3 className="text-lg font-black text-rose-300 flex items-center gap-2.5 font-serif border-b border-[#3a1523] pb-2">
-              <Feather className="w-4 h-4 text-rose-400" />
-              <span>Diretrizes de Interpretação & Conflitos</span>
-            </h3>
+          {/* Quick Insert Snippet Chips */}
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-rose-400/80 font-mono text-[11px] font-bold">Inserir Rápido:</span>
+            <button
+              type="button"
+              onClick={() => {
+                setGmNotesText((prev) => `${prev}\n\n### 🎭 NPC Relevante\n- **Nome:** \n- **Papel:** \n- **Segredo:** `);
+              }}
+              className="px-2.5 py-1 rounded-lg bg-[#180e1a] hover:bg-[#251328] border border-rose-900/50 text-rose-300 hover:text-rose-100 transition-colors"
+            >
+              + Modelo de NPC
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setGmNotesText((prev) => `${prev}\n\n### 🧭 Gancho de Aventura\n- **Gatilho:** \n- **Recompensa:** \n- **Perigo Oculto:** `);
+              }}
+              className="px-2.5 py-1 rounded-lg bg-[#180e1a] hover:bg-[#251328] border border-rose-900/50 text-rose-300 hover:text-rose-100 transition-colors"
+            >
+              + Gancho de Missão
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setGmNotesText((prev) => `${prev}\n\n> 🔒 **Segredo Ancestral:** `);
+              }}
+              className="px-2.5 py-1 rounded-lg bg-[#180e1a] hover:bg-[#251328] border border-rose-900/50 text-rose-300 hover:text-rose-100 transition-colors"
+            >
+              + Caixa de Segredo
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setGmNotesText((prev) => `${prev}\n\n- [ ] Planejar encontro com facção ancestral\n- [ ] Revelar mistério da linhagem no nível 5`);
+              }}
+              className="px-2.5 py-1 rounded-lg bg-[#180e1a] hover:bg-[#251328] border border-rose-900/50 text-rose-300 hover:text-rose-100 transition-colors"
+            >
+              + Lista de Tarefas GM
+            </button>
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-zinc-300 leading-relaxed">
-              <div className="p-4 rounded-xl bg-[#170c1b] border border-rose-900/40 min-w-0 break-words space-y-2">
-                <h4 className="text-xs font-bold text-rose-300 uppercase font-mono flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 text-rose-400" />
-                  <span>Interpretando NPCs da Espécie</span>
-                </h4>
-                <div className="text-sm text-zinc-300 leading-relaxed">
-                  <RichContentRenderer
-                    content={data.gmGuide?.roleplayingNpcs || 'Nenhuma diretriz de interpretação cadastrada ainda.'}
-                    onNavigate={onNavigate}
-                  />
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#170c1b] border border-rose-900/40 min-w-0 break-words space-y-2">
-                <h4 className="text-xs font-bold text-rose-300 uppercase font-mono flex items-center gap-1.5">
-                  <Scale className="w-3.5 h-3.5 text-rose-400" />
-                  <span>Temas e Conflitos Sugeridos</span>
-                </h4>
-                <div className="text-sm text-zinc-300 leading-relaxed">
-                  <RichContentRenderer
-                    content={data.gmGuide?.themesAndConflicts || 'Nenhum tema narrativo específico cadastrado.'}
-                    onNavigate={onNavigate}
-                  />
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* SEGREDOS E GANCHOS OCULTOS */}
-          <section className="p-5 rounded-xl bg-[#110914] border border-[#3a1523] space-y-4">
-            <h3 className="text-lg font-black text-amber-300 flex items-center gap-2.5 font-serif border-b border-[#3a1523] pb-2">
-              <Eye className="w-4 h-4 text-amber-400" />
-              <span>Segredos Ancestrais & Ganchos de Campanha</span>
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-zinc-300 leading-relaxed">
-              <div className="p-4 rounded-xl bg-[#170c1b] border border-amber-900/40 min-w-0 break-words space-y-2">
-                <h4 className="text-xs font-bold text-amber-300 uppercase font-mono flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Segredos Ancestrais & Ocultismo</span>
-                </h4>
-                <div className="text-sm text-zinc-300 leading-relaxed">
-                  <RichContentRenderer
-                    content={data.gmGuide?.secretLore || 'Mistérios arcanos e segredos ocultos da linhagem não descritos publicamente.'}
-                    onNavigate={onNavigate}
-                  />
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#170c1b] border border-amber-900/40 min-w-0 break-words space-y-2">
-                <h4 className="text-xs font-bold text-amber-300 uppercase font-mono flex items-center gap-1.5">
-                  <Compass className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Ganchos de Aventura & Encontros</span>
-                </h4>
-                <div className="text-sm text-zinc-300 leading-relaxed">
-                  <RichContentRenderer
-                    content={data.gmGuide?.adventureHooks || 'Ganchos prontos para o mestre envolver personagens desta linhagem em missões e intrigas.'}
-                    onNavigate={onNavigate}
-                  />
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#170c1b] border border-purple-900/40 min-w-0 break-words space-y-2">
-                <h4 className="text-xs font-bold text-purple-300 uppercase font-mono flex items-center gap-1.5">
-                  <ShieldAlert className="w-3.5 h-3.5 text-purple-400" />
-                  <span>Origens Ocultas & Facções Secretas</span>
-                </h4>
-                <div className="text-sm text-zinc-300 leading-relaxed">
-                  <RichContentRenderer
-                    content={data.gmGuide?.trueOrigins || 'Sociedades secretas, facções obscuras ou a verdadeira gênese proibida da espécie.'}
-                    onNavigate={onNavigate}
-                  />
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#170c1b] border border-rose-900/40 min-w-0 break-words space-y-2">
-                <h4 className="text-xs font-bold text-rose-300 uppercase font-mono flex items-center gap-1.5">
-                  <BookOpen className="w-3.5 h-3.5 text-rose-400" />
-                  <span>Notas & Scratchpad do Narrador</span>
-                </h4>
-                <div className="text-sm text-zinc-300 leading-relaxed">
-                  <RichContentRenderer
-                    content={data.gmGuide?.gmNotes || 'Anotações livres do mestre para a campanha atual.'}
-                    onNavigate={onNavigate}
-                  />
-                </div>
+          {/* Big Text Editor or Rich Preview */}
+          {gmEditorMode === 'edit' ? (
+            <div className="space-y-2">
+              <textarea
+                value={gmNotesText}
+                onChange={(e) => setGmNotesText(e.target.value)}
+                placeholder="Escreva aqui todas as notas confidenciais, tramas ocultas, estatísticas de NPCs e informações que apenas você (o Mestre) deve ter acesso... Suporta formatação completa de Markdown, @menções de artigos e callouts como > 🔒"
+                rows={16}
+                className="w-full p-4 rounded-2xl bg-[#08050c] border border-rose-900/60 focus:border-rose-500 text-zinc-100 text-sm font-mono leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-rose-500/20 shadow-inner"
+              />
+              <div className="flex items-center justify-between text-xs text-zinc-500">
+                <span>
+                  {gmNotesText.length} caracteres • {gmNotesText.trim() ? gmNotesText.trim().split(/\s+/).length : 0} palavras
+                </span>
+                <span className="italic text-rose-400/80">
+                  Dica: Clique em "Salvar Notas" ou use o modo "Visualizar" para ver a formatação.
+                </span>
               </div>
             </div>
-          </section>
+          ) : (
+            <div className="p-6 rounded-2xl bg-[#08050c] border border-rose-900/60 min-h-[350px] space-y-4">
+              {gmNotesText.trim() ? (
+                <RichContentRenderer content={gmNotesText} onNavigate={onNavigate} />
+              ) : (
+                <p className="text-zinc-500 italic text-sm">
+                  Nenhuma anotação registrada ainda. Alterne para o modo 'Editor' para escrever anotações do Mestre.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 };
-

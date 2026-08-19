@@ -1,4 +1,4 @@
-import { HecosEntity, InteractiveMapData, YouTubeAmbianceTrack, GoogleDriveResource, TagInfo } from '../types';
+import { HecosEntity, InteractiveMapData, YouTubeAmbianceTrack, GoogleDriveResource, TagInfo, HecosUser, FolderPermission, ItemVisibility } from '../types';
 import { INITIAL_ENTITIES, INITIAL_MAPS, INITIAL_YOUTUBE_TRACKS, INITIAL_DRIVE_RESOURCES } from '../data/initialHecosData';
 import {
   syncEntityToFirebase,
@@ -13,7 +13,15 @@ import {
   subscribeToFeatCategoriesRealtime,
   syncFeatCategoriesToFirebase,
   subscribeToSecretFoldersRealtime,
-  syncSecretFoldersToFirebase
+  syncSecretFoldersToFirebase,
+  subscribeToPublicFoldersRealtime,
+  syncPublicFoldersToFirebase,
+  syncUsersToFirebase,
+  loadUsersFromFirebase,
+  subscribeToUsersRealtime,
+  syncFolderPermissionsToFirebase,
+  loadFolderPermissionsFromFirebase,
+  subscribeToFolderPermissionsRealtime
 } from './firebase';
 
 const STORAGE_KEYS = {
@@ -26,6 +34,19 @@ const STORAGE_KEYS = {
   GM_MODE: 'hecos_gm_mode_v1',
   RECENT_PAGES: 'hecos_recent_pages_v1',
   SECRET_FOLDERS: 'hecos_secret_folders_v1',
+  PUBLIC_FOLDERS: 'hecos_public_folders_v1',
+  USERS: 'hecos_users_v1',
+  CURRENT_USER: 'hecos_current_user_v1',
+  FOLDER_PERMISSIONS: 'hecos_folder_permissions_v1',
+};
+
+export const INITIAL_ADMIN_USER: HecosUser = {
+  id: 'gm_henrick',
+  username: 'Henrick(GM)',
+  password: '159753',
+  name: 'Henrick (GM)',
+  role: 'gm',
+  createdAt: new Date().toISOString()
 };
 
 export const DEFAULT_FEAT_CATEGORIES_CONFIG: Record<string, string[]> = {
@@ -47,10 +68,16 @@ export class HecosStorage {
   private static tracksCache: YouTubeAmbianceTrack[] | null = null;
   private static driveCache: GoogleDriveResource[] | null = null;
   private static featCategoriesCache: Record<string, string[]> | null = null;
+  private static usersCache: HecosUser[] | null = null;
+  private static currentUserCache: HecosUser | null = null;
+  private static folderPermissionsCache: Record<string, FolderPermission> | null = null;
 
   private static entitySubscribers = new Set<EntitySubscriber>();
   private static mapSubscribers = new Set<MapSubscriber>();
   private static featCategoriesSubscribers = new Set<FeatCategoriesSubscriber>();
+  private static userSubscribers = new Set<(user: HecosUser | null) => void>();
+  private static usersListSubscribers = new Set<(users: HecosUser[]) => void>();
+  private static folderPermissionsSubscribers = new Set<(perms: Record<string, FolderPermission>) => void>();
   private static isRealtimeInitialized = false;
 
   /**
@@ -214,7 +241,18 @@ export class HecosStorage {
       this.notifyFeatCategoriesSubscribers();
     });
 
-    // Start real-time listener for secret folders
+    // Start real-time listener for public (revealed) folders
+    subscribeToPublicFoldersRealtime((publicFolders) => {
+      if (!Array.isArray(publicFolders)) return;
+      try {
+        localStorage.setItem(STORAGE_KEYS.PUBLIC_FOLDERS, JSON.stringify(publicFolders));
+      } catch (e) {
+        console.warn("Error saving public folders to local:", e);
+      }
+      this.notifyEntitySubscribers();
+    });
+
+    // Start real-time listener for secret folders (backward compatibility)
     subscribeToSecretFoldersRealtime((secretFolders) => {
       if (!Array.isArray(secretFolders)) return;
       try {
@@ -222,6 +260,33 @@ export class HecosStorage {
       } catch (e) {
         console.warn("Error saving secret folders to local:", e);
       }
+      this.notifyEntitySubscribers();
+    });
+
+    // Start real-time listener for users
+    subscribeToUsersRealtime((firebaseUsers) => {
+      if (!firebaseUsers || firebaseUsers.length === 0) return;
+      const current = this.getUsers();
+      const map = new Map<string, HecosUser>();
+      current.forEach((u) => map.set(u.id, u));
+      firebaseUsers.forEach((u) => {
+        if (u && u.id) map.set(u.id, u);
+      });
+      if (!map.has(INITIAL_ADMIN_USER.id)) {
+        map.set(INITIAL_ADMIN_USER.id, INITIAL_ADMIN_USER);
+      }
+      this.usersCache = Array.from(map.values());
+      this.saveUsersLocal(this.usersCache);
+      this.notifyUsersListSubscribers();
+    });
+
+    // Start real-time listener for folder permissions
+    subscribeToFolderPermissionsRealtime((perms) => {
+      if (!perms) return;
+      this.folderPermissionsCache = perms;
+      try {
+        localStorage.setItem(STORAGE_KEYS.FOLDER_PERMISSIONS, JSON.stringify(perms));
+      } catch {}
       this.notifyEntitySubscribers();
     });
   }
@@ -309,6 +374,14 @@ export class HecosStorage {
         );
         let changed = false;
 
+        // Ensure all entities have isSecret defined (default to true: secret mode)
+        activeEntities.forEach((e) => {
+          if (e.isSecret === undefined) {
+            e.isSecret = true;
+            changed = true;
+          }
+        });
+
         for (const initEnt of INITIAL_ENTITIES) {
           // Never re-add if deleted or already present
           if (
@@ -316,7 +389,10 @@ export class HecosStorage {
             !existingIds.has(initEnt.id.toLowerCase()) &&
             !this.isEntityDeleted(deletedIds, initEnt.id, initEnt.slug, initEnt.title)
           ) {
-            activeEntities.push(initEnt);
+            activeEntities.push({
+              ...initEnt,
+              isSecret: initEnt.isSecret !== undefined ? initEnt.isSecret : true
+            });
             changed = true;
           }
         }
@@ -329,10 +405,13 @@ export class HecosStorage {
     } catch (e) {
       console.warn("Error reading local storage entities:", e);
     }
-    // Fallback to initial seed minus deleted
+    // Fallback to initial seed minus deleted (all secret by default)
     this.entitiesCache = INITIAL_ENTITIES.filter(
       (e) => !this.isEntityDeleted(deletedIds, e.id, e.slug, e.title)
-    );
+    ).map((e) => ({
+      ...e,
+      isSecret: e.isSecret !== undefined ? e.isSecret : true
+    }));
     this.saveEntitiesLocal(this.entitiesCache);
     return this.entitiesCache;
   }
@@ -798,27 +877,31 @@ export class HecosStorage {
   }
 
   /**
-   * Get set of secret folders / subcategories
+   * Get set of revealed/public folders / subcategories
    */
-  static getSecretFolders(): Set<string> {
+  static getPublicFolders(): Set<string> {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.SECRET_FOLDERS);
+      const stored = localStorage.getItem(STORAGE_KEYS.PUBLIC_FOLDERS);
       if (stored) {
         return new Set(JSON.parse(stored));
       }
     } catch (e) {
-      console.warn('Error reading secret folders:', e);
+      console.warn('Error reading public folders:', e);
     }
     return new Set<string>();
   }
 
   /**
-   * Check if a folder/subcategory is marked secret (GM only)
+   * Check if a folder/subcategory is marked secret (GM only).
+   * BY DEFAULT, EVERY FOLDER IS SECRET unless the GM explicitly clicked the Eye to reveal it!
    */
   static isFolderSecret(folderOrSubcategory: string): boolean {
     if (!folderOrSubcategory) return false;
-    const secrets = this.getSecretFolders();
-    return secrets.has(folderOrSubcategory.trim().toLowerCase()) || secrets.has(folderOrSubcategory.trim());
+    const trimmed = folderOrSubcategory.trim();
+    if (trimmed === 'all' || trimmed === '__none__' || trimmed === '') return false;
+    const publics = this.getPublicFolders();
+    const isPublic = publics.has(trimmed) || publics.has(trimmed.toLowerCase());
+    return !isPublic;
   }
 
   /**
@@ -827,22 +910,26 @@ export class HecosStorage {
   static toggleFolderSecret(folderOrSubcategory: string): boolean {
     if (!folderOrSubcategory) return false;
     const trimmed = folderOrSubcategory.trim();
-    const secrets = this.getSecretFolders();
-    const isSec = secrets.has(trimmed) || secrets.has(trimmed.toLowerCase());
-    if (isSec) {
-      secrets.delete(trimmed);
-      secrets.delete(trimmed.toLowerCase());
+    const publics = this.getPublicFolders();
+    const currentlySecret = this.isFolderSecret(trimmed);
+
+    if (currentlySecret) {
+      // Reveal folder -> mark as public
+      publics.add(trimmed);
+      publics.add(trimmed.toLowerCase());
     } else {
-      secrets.add(trimmed);
+      // Make secret -> remove from public
+      publics.delete(trimmed);
+      publics.delete(trimmed.toLowerCase());
     }
     try {
-      localStorage.setItem(STORAGE_KEYS.SECRET_FOLDERS, JSON.stringify(Array.from(secrets)));
+      localStorage.setItem(STORAGE_KEYS.PUBLIC_FOLDERS, JSON.stringify(Array.from(publics)));
     } catch (e) {
-      console.warn('Error saving secret folders:', e);
+      console.warn('Error saving public folders:', e);
     }
     this.notifyEntitySubscribers();
-    syncSecretFoldersToFirebase(Array.from(secrets)).catch(() => {});
-    return !isSec;
+    syncPublicFoldersToFirebase(Array.from(publics)).catch(() => {});
+    return this.isFolderSecret(trimmed);
   }
 
   /**
@@ -851,31 +938,367 @@ export class HecosStorage {
   static setFolderSecret(folderOrSubcategory: string, isSecret: boolean): void {
     if (!folderOrSubcategory) return;
     const trimmed = folderOrSubcategory.trim();
-    const secrets = this.getSecretFolders();
+    const publics = this.getPublicFolders();
     if (isSecret) {
-      secrets.add(trimmed);
+      publics.delete(trimmed);
+      publics.delete(trimmed.toLowerCase());
     } else {
-      secrets.delete(trimmed);
-      secrets.delete(trimmed.toLowerCase());
+      publics.add(trimmed);
+      publics.add(trimmed.toLowerCase());
     }
     try {
-      localStorage.setItem(STORAGE_KEYS.SECRET_FOLDERS, JSON.stringify(Array.from(secrets)));
+      localStorage.setItem(STORAGE_KEYS.PUBLIC_FOLDERS, JSON.stringify(Array.from(publics)));
     } catch (e) {
-      console.warn('Error saving secret folders:', e);
+      console.warn('Error saving public folders:', e);
     }
     this.notifyEntitySubscribers();
-    syncSecretFoldersToFirebase(Array.from(secrets)).catch(() => {});
+    syncPublicFoldersToFirebase(Array.from(publics)).catch(() => {});
   }
 
   /**
-   * Toggle entity secret status directly
+   * Set entity granular visibility ('gm' | 'all' | 'custom')
+   */
+  static setEntityVisibility(
+    entityId: string,
+    visibility: ItemVisibility,
+    allowedUserIds: string[] = []
+  ): void {
+    const ent = this.getEntityById(entityId);
+    if (!ent) return;
+    ent.visibility = visibility;
+    ent.allowedUserIds = allowedUserIds;
+    ent.isSecret = visibility === 'gm';
+    this.saveEntity(ent);
+  }
+
+  /**
+   * Toggle entity secret status directly (legacy fallback)
    */
   static toggleEntitySecret(entityId: string): boolean {
     const ent = this.getEntityById(entityId);
     if (!ent) return false;
-    ent.isSecret = !ent.isSecret;
+    const currentlySecret = ent.visibility === 'gm' || (ent.isSecret && ent.visibility !== 'all');
+    if (currentlySecret) {
+      ent.visibility = 'all';
+      ent.isSecret = false;
+    } else {
+      ent.visibility = 'gm';
+      ent.isSecret = true;
+    }
     this.saveEntity(ent);
-    return !!ent.isSecret;
+    return ent.isSecret;
+  }
+
+  /**
+   * Folder / Subcategory Granular Permissions
+   */
+  static getFolderPermissions(): Record<string, FolderPermission> {
+    if (this.folderPermissionsCache) return this.folderPermissionsCache;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.FOLDER_PERMISSIONS);
+      if (stored) {
+        this.folderPermissionsCache = JSON.parse(stored);
+        return this.folderPermissionsCache || {};
+      }
+    } catch (e) {
+      console.warn("Error reading folder permissions:", e);
+    }
+    this.folderPermissionsCache = {};
+    return this.folderPermissionsCache;
+  }
+
+  static getFolderPermission(folderId: string): FolderPermission {
+    if (!folderId) return { folderId: '', visibility: 'gm', allowedUserIds: [] };
+    const clean = folderId.trim().toLowerCase();
+    const all = this.getFolderPermissions();
+    if (all[clean]) return all[clean];
+
+    // Fallback to legacy isFolderSecret
+    const isSecret = this.isFolderSecret(folderId);
+    return {
+      folderId,
+      visibility: isSecret ? 'gm' : 'all',
+      allowedUserIds: []
+    };
+  }
+
+  static setFolderPermission(
+    folderId: string,
+    visibility: ItemVisibility,
+    allowedUserIds: string[] = []
+  ): void {
+    if (!folderId) return;
+    const clean = folderId.trim().toLowerCase();
+    const all = { ...this.getFolderPermissions() };
+    all[clean] = {
+      folderId,
+      visibility,
+      allowedUserIds
+    };
+    this.folderPermissionsCache = all;
+    try {
+      localStorage.setItem(STORAGE_KEYS.FOLDER_PERMISSIONS, JSON.stringify(all));
+    } catch (e) {
+      console.warn("Error saving folder permissions:", e);
+    }
+
+    // Also sync legacy public folders
+    if (visibility === 'all') {
+      this.setFolderSecret(folderId, false);
+    } else {
+      this.setFolderSecret(folderId, true);
+    }
+
+    syncFolderPermissionsToFirebase(all).catch(() => {});
+    this.notifyFolderPermissionsSubscribers();
+    this.notifyEntitySubscribers();
+  }
+
+  static subscribeFolderPermissions(callback: (perms: Record<string, FolderPermission>) => void): () => void {
+    this.folderPermissionsSubscribers.add(callback);
+    callback(this.getFolderPermissions());
+    return () => this.folderPermissionsSubscribers.delete(callback);
+  }
+
+  private static notifyFolderPermissionsSubscribers() {
+    const perms = this.getFolderPermissions();
+    this.folderPermissionsSubscribers.forEach((cb) => {
+      try {
+        cb(perms);
+      } catch (e) {
+        console.error(e);
+      }
+    });
+  }
+
+  /**
+   * Check if an item (entity or folder) is accessible to the specified or current user
+   */
+  static canUserAccess(
+    visibility?: ItemVisibility,
+    allowedUserIds?: string[],
+    currentUser?: HecosUser | null,
+    isSecretFallback?: boolean
+  ): boolean {
+    const user = currentUser !== undefined ? currentUser : this.getCurrentUser();
+
+    // 1. GM has full unrestricted access to everything
+    if (user && user.role === 'gm') {
+      return true;
+    }
+
+    // Resolve effective visibility
+    let effectiveVisibility: ItemVisibility = visibility || (isSecretFallback === false ? 'all' : 'gm');
+    if (!visibility && isSecretFallback === undefined) {
+      effectiveVisibility = 'gm';
+    }
+
+    // 2. If visibility is 'all', anyone can view (even without login)
+    if (effectiveVisibility === 'all') {
+      return true;
+    }
+
+    // 3. If visibility is 'gm', only GM can view
+    if (effectiveVisibility === 'gm') {
+      return false;
+    }
+
+    // 4. If visibility is 'custom', only GM and specific players can view
+    if (effectiveVisibility === 'custom') {
+      if (!user) return false;
+      if (!allowedUserIds || allowedUserIds.length === 0) return false;
+      return allowedUserIds.some(
+        (id) =>
+          id === user.id ||
+          id.toLowerCase() === user.username.toLowerCase() ||
+          id.toLowerCase() === user.name.toLowerCase()
+      );
+    }
+
+    return false;
+  }
+
+  /**
+   * User & Authentication System
+   */
+  static getUsers(): HecosUser[] {
+    if (this.usersCache) return this.usersCache;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.USERS);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const hasAdmin = parsed.some((u) => u.username === INITIAL_ADMIN_USER.username);
+          if (!hasAdmin) {
+            parsed.unshift(INITIAL_ADMIN_USER);
+          }
+          this.usersCache = parsed;
+          return this.usersCache;
+        }
+      }
+    } catch (e) {
+      console.warn("Error reading users:", e);
+    }
+    this.usersCache = [INITIAL_ADMIN_USER];
+    this.saveUsersLocal(this.usersCache);
+    return this.usersCache;
+  }
+
+  private static saveUsersLocal(users: HecosUser[]) {
+    try {
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+    } catch (e) {
+      console.warn("Error saving users:", e);
+    }
+  }
+
+  static saveUser(user: HecosUser): void {
+    const list = this.getUsers();
+    const idx = list.findIndex(
+      (u) => u.id === user.id || u.username.toLowerCase() === user.username.toLowerCase()
+    );
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], ...user };
+    } else {
+      list.push(user);
+    }
+    this.usersCache = [...list];
+    this.saveUsersLocal(this.usersCache);
+    this.notifyUsersListSubscribers();
+    syncUsersToFirebase(this.usersCache).catch(() => {});
+  }
+
+  static deleteUser(userId: string): boolean {
+    const list = this.getUsers();
+    const target = list.find((u) => u.id === userId);
+    if (!target || target.username === INITIAL_ADMIN_USER.username) {
+      return false;
+    }
+    const filtered = list.filter((u) => u.id !== userId);
+    this.usersCache = filtered;
+    this.saveUsersLocal(filtered);
+    this.notifyUsersListSubscribers();
+    syncUsersToFirebase(filtered).catch(() => {});
+
+    const current = this.getCurrentUser();
+    if (current && current.id === userId) {
+      this.logout();
+    }
+    return true;
+  }
+
+  static getCurrentUser(): HecosUser | null {
+    if (this.currentUserCache !== null) return this.currentUserCache;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.id) {
+          const existing = this.getUsers().find(
+            (u) => u.id === parsed.id || u.username === parsed.username
+          );
+          if (existing) {
+            this.currentUserCache = existing;
+            this.setGmMode(existing.role === 'gm');
+            return this.currentUserCache;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Error reading current user:", e);
+    }
+    if (this.getGmMode()) {
+      this.currentUserCache = INITIAL_ADMIN_USER;
+      this.saveCurrentUserLocal(this.currentUserCache);
+      return this.currentUserCache;
+    }
+    this.currentUserCache = null;
+    return null;
+  }
+
+  private static saveCurrentUserLocal(user: HecosUser | null) {
+    try {
+      if (user) {
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+      }
+    } catch (e) {
+      console.warn("Error saving current user:", e);
+    }
+  }
+
+  static login(
+    username: string,
+    password?: string
+  ): { success: boolean; user?: HecosUser; error?: string } {
+    const cleanUser = (username || '').trim();
+    const cleanPass = (password || '').trim();
+    if (!cleanUser) {
+      return { success: false, error: 'Informe o nome de usuário.' };
+    }
+
+    const allUsers = this.getUsers();
+    const found = allUsers.find(
+      (u) => u.username.toLowerCase() === cleanUser.toLowerCase()
+    );
+
+    if (!found) {
+      return { success: false, error: 'Usuário não encontrado.' };
+    }
+
+    if (found.password && found.password !== cleanPass) {
+      return { success: false, error: 'Senha incorreta.' };
+    }
+
+    this.currentUserCache = found;
+    this.saveCurrentUserLocal(found);
+    this.setGmMode(found.role === 'gm');
+    this.notifyUserSubscribers();
+    this.notifyEntitySubscribers();
+    return { success: true, user: found };
+  }
+
+  static logout(): void {
+    this.currentUserCache = null;
+    this.saveCurrentUserLocal(null);
+    this.setGmMode(false);
+    this.notifyUserSubscribers();
+    this.notifyEntitySubscribers();
+  }
+
+  static subscribeUser(callback: (user: HecosUser | null) => void): () => void {
+    this.userSubscribers.add(callback);
+    callback(this.getCurrentUser());
+    return () => this.userSubscribers.delete(callback);
+  }
+
+  private static notifyUserSubscribers() {
+    const user = this.getCurrentUser();
+    this.userSubscribers.forEach((cb) => {
+      try {
+        cb(user);
+      } catch (e) {
+        console.error(e);
+      }
+    });
+  }
+
+  static subscribeUsersList(callback: (users: HecosUser[]) => void): () => void {
+    this.usersListSubscribers.add(callback);
+    callback(this.getUsers());
+    return () => this.usersListSubscribers.delete(callback);
+  }
+
+  private static notifyUsersListSubscribers() {
+    const users = this.getUsers();
+    this.usersListSubscribers.forEach((cb) => {
+      try {
+        cb(users);
+      } catch (e) {
+        console.error(e);
+      }
+    });
   }
 
   /**
@@ -908,6 +1331,9 @@ export class HecosStorage {
     const current = this.getGmMode();
     const next = !current;
     this.setGmMode(next);
+    if (!next && this.currentUserCache?.role === 'gm') {
+      // If GM mode manually disabled, keep user logged in or guest
+    }
     return next;
   }
 

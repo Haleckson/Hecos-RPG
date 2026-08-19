@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { HecosEntity, EntityCategory } from '../types';
+import { HecosEntity, EntityCategory, ItemVisibility } from '../types';
 import { HecosStorage } from '../services/storage';
 import { uploadToImgBB } from '../services/imgbb';
+import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import {
   Save,
   Image as ImageIcon,
@@ -75,7 +76,9 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
   const [content, setContent] = useState(entity.content || '');
   const [coverImage, setCoverImage] = useState(entity.coverImage || '');
   const [tagsString, setTagsString] = useState(entity.tags.join(', '));
-  const [isSecret, setIsSecret] = useState(entity.isSecret || false);
+  const [isSecret, setIsSecret] = useState(entity.isSecret !== undefined ? entity.isSecret : true);
+  const [visibility, setVisibility] = useState<ItemVisibility>(entity.visibility || (entity.isSecret ? 'gm' : 'public'));
+  const [allowedUserIds, setAllowedUserIds] = useState<string[]>(entity.allowedUserIds || []);
   const [useStructuredAncestry, setUseStructuredAncestry] = useState(true);
   const [useStructuredFeat, setUseStructuredFeat] = useState(true);
 
@@ -803,32 +806,16 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
           </div>
 
           <div className="md:col-span-1 flex items-center justify-end">
-            <button
-              type="button"
-              onClick={() => setIsSecret(!isSecret)}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
-                isSecret
-                  ? 'bg-zinc-900/90 border-zinc-700 text-zinc-400 hover:text-amber-300 hover:border-amber-500/50'
-                  : 'bg-amber-950/80 border-amber-500/60 text-amber-300 hover:text-amber-200 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
-              }`}
-              title={
-                isSecret
-                  ? 'Secreto: Apenas o GM pode ver (Clique para tornar Público)'
-                  : 'Público: Todos podem ver (Clique para tornar Secreto do GM)'
-              }
-            >
-              {isSecret ? (
-                <>
-                  <EyeOff className="w-3.5 h-3.5 text-zinc-400" />
-                  <span className="hidden sm:inline">GM</span>
-                </>
-              ) : (
-                <>
-                  <Eye className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
-                  <span className="hidden sm:inline">Público</span>
-                </>
-              )}
-            </button>
+            <VisibilityBadgeMenu
+              visibility={visibility}
+              allowedUserIds={allowedUserIds}
+              isSecret={isSecret}
+              onChange={(newVis, newAllowed) => {
+                setVisibility(newVis);
+                setAllowedUserIds(newAllowed);
+                setIsSecret(newVis === 'gm');
+              }}
+            />
           </div>
         </div>
 

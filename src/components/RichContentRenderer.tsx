@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { renderContentWithMentions } from './MentionBadge';
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { HecosStorage } from '../services/storage';
@@ -606,7 +606,7 @@ export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
  * Clean Code Block component with Copy button
  */
 const CodeBlock: React.FC<{ code: string; language?: string }> = ({ code, language }) => {
-  const [copied, setCopied] = React.useState(false);
+  const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(code);

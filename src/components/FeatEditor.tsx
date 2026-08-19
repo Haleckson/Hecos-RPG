@@ -5,6 +5,7 @@ import {
   FeatActionCost,
   FeatCategoryType,
   FeatRarity,
+  ItemVisibility,
 } from '../types';
 import {
   getEmptyFeatData,
@@ -16,6 +17,7 @@ import { HecosStorage } from '../services/storage';
 import { ReferenceField } from './ReferenceField';
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { ImageUploadInput } from './ImageUploadInput';
+import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import {
   Award,
   Sparkles,
@@ -90,6 +92,8 @@ export const FeatEditor: React.FC<FeatEditorProps> = ({
     entity.tags.length > 0 ? entity.tags.join(', ') : 'talento, pf2e'
   );
   const [isSecret, setIsSecret] = useState(entity.isSecret || false);
+  const [visibility, setVisibility] = useState<ItemVisibility>(entity.visibility || (entity.isSecret ? 'gm' : 'public'));
+  const [allowedUserIds, setAllowedUserIds] = useState<string[]>(entity.allowedUserIds || []);
 
   // Parse or initialize blank structured Feat Attributes
   const [data, setData] = useState<PF2eFeatAttributes>(() => {
@@ -224,7 +228,9 @@ export const FeatEditor: React.FC<FeatEditorProps> = ({
       featData: data,
       coverImage: coverImage.trim(),
       tags: Array.from(updatedTagsSet),
-      isSecret,
+      isSecret: visibility === 'gm',
+      visibility,
+      allowedUserIds,
       updatedAt: new Date().toISOString(),
     };
 
@@ -325,15 +331,16 @@ export const FeatEditor: React.FC<FeatEditorProps> = ({
         </div>
 
         <div className="sm:col-span-1 flex items-center justify-end">
-          <label className="flex items-center gap-1.5 cursor-pointer text-zinc-400 hover:text-zinc-200">
-            <input
-              type="checkbox"
-              checked={isSecret}
-              onChange={(e) => setIsSecret(e.target.checked)}
-              className="rounded bg-zinc-900 border-zinc-700 text-rose-500 focus:ring-0"
-            />
-            <Lock className="w-3 h-3 text-rose-400" />
-          </label>
+          <VisibilityBadgeMenu
+            visibility={visibility}
+            allowedUserIds={allowedUserIds}
+            isSecret={isSecret}
+            onChange={(newVis, newAllowed) => {
+              setVisibility(newVis);
+              setAllowedUserIds(newAllowed);
+              setIsSecret(newVis === 'gm');
+            }}
+          />
         </div>
       </div>
 

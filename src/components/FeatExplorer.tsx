@@ -9,6 +9,7 @@ import {
 import { parseFeatFromContent, getFeatTypeLabel } from '../utils/featSerializer';
 import { HecosStorage, DEFAULT_FEAT_CATEGORIES_CONFIG } from '../services/storage';
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
+import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import {
   Award,
   Search,
@@ -692,29 +693,18 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
                   {count}
                 </span>
 
-                {/* GM Mode: Secret Toggle */}
+                {/* GM Mode: 3-Level Granular Folder Visibility Menu */}
                 {effectiveGmMode && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      HecosStorage.toggleFolderSecret(subcat);
-                    }}
-                    className={`ml-0.5 p-0.5 rounded hover:bg-zinc-800 transition-colors ${
-                      isSecret ? 'text-zinc-500 hover:text-amber-300' : 'text-amber-400/80 hover:text-amber-300'
-                    }`}
-                    title={
-                      isSecret
-                        ? 'Pasta Secreta (GM apenas). Clique para tornar pública'
-                        : 'Pasta Pública. Clique para tornar secreta do GM'
-                    }
-                  >
-                    {isSecret ? (
-                      <EyeOff className="w-3 h-3" />
-                    ) : (
-                      <Eye className="w-3 h-3 fill-amber-400/20" />
-                    )}
-                  </button>
+                  <div className="ml-0.5" onClick={(e) => e.stopPropagation()}>
+                    <VisibilityBadgeMenu
+                      visibility={HecosStorage.getFolderPermission(subcat).visibility}
+                      allowedUserIds={HecosStorage.getFolderPermission(subcat).allowedUserIds}
+                      isSecret={isSecret}
+                      onChange={(newVis, newAllowed) => {
+                        HecosStorage.setFolderPermission(subcat, newVis, newAllowed);
+                      }}
+                    />
+                  </div>
                 )}
               </div>
             );
@@ -1062,30 +1052,17 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                      {/* Secret Visibility Toggle with Eye icon */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          HecosStorage.toggleEntitySecret(ent.id);
-                        }}
-                        className={`p-1 rounded-lg border transition-all ${
-                          ent.isSecret
-                            ? 'bg-zinc-900/90 text-zinc-500 hover:text-amber-300 border-zinc-700 hover:border-amber-500/50'
-                            : 'bg-amber-950/40 text-amber-400 hover:text-amber-300 border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.2)]'
-                        }`}
-                        title={
-                          ent.isSecret
-                            ? 'Secreto: Apenas o GM pode ver (Clique para tornar Público)'
-                            : 'Público: Todos podem ver (Clique para tornar Secreto do GM)'
-                        }
-                      >
-                        {ent.isSecret ? (
-                          <EyeOff className="w-3.5 h-3.5" />
-                        ) : (
-                          <Eye className="w-3.5 h-3.5 fill-amber-400/20" />
-                        )}
-                      </button>
+                      {/* 3-Level Granular Visibility Menu */}
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <VisibilityBadgeMenu
+                          visibility={ent.visibility}
+                          allowedUserIds={ent.allowedUserIds}
+                          isSecret={ent.isSecret}
+                          onChange={(newVis, newAllowed) => {
+                            HecosStorage.setEntityVisibility(ent.id, newVis, newAllowed);
+                          }}
+                        />
+                      </div>
 
                       <button
                         type="button"

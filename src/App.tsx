@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HecosEntity, EntityCategory } from './types';
+import { HecosEntity, EntityCategory, HecosUser, FolderPermission } from './types';
 import { HecosStorage } from './services/storage';
 import { CATEGORY_DEFINITIONS, CategoryDefinition, getCategoryMeta } from './utils/categories';
 import { EntityView } from './components/EntityView';
@@ -15,6 +15,9 @@ import { AoNSearchModal } from './components/AoNSearchModal';
 import { ConfirmModal } from './components/ConfirmModal';
 import { FirebaseStatusModal } from './components/FirebaseStatusModal';
 import { NewArticleModal } from './components/NewArticleModal';
+import { LoginModal } from './components/LoginModal';
+import { UserManagementModal } from './components/UserManagementModal';
+import { VisibilityBadgeMenu } from './components/VisibilityBadgeMenu';
 import { FeatExplorer } from './components/FeatExplorer';
 import { FeatCategoryType } from './types';
 import { getEmptyAncestryData, serializeAncestryToHTML } from './utils/ancestrySerializer';
@@ -51,7 +54,14 @@ import {
   Radio,
   Flame,
   Eye,
-  EyeOff
+  EyeOff,
+  PanelLeftClose,
+  PanelLeftOpen,
+  User,
+  Users,
+  LogOut,
+  Key,
+  Crown
 } from 'lucide-react';
 
 export function App() {
@@ -66,7 +76,71 @@ export function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({ 'codex': true });
 
-  // Modals
+  // Resizable & Collapsible Sidebar State
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    const saved = localStorage.getItem('hecos_sidebar_width');
+    const parsed = saved ? parseInt(saved, 10) : 288;
+    return isNaN(parsed) || parsed < 220 || parsed > 520 ? 288 : parsed;
+  });
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    return localStorage.getItem('hecos_sidebar_collapsed') === 'true';
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const sidebarWidthRef = React.useRef(sidebarWidth);
+  sidebarWidthRef.current = sidebarWidth;
+
+  // Toggle Collapse function
+  const toggleSidebarCollapse = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('hecos_sidebar_collapsed', String(next));
+      return next;
+    });
+  };
+
+  // Keyboard shortcut: Alt+S or Ctrl+B to toggle sidebar collapse
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.altKey && e.key.toLowerCase() === 's') || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b')) {
+        e.preventDefault();
+        toggleSidebarCollapse();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Resize Drag Handlers
+  const handleMouseDownResizer = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const newWidth = Math.min(Math.max(moveEvent.clientX, 220), 520);
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      localStorage.setItem('hecos_sidebar_width', String(sidebarWidthRef.current));
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  // Modals & Auth State
+  const [currentUser, setCurrentUser] = useState<HecosUser | null>(() => HecosStorage.getCurrentUser());
+  const [folderPermissions, setFolderPermissions] = useState<Record<string, FolderPermission>>(() => HecosStorage.getFolderPermissions());
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isUserManagementModalOpen, setIsUserManagementModalOpen] = useState(false);
+
   const [isNewArticleModalOpen, setIsNewArticleModalOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isJukeboxOpen, setIsJukeboxOpen] = useState(false);
@@ -93,12 +167,27 @@ export function App() {
       setFirebaseStatus(state);
     });
 
-    // 3. Trigger initial merge sync
+    // 3. Subscribe to Auth user changes
+    const unsubUser = HecosStorage.subscribeUser((user) => {
+      setCurrentUser(user);
+      if (user && user.role === 'gm') {
+        setIsGmMode(true);
+      }
+    });
+
+    // 4. Subscribe to Folder Permissions
+    const unsubFolderPerms = HecosStorage.subscribeFolderPermissions((perms) => {
+      setFolderPermissions(perms);
+    });
+
+    // 5. Trigger initial merge sync
     HecosStorage.syncWithFirebase();
 
     return () => {
       unsubEntities();
       unsubFirebase();
+      unsubUser();
+      unsubFolderPerms();
     };
   }, []);
 
@@ -153,7 +242,7 @@ export function App() {
         tags: ['ancestry', 'pf2e'],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        isSecret: false,
+        isSecret: true,
       };
     } else if (category === 'feat') {
       const blankFeat = getEmptyFeatData();
@@ -171,7 +260,7 @@ export function App() {
         tags: ['talento', 'pf2e'],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        isSecret: false,
+        isSecret: true,
       };
     } else {
       newEnt = {
@@ -187,7 +276,7 @@ export function App() {
         tags: [category, 'Hecos'],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        isSecret: category === 'gm_note',
+        isSecret: true,
       };
     }
 
@@ -218,7 +307,7 @@ export function App() {
       tags: ['talento', 'pf2e', ...(presetSubcategory ? [presetSubcategory] : [])],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      isSecret: false,
+      isSecret: true,
     };
     setEditingEntity(newEnt);
     setActiveView('edit');
@@ -264,10 +353,26 @@ export function App() {
 
   // Filter entities for Category view
   const categoryEntities = entities.filter((e) => {
-    if (!isGmMode && e.isSecret) return false;
+    // 3-Level Access Permission Check:
+    // If GM is logged in and GM mode is active, GM can see everything.
+    // Otherwise, check granular user access (GM, Public, or specific Player).
+    const isActualGm = currentUser?.role === 'gm' && isGmMode;
+    if (!isActualGm) {
+      if (!HecosStorage.canUserAccess(e.visibility, e.allowedUserIds, currentUser, e.isSecret)) {
+        return false;
+      }
+    }
 
     // Subcategory check
     if (activeSubcategory) {
+      // Check if folder itself is restricted
+      if (!isActualGm) {
+        const folderPerm = HecosStorage.getFolderPermission(activeSubcategory);
+        if (!HecosStorage.canUserAccess(folderPerm.visibility, folderPerm.allowedUserIds, currentUser)) {
+          return false;
+        }
+      }
+
       if (activeSubcategory === 'NPC' && e.category === 'npc') return true;
       if (activeSubcategory === 'Criaturas' && e.category === 'creature') return true;
       if (activeSubcategory === 'Ancestralidades' && e.category === 'ancestry') return true;
@@ -354,9 +459,10 @@ export function App() {
 
       {/* Sidebar Navigation */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-40 w-72 bg-[#09080e]/95 backdrop-blur-xl border-r border-zinc-800/80 flex flex-col transition-transform duration-200 ${
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        }`}
+        style={{ width: isSidebarCollapsed ? undefined : `${sidebarWidth}px` }}
+        className={`fixed lg:static inset-y-0 left-0 z-40 bg-[#09080e]/95 backdrop-blur-xl border-r border-zinc-800/80 flex flex-col transition-all duration-150 relative select-none ${
+          isSidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full lg:translate-x-0'
+        } ${isSidebarCollapsed ? 'lg:hidden' : ''}`}
       >
         {/* Logo & Setting Title */}
         <div className="p-5 border-b border-zinc-800/80 flex items-center justify-between">
@@ -386,12 +492,25 @@ export function App() {
             </div>
           </div>
 
-          <button
-            onClick={() => setIsSidebarOpen(false)}
-            className="lg:hidden p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            {/* Collapse button for desktop */}
+            <button
+              type="button"
+              onClick={toggleSidebarCollapse}
+              className="hidden lg:flex p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+              title="Recolher menu lateral (Alt + S)"
+            >
+              <PanelLeftClose className="w-4 h-4" />
+            </button>
+
+            {/* Close button for mobile */}
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="lg:hidden p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Global Quick Search Button (Ctrl+K) */}
@@ -457,35 +576,58 @@ export function App() {
 
                 {/* Submenu for Codex */}
                 {hasChildren && isExpanded && (
-                  <div className="pl-6 space-y-0.5 pt-0.5 border-l border-zinc-800/80 ml-4">
+                  <div className="pl-5 space-y-0.5 pt-0.5 border-l border-zinc-800/80 ml-3.5">
                     {category.children!.map((child) => {
                       const isChildSelected = activeSubcategory === child.subcategory;
                       const ChildIcon = child.icon;
+                      const subcatKey = child.subcategory || child.id;
+                      const folderPerm = HecosStorage.getFolderPermission(subcatKey);
+                      const isActualGm = currentUser?.role === 'gm' && isGmMode;
+                      const canAccess = isActualGm || HecosStorage.canUserAccess(folderPerm.visibility, folderPerm.allowedUserIds, currentUser);
+
+                      if (!canAccess) return null;
 
                       return (
                         <div
                           key={child.id}
-                          onClick={() => {
-                            setSelectedCategoryKey(category.id);
-                            setActiveSubcategory(child.subcategory!);
-                            setSelectedEntityId(null);
-                            if (child.viewType && child.viewType !== 'entities') {
-                              setActiveView(child.viewType);
-                            } else {
-                              setActiveView('entities');
-                            }
-                            setIsSidebarOpen(false);
-                          }}
-                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition-colors ${
-                            isChildSelected
-                              ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-700/60 font-semibold'
-                              : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40'
-                          }`}
+                          className="flex items-center justify-between group/subcat rounded-lg hover:bg-zinc-900/50 transition-all pr-1"
                         >
-                          <span style={{ color: child.color }}>
-                            <ChildIcon className="w-3.5 h-3.5" />
-                          </span>
-                          <span>{child.name}</span>
+                          <div
+                            onClick={() => {
+                              setSelectedCategoryKey(category.id);
+                              setActiveSubcategory(child.subcategory!);
+                              setSelectedEntityId(null);
+                              if (child.viewType && child.viewType !== 'entities') {
+                                setActiveView(child.viewType);
+                              } else {
+                                setActiveView('entities');
+                              }
+                              setIsSidebarOpen(false);
+                            }}
+                            className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer transition-colors ${
+                              isChildSelected
+                                ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-700/60 font-semibold'
+                                : 'text-zinc-400 hover:text-zinc-200'
+                            }`}
+                          >
+                            <span style={{ color: child.color }}>
+                              <ChildIcon className="w-3.5 h-3.5" />
+                            </span>
+                            <span className="truncate">{child.name}</span>
+                          </div>
+
+                          {/* GM Granular Folder Visibility Menu */}
+                          {currentUser?.role === 'gm' && (
+                            <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <VisibilityBadgeMenu
+                                visibility={folderPerm.visibility}
+                                allowedUserIds={folderPerm.allowedUserIds}
+                                onChange={(newVis, newAllowed) => {
+                                  HecosStorage.setFolderPermission(subcatKey, newVis, newAllowed);
+                                }}
+                              />
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -562,6 +704,17 @@ export function App() {
             </button>
           </div>
         </div>
+
+        {/* Resizer Handle on right border (Desktop only) */}
+        {!isSidebarCollapsed && (
+          <div
+            onMouseDown={handleMouseDownResizer}
+            className={`hidden lg:block absolute top-0 right-0 bottom-0 w-1.5 cursor-col-resize hover:bg-cyan-500/60 active:bg-cyan-400 z-50 transition-colors ${
+              isResizing ? 'bg-cyan-400 w-2 shadow-[0_0_12px_rgba(6,182,212,0.8)]' : 'bg-transparent'
+            }`}
+            title="Arraste para redimensionar o menu lateral"
+          />
+        )}
       </aside>
 
       {/* Main Container */}
@@ -575,6 +728,19 @@ export function App() {
             >
               <Menu className="w-5 h-5" />
             </button>
+
+            {/* Expand sidebar button (shown when collapsed on desktop) */}
+            {isSidebarCollapsed && (
+              <button
+                type="button"
+                onClick={toggleSidebarCollapse}
+                className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-cyan-300 text-xs font-bold transition-all shadow-sm hover:shadow-[0_0_12px_rgba(6,182,212,0.3)] hover:scale-105 cursor-pointer"
+                title="Expandir menu lateral (Alt + S)"
+              >
+                <PanelLeftOpen className="w-4 h-4 text-cyan-400" />
+                <span>Menu</span>
+              </button>
+            )}
 
             {/* Breadcrumb path */}
             <div className="flex items-center gap-2 text-xs">
@@ -643,6 +809,54 @@ export function App() {
             >
               <Music className="w-4 h-4" />
             </button>
+
+            {/* User Account / Login & Management */}
+            {currentUser ? (
+              <div className="flex items-center gap-1.5">
+                {currentUser.role === 'gm' && (
+                  <button
+                    type="button"
+                    onClick={() => setIsUserManagementModalOpen(true)}
+                    className="p-2 sm:px-2.5 sm:py-1.5 rounded-xl bg-amber-950/60 hover:bg-amber-900/80 border border-amber-500/50 text-amber-300 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:shadow-[0_0_12px_rgba(245,158,11,0.25)]"
+                    title="Gerenciar Jogadores e Senhas (Apenas GM)"
+                  >
+                    <Users className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="hidden xl:inline">Jogadores</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setIsLoginModalOpen(true)}
+                  className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    currentUser.role === 'gm'
+                      ? 'bg-gradient-to-r from-amber-950/80 to-rose-950/70 border-amber-500/60 text-amber-200 shadow-sm'
+                      : 'bg-gradient-to-r from-cyan-950/80 to-purple-950/70 border-cyan-500/50 text-cyan-200 shadow-sm'
+                  }`}
+                  title={`Conectado como: ${currentUser.name} (${currentUser.role === 'gm' ? 'Mestre' : 'Jogador'}). Clique para trocar de usuário ou sair.`}
+                >
+                  {currentUser.role === 'gm' ? (
+                    <Crown className="w-3.5 h-3.5 text-amber-400" />
+                  ) : (
+                    <User className="w-3.5 h-3.5 text-cyan-400" />
+                  )}
+                  <span className="truncate max-w-[90px] sm:max-w-[130px]">{currentUser.name}</span>
+                  <span className="text-[10px] uppercase font-mono px-1 py-0.2 rounded bg-black/40 text-zinc-400 border border-white/10 hidden sm:inline">
+                    {currentUser.role === 'gm' ? 'GM' : 'Player'}
+                  </span>
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsLoginModalOpen(true)}
+                className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-700/80 hover:border-cyan-500/60 text-zinc-300 hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                title="Fazer login (Mestre GM ou Jogador)"
+              >
+                <Key className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="hidden sm:inline">Entrar</span>
+              </button>
+            )}
 
             {/* Google Drive Resources */}
             <button
@@ -819,30 +1033,17 @@ export function App() {
                               </span>
 
                               <div className="flex items-center gap-1.5">
-                                {/* Secret Visibility Toggle (Eye icon) */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    HecosStorage.toggleEntitySecret(item.id);
-                                  }}
-                                  className={`p-1.5 rounded-lg border transition-all ${
-                                    item.isSecret
-                                      ? 'bg-zinc-900/90 text-zinc-500 hover:text-amber-300 border-zinc-700 hover:border-amber-500/50'
-                                      : 'bg-amber-950/40 text-amber-400 hover:text-amber-300 border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.2)]'
-                                  }`}
-                                  title={
-                                    item.isSecret
-                                      ? 'Secreto: Apenas o GM pode ver (Clique para tornar Público)'
-                                      : 'Público: Todos podem ver (Clique para tornar Secreto do GM)'
-                                  }
-                                >
-                                  {item.isSecret ? (
-                                    <EyeOff className="w-3.5 h-3.5" />
-                                  ) : (
-                                    <Eye className="w-3.5 h-3.5 fill-amber-400/20" />
-                                  )}
-                                </button>
+                                {/* 3-Level Granular Visibility Menu */}
+                                <div onClick={(e) => e.stopPropagation()}>
+                                  <VisibilityBadgeMenu
+                                    visibility={item.visibility}
+                                    allowedUserIds={item.allowedUserIds}
+                                    isSecret={item.isSecret}
+                                    onChange={(newVis, newAllowed) => {
+                                      HecosStorage.setEntityVisibility(item.id, newVis, newAllowed);
+                                    }}
+                                  />
+                                </div>
 
                                 <button
                                   type="button"
@@ -947,6 +1148,17 @@ export function App() {
       <FirebaseStatusModal
         isOpen={isFirebaseModalOpen}
         onClose={() => setIsFirebaseModalOpen(false)}
+      />
+
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        onOpenUserManagement={() => setIsUserManagementModalOpen(true)}
+      />
+
+      <UserManagementModal
+        isOpen={isUserManagementModalOpen}
+        onClose={() => setIsUserManagementModalOpen(false)}
       />
     </div>
   );

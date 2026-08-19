@@ -1,4 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
 import {
   getDatabase,
   ref,
@@ -26,6 +27,7 @@ export const firebaseConfig = {
 
 let app: any = null;
 let db: Database | null = null;
+let analytics: Analytics | null = null;
 let isFirebaseAvailable = false;
 
 export type FirebaseConnectionStatus = 'connected' | 'connecting' | 'offline' | 'error';
@@ -87,6 +89,17 @@ try {
   db = getDatabase(app, firebaseConfig.databaseURL);
   isFirebaseAvailable = true;
 
+  // Initialize Analytics if running in supported browser environment
+  if (typeof window !== 'undefined') {
+    isSupported()
+      .then((supported) => {
+        if (supported && app) {
+          analytics = getAnalytics(app);
+        }
+      })
+      .catch(() => {});
+  }
+
   // Monitor real-time connection status via Firebase RTDB's native /.info/connected
   try {
     const connectedRef = ref(db, '.info/connected');
@@ -120,7 +133,7 @@ try {
   });
 }
 
-export { app, db, isFirebaseAvailable };
+export { app, db, analytics, isFirebaseAvailable };
 
 /**
  * Convert any string key to a safe Firebase Realtime Database key.
@@ -322,6 +335,49 @@ export async function syncFeatCategoriesToFirebase(config: Record<string, string
 }
 
 /**
+ * Real-time listener for 'hecos_public_folders' (revealed folders)
+ */
+export function subscribeToPublicFoldersRealtime(
+  onUpdate: (folders: string[]) => void
+): Unsubscribe | null {
+  if (!isFirebaseAvailable || !db) return null;
+
+  try {
+    const publicRef = ref(db, 'hecos_public_folders');
+    return onValue(
+      publicRef,
+      (snapshot) => {
+        const val = snapshot.val();
+        if (Array.isArray(val)) {
+          onUpdate(val);
+        } else if (val && typeof val === 'object') {
+          onUpdate(Object.keys(val));
+        }
+      },
+      (error) => {
+        console.warn("Real-time public folders error:", error);
+      }
+    );
+  } catch (err) {
+    return null;
+  }
+}
+
+/**
+ * Save public (revealed) folders set to Firebase Realtime Database
+ */
+export async function syncPublicFoldersToFirebase(folders: string[]): Promise<boolean> {
+  if (!isFirebaseAvailable || !db || !folders) return false;
+  try {
+    const publicRef = ref(db, 'hecos_public_folders');
+    await withTimeout(set(publicRef, folders), 6000);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+/**
  * Real-time listener for 'hecos_secret_folders'
  */
 export function subscribeToSecretFoldersRealtime(
@@ -509,6 +565,120 @@ export async function loadMapsFromFirebase(): Promise<any[] | null> {
     return list.length > 0 ? list : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Sync Users to Firebase Realtime Database
+ */
+export async function syncUsersToFirebase(users: any[]): Promise<boolean> {
+  if (!isFirebaseAvailable || !db) return false;
+  try {
+    const usersRef = ref(db, 'hecos_users');
+    const batch: Record<string, any> = {};
+    users.forEach((u) => {
+      if (u && u.id) {
+        batch[toSafeKey(u.id)] = cleanForFirebase(u);
+      }
+    });
+    await withTimeout(set(usersRef, batch), 6000);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Load Users from Firebase
+ */
+export async function loadUsersFromFirebase(): Promise<any[] | null> {
+  if (!isFirebaseAvailable || !db) return null;
+  try {
+    const usersRef = ref(db, 'hecos_users');
+    const snap = await withTimeout(get(usersRef), 6000);
+    if (!snap.exists()) return null;
+    const val = snap.val();
+    const list: any[] = [];
+    if (Array.isArray(val)) {
+      val.forEach(u => { if (u && u.id) list.push(u); });
+    } else if (typeof val === 'object') {
+      Object.values(val).forEach((u: any) => { if (u && u.id) list.push(u); });
+    }
+    return list.length > 0 ? list : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Subscribe to Users in Realtime
+ */
+export function subscribeToUsersRealtime(callback: (users: any[]) => void): Unsubscribe {
+  if (!isFirebaseAvailable || !db) return () => {};
+  try {
+    const usersRef = ref(db, 'hecos_users');
+    const listener = (snap: any) => {
+      if (!snap.exists()) return;
+      const val = snap.val();
+      const list: any[] = [];
+      if (Array.isArray(val)) {
+        val.forEach(u => { if (u && u.id) list.push(u); });
+      } else if (typeof val === 'object') {
+        Object.values(val).forEach((u: any) => { if (u && u.id) list.push(u); });
+      }
+      callback(list);
+    };
+    onValue(usersRef, listener);
+    return () => off(usersRef, 'value', listener);
+  } catch {
+    return () => {};
+  }
+}
+
+/**
+ * Sync Folder Permissions to Firebase Realtime Database
+ */
+export async function syncFolderPermissionsToFirebase(permissions: Record<string, any>): Promise<boolean> {
+  if (!isFirebaseAvailable || !db) return false;
+  try {
+    const permsRef = ref(db, 'hecos_folder_permissions');
+    await withTimeout(set(permsRef, cleanForFirebase(permissions)), 6000);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Load Folder Permissions from Firebase
+ */
+export async function loadFolderPermissionsFromFirebase(): Promise<Record<string, any> | null> {
+  if (!isFirebaseAvailable || !db) return null;
+  try {
+    const permsRef = ref(db, 'hecos_folder_permissions');
+    const snap = await withTimeout(get(permsRef), 6000);
+    if (!snap.exists()) return null;
+    return snap.val();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Subscribe to Folder Permissions in Realtime
+ */
+export function subscribeToFolderPermissionsRealtime(callback: (perms: Record<string, any>) => void): Unsubscribe {
+  if (!isFirebaseAvailable || !db) return () => {};
+  try {
+    const permsRef = ref(db, 'hecos_folder_permissions');
+    const listener = (snap: any) => {
+      if (!snap.exists()) return;
+      callback(snap.val() || {});
+    };
+    onValue(permsRef, listener);
+    return () => off(permsRef, 'value', listener);
+  } catch {
+    return () => {};
   }
 }
 

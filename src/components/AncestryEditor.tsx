@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { AncestryAttributes, AncestryFeat, AncestryHeritage, HecosEntity } from '../types';
+import { AncestryAttributes, AncestryFeat, AncestryHeritage, HecosEntity, ItemVisibility } from '../types';
 import { getEmptyAncestryData, serializeAncestryToHTML, parseAncestryFromContent } from '../utils/ancestrySerializer';
 import { ReferenceField } from './ReferenceField';
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { ImageUploadInput } from './ImageUploadInput';
 import { FeatPickerModal } from './FeatPickerModal';
+import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { HecosStorage } from '../services/storage';
 import { parseFeatFromContent } from '../utils/featSerializer';
 import {
@@ -57,6 +58,8 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
   const [coverImage, setCoverImage] = useState(entity.coverImage || '');
   const [tagsString, setTagsString] = useState(entity.tags.join(', '));
   const [isSecret, setIsSecret] = useState(entity.isSecret || false);
+  const [visibility, setVisibility] = useState<ItemVisibility>(entity.visibility || (entity.isSecret ? 'gm' : 'public'));
+  const [allowedUserIds, setAllowedUserIds] = useState<string[]>(entity.allowedUserIds || []);
 
   // Parse or initialize blank structured Ancestry Attributes
   const [data, setData] = useState<AncestryAttributes>(() => {
@@ -299,7 +302,7 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
   };
 
   // Save full entity with structured data and generated clean HTML
-  const handleSave = () => {
+  const handleSave = React.useCallback(() => {
     const finalTitle = title.trim() || 'Nova Ancestralidade';
     const generatedHTML = serializeAncestryToHTML(finalTitle, data);
     const tags = tagsString
@@ -314,7 +317,9 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
       category: 'ancestry',
       tags: tags.length > 0 ? tags : ['ancestry', 'pf2e'],
       coverImage: coverImage.trim() || undefined,
-      isSecret,
+      isSecret: visibility === 'gm',
+      visibility,
+      allowedUserIds,
       summary: data.identity?.narrativeHook || subtitle || entity.summary || 'Ancestralidade de Hecos',
       ancestryData: data,
       content: generatedHTML,
@@ -322,10 +327,45 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
     };
 
     onSave(updatedEntity);
-  };
+  }, [title, subtitle, tagsString, coverImage, visibility, allowedUserIds, data, entity, onSave]);
+
+  // Keyboard shortcut: Ctrl + S / Cmd + S to save
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleSave]);
+
+  const totalFeatsCount = useMemo(() => {
+    return (
+      (data.feats?.rank1?.length || 0) +
+      (data.feats?.rank5?.length || 0) +
+      (data.feats?.rank9?.length || 0) +
+      (data.feats?.rank13?.length || 0) +
+      (data.feats?.rank17?.length || 0)
+    );
+  }, [data.feats]);
 
   return (
-    <div className="bg-[#0c0b12] text-zinc-100 rounded-2xl border border-zinc-800/90 shadow-2xl overflow-hidden space-y-6 max-w-full">
+    <div className="bg-[#0c0b12] text-zinc-100 rounded-2xl border border-zinc-800/90 shadow-2xl overflow-hidden space-y-6 max-w-full relative">
+      {/* Floating Save Button */}
+      <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={handleSave}
+          className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-[#74b6c2] to-[#b19ecc] hover:from-[#88cbd7] hover:to-[#c4b3dc] text-zinc-950 font-black text-sm shadow-[0_4px_25px_rgba(116,182,194,0.4)] hover:shadow-[0_4px_30px_rgba(116,182,194,0.6)] hover:scale-105 active:scale-95 transition-all cursor-pointer border border-white/20"
+          title="Salvar Ancestralidade (Ctrl+S)"
+        >
+          <Save className="w-5 h-5 stroke-[2.5]" />
+          <span>Salvar Artigo</span>
+        </button>
+      </div>
+
       {/* Top Header & Save Actions Bar */}
       <div className="px-5 sm:px-6 py-4 bg-[#14121d] border-b border-zinc-800/90 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-30 backdrop-blur-md">
         <div className="flex items-center gap-3">
@@ -346,6 +386,18 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5">
+          {/* 3-Level Granular Visibility Menu */}
+          <VisibilityBadgeMenu
+            visibility={visibility}
+            allowedUserIds={allowedUserIds}
+            isSecret={isSecret}
+            onChange={(newVis, newAllowed) => {
+              setVisibility(newVis);
+              setAllowedUserIds(newAllowed);
+              setIsSecret(newVis === 'gm');
+            }}
+          />
+
           <button
             type="button"
             onClick={onCancel}
@@ -361,7 +413,7 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
             className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#74b6c2] to-[#b19ecc] hover:opacity-95 text-[#0c0b12] text-xs font-black transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
           >
             <Save className="w-4 h-4" />
-            <span>Salvar Ancestralidade</span>
+            <span>Salvar</span>
           </button>
         </div>
       </div>
@@ -567,22 +619,22 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
         </div>
 
         {/* ═══════════════════════════════════════════════════════════════════════════ */}
-        {/* NAVEGAÇÃO ENTRE AS TRÊS ABAS: MECÂNICAS, LORE & ABA GM */}
+        {/* NAVEGAÇÃO ENTRE AS TRÊS ABAS: MECÂNICAS, LORE & GM */}
         {/* ═══════════════════════════════════════════════════════════════════════════ */}
-        <div className="flex border-b border-zinc-800 bg-[#14121d] rounded-t-xl overflow-hidden p-1 gap-1">
+        <div className="flex border-b border-zinc-800 bg-[#14121d] rounded-t-xl overflow-hidden p-1.5 gap-1.5 shadow-md">
           <button
             type="button"
             onClick={() => setActiveMainTab('mechanics')}
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 font-extrabold text-xs sm:text-sm tracking-wide rounded-lg transition-all cursor-pointer ${
               activeMainTab === 'mechanics'
-                ? 'bg-[#1b2a32] text-[#74b6c2] border border-[#2e4f5a] shadow-sm'
+                ? 'bg-[#1b2a32] text-[#74b6c2] border border-[#2e4f5a] shadow-[0_0_12px_rgba(6,182,212,0.2)]'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#191724]'
             }`}
           >
             <Swords className="w-4 h-4 text-[#74b6c2]" />
-            <span>Mecânicas de Jogo</span>
-            <span className="hidden md:inline text-[10px] px-2 py-0.5 rounded-full bg-[#142229] text-[#74b6c2] font-mono">
-              Heranças & Talentos
+            <span>Mecânicas</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#142229] text-[#74b6c2] font-mono">
+              {totalFeatsCount + (data.heritages?.length || 0)}
             </span>
           </button>
 
@@ -591,15 +643,12 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
             onClick={() => setActiveMainTab('lore')}
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 font-extrabold text-xs sm:text-sm tracking-wide rounded-lg transition-all cursor-pointer ${
               activeMainTab === 'lore'
-                ? 'bg-[#241e33] text-[#b19ecc] border border-[#493b61] shadow-sm'
+                ? 'bg-[#241e33] text-[#b19ecc] border border-[#493b61] shadow-[0_0_12px_rgba(177,158,204,0.2)]'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#191724]'
             }`}
           >
             <BookOpen className="w-4 h-4 text-[#b19ecc]" />
-            <span>Lore & Cenário</span>
-            <span className="hidden md:inline text-[10px] px-2 py-0.5 rounded-full bg-[#1e172a] text-[#b19ecc] font-mono">
-              Cultura & Sociedade
-            </span>
+            <span>Lore</span>
           </button>
 
           <button
@@ -607,14 +656,14 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
             onClick={() => setActiveMainTab('gm')}
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 font-extrabold text-xs sm:text-sm tracking-wide rounded-lg transition-all cursor-pointer ${
               activeMainTab === 'gm'
-                ? 'bg-[#2e1320] text-[#f43f5e] border border-[#701a2d] shadow-[0_0_15px_rgba(244,63,94,0.2)]'
-                : 'text-zinc-400 hover:text-rose-300 hover:bg-[#1a0f19]'
+                ? 'bg-[#2e1320] text-rose-300 border border-[#701a2d] shadow-[0_0_15px_rgba(244,63,94,0.3)]'
+                : 'text-rose-400/80 hover:text-rose-200 hover:bg-[#1a0f19]'
             }`}
           >
-            <Crown className="w-4 h-4 text-[#f43f5e]" />
-            <span>Aba GM</span>
-            <span className="hidden md:inline text-[10px] px-2 py-0.5 rounded-full bg-[#3b1220] text-rose-300 font-mono font-bold">
-              Segredos & Narrador
+            <Crown className="w-4 h-4 text-rose-400" />
+            <span>GM</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#3b1220] text-rose-300 font-mono font-bold">
+              Segredos
             </span>
           </button>
         </div>
@@ -1360,122 +1409,124 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
         )}
 
         {/* ═══════════════════════════════════════════════════════════════════════════ */}
-        {/* CONTEÚDO DA ABA: ABA GM (NOTAS & SEGREDOS DO MESTRE) */}
+        {/* CONTEÚDO DA ABA: ABA GM (GRANDE EDITOR DE TEXTO PARA ANOTAÇÕES DO MESTRE) */}
         {/* ═══════════════════════════════════════════════════════════════════════════ */}
         {activeMainTab === 'gm' && (
           <div className="space-y-6">
-            <div className="p-4 rounded-xl bg-gradient-to-r from-rose-950/70 via-purple-950/40 to-black border border-rose-600/50 flex items-center justify-between gap-4">
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-950/70 via-purple-950/40 to-black border border-rose-600/50 flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-rose-900/60 border border-rose-500/80 flex items-center justify-center text-rose-300 shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-rose-900/60 border border-rose-500/80 flex items-center justify-center text-rose-300 shrink-0">
                   <Crown className="w-5 h-5" />
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-rose-200 flex items-center gap-2">
-                    <span>Aba do Mestre (Conteúdo Reservado e Segredos)</span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-900 text-rose-300 border border-rose-700">
-                      GM ONLY
+                    <span>Aba do Mestre (Caderno Completo de Anotações)</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-900 text-rose-300 border border-rose-700">
+                      SEMPRE GM ONLY
                     </span>
                   </h4>
                   <p className="text-xs text-rose-200/70">
-                    Estes campos são destinados exclusivamente para a condução do Narrador. Jogadores não devem ver estas informações a menos que você as revele na mesa.
+                    Espaço livre e confidencial para anotações avulsas, ganchos de campanha, revelações e ideias de NPCs.
                   </p>
                 </div>
+              </div>
+
+              {/* Snippet insertion shortcuts */}
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = data.gmGuide?.gmNotes || '';
+                    updateNestedField('gmGuide', 'gmNotes', `${current}\n\n### 🎭 NPC da Ancestralidade\n- **Nome:** \n- **Função:** \n- **Segredo:** `);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-rose-950/60 hover:bg-rose-900/80 border border-rose-800/60 text-rose-300 text-xs transition-colors"
+                >
+                  + NPC
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = data.gmGuide?.gmNotes || '';
+                    updateNestedField('gmGuide', 'gmNotes', `${current}\n\n### 🧭 Gancho de Aventura\n- **Cenário:** \n- **Objetivo:** \n- **Reviravolta:** `);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-rose-950/60 hover:bg-rose-900/80 border border-rose-800/60 text-rose-300 text-xs transition-colors"
+                >
+                  + Gancho
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = data.gmGuide?.gmNotes || '';
+                    updateNestedField('gmGuide', 'gmNotes', `${current}\n\n> 🔒 **Segredo Proibido:** `);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-rose-950/60 hover:bg-rose-900/80 border border-rose-800/60 text-rose-300 text-xs transition-colors"
+                >
+                  + Segredo
+                </button>
               </div>
             </div>
 
-            {/* SEÇÃO: INTERPRETAÇÃO & TEMAS */}
-            <div className="p-5 sm:p-6 rounded-2xl bg-[#13111b] border border-rose-900/40 space-y-4">
-              <div className="flex items-center gap-2.5 pb-3 border-b border-zinc-800/80">
-                <div className="p-1.5 rounded-lg bg-[#2e1320] text-rose-300 border border-rose-800">
-                  <Users className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-base font-extrabold text-rose-200">
-                    Interpretação de NPCs & Temas Narrativos
-                  </h3>
-                  <p className="text-xs text-zinc-400">
-                    Como representar personagens desta espécie e temáticas sugeridas para aventuras.
-                  </p>
-                </div>
+            {/* Large Dedicated GM Notepad Text Area */}
+            <div className="p-5 sm:p-6 rounded-2xl bg-[#110a14] border border-rose-900/50 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-rose-300 font-mono flex items-center gap-1.5">
+                  <Crown className="w-3.5 h-3.5" />
+                  <span>Anotações Livres do Mestre (Markdown Suportado)</span>
+                </label>
+                <span className="text-[11px] text-zinc-500 font-mono">
+                  {(data.gmGuide?.gmNotes || '').length} caracteres
+                </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <ReferenceField
-                  label="Interpretando NPCs da Espécie"
-                  value={data.gmGuide?.roleplayingNpcs || ''}
-                  onChange={(val) => updateNestedField('gmGuide', 'roleplayingNpcs', val)}
-                  placeholder="Dicas de maneirismos, postura, tom de voz e motivações comuns de NPCs desta ancestralidade..."
-                  rows={4}
-                  onNavigate={onNavigate}
-                />
-
-                <ReferenceField
-                  label="Temas e Conflitos Sugeridos"
-                  value={data.gmGuide?.themesAndConflicts || ''}
-                  onChange={(val) => updateNestedField('gmGuide', 'themesAndConflicts', val)}
-                  placeholder="Quais tipos de histórias combinam melhor? Conflitos morais, intrigas tribais, preconceitos históricos..."
-                  rows={4}
-                  onNavigate={onNavigate}
-                />
-              </div>
-            </div>
-
-            {/* SEÇÃO: SEGREDOS & GANCHOS OCULTOS */}
-            <div className="p-5 sm:p-6 rounded-2xl bg-[#13111b] border border-amber-900/40 space-y-4">
-              <div className="flex items-center gap-2.5 pb-3 border-b border-zinc-800/80">
-                <div className="p-1.5 rounded-lg bg-[#2b1f13] text-amber-300 border border-amber-800">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-base font-extrabold text-amber-200">
-                    Segredos Ancestrais & Ganchos de Campanha
-                  </h3>
-                  <p className="text-xs text-zinc-400">
-                    Mistérios ocultos, verdades não reveladas e sementes de missões para o mestre.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <ReferenceField
-                  label="Segredos Ancestrais & Ocultismo"
-                  value={data.gmGuide?.secretLore || ''}
-                  onChange={(val) => updateNestedField('gmGuide', 'secretLore', val)}
-                  placeholder="Segredos proibidos da espécie, pactos arcanos esquecidos ou maldições de sangue..."
-                  rows={4}
-                  onNavigate={onNavigate}
-                />
-
-                <ReferenceField
-                  label="Ganchos de Aventura & Encontros"
-                  value={data.gmGuide?.adventureHooks || ''}
-                  onChange={(val) => updateNestedField('gmGuide', 'adventureHooks', val)}
-                  placeholder="Ganchos de missões prontos: um ritual interrompido, um herdeiro desaparecido, relíquia ancestral..."
-                  rows={4}
-                  onNavigate={onNavigate}
-                />
-
-                <ReferenceField
-                  label="Origens Ocultas & Facções Secretas"
-                  value={data.gmGuide?.trueOrigins || ''}
-                  onChange={(val) => updateNestedField('gmGuide', 'trueOrigins', val)}
-                  placeholder="Origem real da espécie (se diferente da crença popular), facções sombrias e conspirações internas..."
-                  rows={4}
-                  onNavigate={onNavigate}
-                />
-
-                <ReferenceField
-                  label="Anotações Livres & Scratchpad do Narrador"
-                  value={data.gmGuide?.gmNotes || ''}
-                  onChange={(val) => updateNestedField('gmGuide', 'gmNotes', val)}
-                  placeholder="Ideias rápidas, estatísticas de NPCs únicos para a mesa, lembretes de trama..."
-                  rows={4}
-                  onNavigate={onNavigate}
-                />
-              </div>
+              <textarea
+                value={data.gmGuide?.gmNotes || ''}
+                onChange={(e) => updateNestedField('gmGuide', 'gmNotes', e.target.value)}
+                placeholder="Escreva aqui todas as anotações do Mestre para esta ancestralidade... Suporta listas, títulos Markdown (###), referências @ e callouts de segredo."
+                rows={18}
+                className="w-full p-4 rounded-xl bg-[#08050c] border border-rose-900/60 focus:border-rose-500 text-zinc-100 text-sm font-mono leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+              />
             </div>
           </div>
         )}
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════════════ */}
+      {/* BARRA DE SALVAMENTO FLUTUANTE PERSISTENTE (STICKY BOTTOM SAVE BAR) */}
+      {/* ═══════════════════════════════════════════════════════════════════════════ */}
+      <div className="sticky bottom-4 z-40 mx-4 sm:mx-6 p-3.5 sm:p-4 rounded-2xl bg-[#0d0b14]/95 backdrop-blur-xl border border-cyan-500/40 shadow-[0_10px_35px_rgba(0,0,0,0.85)] flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 text-xs">
+          <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
+          <span className="font-bold text-zinc-200">
+            {title ? title : 'Nova Ancestralidade'}
+          </span>
+          <span className="text-zinc-500 hidden sm:inline">•</span>
+          <span className="text-zinc-400 font-mono text-[11px] hidden sm:inline">
+            {totalFeatsCount} talentos • {data.heritages?.length || 0} heranças
+          </span>
+          <span className="text-cyan-400/80 font-mono text-[11px] hidden md:inline bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/50">
+            Ctrl + S para salvar
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 rounded-xl bg-[#171522] hover:bg-[#201d30] border border-zinc-700/80 text-xs font-semibold text-zinc-300 transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+            <span>Cancelar</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSave}
+            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 via-purple-400 to-rose-400 hover:opacity-90 text-black text-xs font-black transition-all shadow-[0_0_20px_rgba(6,182,212,0.4)] flex items-center gap-2 cursor-pointer active:scale-95"
+          >
+            <Save className="w-4 h-4" />
+            <span>Salvar Artigo</span>
+          </button>
+        </div>
       </div>
 
       {/* MODAL DE BUSCA E MULTISELEÇÃO DE TALENTOS */}
