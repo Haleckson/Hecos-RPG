@@ -15,7 +15,8 @@ export type EntityCategory =
   | 'gm_note'
   | 'feat'
   | 'rule'
-  | 'timeline';
+  | 'timeline'
+  | 'quest';
 
 export type ActionCost = 1 | 2 | 3 | 'free' | 'reaction' | 'passive';
 
@@ -178,6 +179,31 @@ export interface TimelineEventAttributes {
   relatedEntityIds?: string[];
 }
 
+export type QuestStatus = 'not_started' | 'in_progress' | 'completed' | 'failed' | 'abandoned';
+export type QuestDifficulty = 'Trivial' | 'Baixa' | 'Moderada' | 'Severa' | 'Extrema' | 'Lendária';
+
+export interface QuestObjective {
+  id: string;
+  text: string;
+  completed: boolean;
+  isSecret?: boolean;
+}
+
+export interface QuestAttributes {
+  status: QuestStatus;
+  difficulty?: QuestDifficulty;
+  recommendedLevel?: number;
+  questGiver?: string; // Entity ID or name
+  location?: string; // Entity ID or location name
+  objectives: QuestObjective[];
+  rewards?: {
+    xp?: number;
+    gold?: string;
+    items?: string[]; // Entity IDs or descriptions
+  };
+  actOrChapter?: string;
+}
+
 export interface GMNoteAttributes {
   category: 'plot' | 'secret_lore' | 'encounter_plan' | 'scratchpad';
   isRevealedToPlayers: boolean;
@@ -263,7 +289,18 @@ export interface FeatCategoryFolderInfo {
   subcategories: string[];
 }
 
+export interface AncestryAlbumImage {
+  id: string;
+  url: string;
+  caption?: string;
+  author?: string;
+  createdAt?: number;
+}
+
 export interface AncestryAttributes {
+  // Álbum & Galeria Visual (Subcategoria colapsável no topo de Lore)
+  album?: AncestryAlbumImage[];
+
   // Cabeçalho
   hp: string;
   size: string;
@@ -343,6 +380,178 @@ export interface AncestryAttributes {
   };
 }
 
+export type PerilKind = 'monster' | 'hazard_simple' | 'hazard_complex' | 'environmental' | 'haunt';
+
+export interface PerilAttack {
+  id: string;
+  name: string;
+  type: 'melee' | 'ranged';
+  bonus: number;
+  traits: string[];
+  damage: string;
+  range?: string;
+  extraEffects?: string;
+}
+
+export interface PerilAction {
+  id: string;
+  name: string;
+  cost: '1' | '2' | '3' | 'free' | 'reaction';
+  traits: string[];
+  trigger?: string;
+  effect: string;
+}
+
+export interface PerilFieldVisibility {
+  name?: ItemVisibility;
+  level?: ItemVisibility;
+  typeAndTraits?: ItemVisibility;
+  description?: ItemVisibility;
+  sensesAndPerception?: ItemVisibility;
+  acAndDefenses?: ItemVisibility;
+  hpAndHealth?: ItemVisibility;
+  hardnessAndBT?: ItemVisibility;
+  weaknessesAndResistances?: ItemVisibility;
+  immunities?: ItemVisibility;
+  attacksAndDamage?: ItemVisibility;
+  actionsAndAbilities?: ItemVisibility;
+  disableAndReset?: ItemVisibility;
+  routine?: ItemVisibility;
+  spells?: ItemVisibility;
+  gmNotes?: ItemVisibility;
+  allowedUsers?: Record<string, string[]>;
+}
+
+export interface PerilAttributes {
+  perilKind: PerilKind;
+  level: number;
+  rarity: 'Comum' | 'Incomum' | 'Raro' | 'Único';
+  size?: 'Tiny' | 'Small' | 'Medium' | 'Large' | 'Huge' | 'Gargantuan';
+  traits: string[];
+  stealthCheck?: string; // e.g. "Furtividade +15 ou Percepção CD 25 para notar"
+  
+  // Perception & Senses
+  perception?: number;
+  senses?: string;
+  languages?: string[];
+  skills?: Record<string, number>;
+  attributes?: {
+    str: number;
+    dex: number;
+    con: number;
+    int: number;
+    wis: number;
+    cha: number;
+  };
+
+  // Defenses
+  ac?: number;
+  fort?: number;
+  ref?: number;
+  will?: number;
+  hp?: number;
+  maxHp?: number;
+  hardness?: number;
+  brokenThreshold?: number;
+  immunities?: string[];
+  weaknesses?: string[];
+  resistances?: string[];
+
+  // Speed & Offense
+  speed?: string;
+  attacks?: PerilAttack[];
+  actions?: PerilAction[];
+  spells?: {
+    tradition: string;
+    dc: number;
+    attack: number;
+    spellsList: string;
+  };
+
+  // Hazard Mechanics
+  disable?: string; // Desativação
+  reset?: string; // Reset
+  routine?: string; // Rotina (Hazard Complexo)
+
+  // Lore & Notes
+  description?: string;
+  hecosLore?: string;
+  gmNotes?: string;
+
+  // Field-level visibility settings
+  fieldVisibility?: PerilFieldVisibility;
+}
+
+export type ClassProficiencyRank = 'Destreinado' | 'Treinado' | 'Especialista' | 'Mestre' | 'Lendário';
+
+export interface ClassFeature {
+  id: string;
+  level: number;
+  name: string;
+  description: string;
+  actionCost?: string;
+  traits?: string[];
+}
+
+export interface ClassSubclass {
+  id: string;
+  name: string;
+  description: string;
+  grantedFeatures?: string;
+}
+
+export interface ClassArchetypeFeat {
+  id: string;
+  level: number;
+  name: string;
+  description: string;
+  prerequisites?: string;
+  actionCost?: string;
+  traits?: string[];
+}
+
+export interface ClassAttributes {
+  kind: 'class' | 'archetype';
+  hpPerLevel?: number; // e.g. 6, 8, 10, 12
+  keyAttribute?: string; // Força, Destreza, etc.
+  rarity?: 'Comum' | 'Incomum' | 'Raro' | 'Único';
+  
+  // Proficiencies
+  perceptionProficiency?: ClassProficiencyRank;
+  savingThrows?: {
+    fortitude: ClassProficiencyRank;
+    reflex: ClassProficiencyRank;
+    will: ClassProficiencyRank;
+  };
+  skillsProficiency?: string;
+  attacksProficiency?: string;
+  defensesProficiency?: string;
+  classDcProficiency?: ClassProficiencyRank;
+  
+  // Spellcasting (optional)
+  spellcasting?: {
+    isSpellcaster: boolean;
+    tradition?: 'Arcana' | 'Divina' | 'Oculta' | 'Primal' | 'Nenhuma';
+    spellType?: 'Preparado' | 'Espontâneo' | 'Foco';
+    keyAttribute?: string;
+  };
+
+  // Features by Level
+  features?: ClassFeature[];
+  subclasses?: ClassSubclass[];
+
+  // Archetype specifics
+  archetypeDedicationLevel?: number;
+  prerequisites?: string;
+  access?: string;
+  dedicationFeat?: ClassArchetypeFeat;
+  archetypeFeats?: ClassArchetypeFeat[];
+
+  description?: string;
+  hecosLore?: string;
+  gmNotes?: string;
+}
+
 export type ItemVisibility = 'gm' | 'all' | 'custom';
 
 export type UserRole = 'gm' | 'player';
@@ -372,6 +581,7 @@ export interface HecosEntity {
   subcategory?: string;
   subcategories?: string[];
   tags: string[];
+  traits?: string[]; // PF2e-style mechanics traits (e.g. Humanoide, Incomum, Fogo, Transmutação...)
   summary: string;
   content: string; // Markdown content with @mention and block support
   coverImage?: string;
@@ -384,6 +594,8 @@ export interface HecosEntity {
 
   // Category specific specialized data
   statblock?: PF2eStatblock;
+  perilData?: PerilAttributes;
+  classData?: ClassAttributes;
   ancestryData?: AncestryAttributes;
   featData?: PF2eFeatAttributes;
   itemData?: ItemAttributes;
@@ -392,6 +604,7 @@ export interface HecosEntity {
   timelineData?: TimelineEventAttributes;
   gmNoteData?: GMNoteAttributes;
   spellData?: PF2eSpellAttributes;
+  questData?: QuestAttributes;
 }
 
 export interface MapPin {
@@ -407,6 +620,8 @@ export interface MapPin {
   iconType?: string;
   color?: string;
   isSecret?: boolean;
+  visibility?: ItemVisibility;
+  allowedUserIds?: string[];
   gmNotes?: string;
   tags?: string[];
   region?: string;
@@ -420,6 +635,9 @@ export interface InteractiveMapData {
   scale?: string;
   gridSize?: number;
   pins: MapPin[];
+  isSecret?: boolean;
+  visibility?: ItemVisibility;
+  allowedUserIds?: string[];
 }
 
 export interface YouTubeAmbianceTrack {
@@ -451,4 +669,11 @@ export interface TrashedEntity {
   deletedAt: string;
   deletedBy?: string;
   originalCategory: string;
+}
+
+export interface ImageAdjustment {
+  x: number; // horizontal translation % (-200 to 200, default 0)
+  y: number; // vertical translation % (-200 to 200, default 0)
+  scale: number; // zoom scale multiplier (0.15 to 8.0, default 1.0)
+  fitMode?: 'cover' | 'contain' | 'custom';
 }

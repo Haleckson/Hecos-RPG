@@ -69,27 +69,81 @@ export const ReferenceField: React.FC<ReferenceFieldProps> = ({
     }, 20);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === '@' || (e.key === '[' && value.endsWith('['))) {
-      setShowMentionMenu(true);
-      setSearchQuery('');
-    }
-  };
-
   const insertFormat = (prefix: string, suffix: string = prefix) => {
     const el = inputRef.current;
     if (!el) return;
     const start = el.selectionStart || 0;
     const end = el.selectionEnd || 0;
-    const selected = value.substring(start, end) || 'texto';
-    const newVal = value.substring(0, start) + prefix + selected + suffix + value.substring(end);
+    const hasSelection = start !== end;
+    const selected = value.substring(start, end);
+
+    let newVal = '';
+    let newStart = start;
+    let newEnd = end;
+
+    if (hasSelection) {
+      // Toggle check: if already wrapped in prefix/suffix, unwrap
+      if (selected.startsWith(prefix) && selected.endsWith(suffix) && selected.length >= prefix.length + suffix.length) {
+        const unwrapped = selected.slice(prefix.length, selected.length - suffix.length);
+        newVal = value.substring(0, start) + unwrapped + value.substring(end);
+        newStart = start;
+        newEnd = start + unwrapped.length;
+      } else {
+        newVal = value.substring(0, start) + prefix + selected + suffix + value.substring(end);
+        newStart = start;
+        newEnd = start + prefix.length + selected.length + suffix.length;
+      }
+    } else {
+      const placeholder = 'texto';
+      newVal = value.substring(0, start) + prefix + placeholder + suffix + value.substring(end);
+      newStart = start + prefix.length;
+      newEnd = newStart + placeholder.length;
+    }
+
     onChange(newVal);
     setTimeout(() => {
       if (el) {
         el.focus();
-        el.setSelectionRange(start + prefix.length, start + prefix.length + selected.length);
+        el.setSelectionRange(newStart, newEnd);
       }
     }, 20);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Keyboard shortcuts: Ctrl+B (Bold), Ctrl+I (Italic), Ctrl+U (Underline), Ctrl+K (Link/Mention)
+    if (e.ctrlKey || e.metaKey) {
+      const key = e.key.toLowerCase();
+      if (key === 'b') {
+        e.preventDefault();
+        e.stopPropagation();
+        insertFormat('**', '**');
+        return;
+      }
+      if (key === 'i') {
+        e.preventDefault();
+        e.stopPropagation();
+        insertFormat('*', '*');
+        return;
+      }
+      if (key === 'u') {
+        e.preventDefault();
+        e.stopPropagation();
+        insertFormat('<u>', '</u>');
+        return;
+      }
+      if (key === 'k') {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowMentionMenu(true);
+        setSearchQuery('');
+        return;
+      }
+    }
+
+    if (e.key === '@' || (e.key === '[' && value.endsWith('['))) {
+      setShowMentionMenu(true);
+      setSearchQuery('');
+    }
   };
 
   return (

@@ -10,6 +10,8 @@ import { parseFeatFromContent, getFeatTypeLabel } from '../utils/featSerializer'
 import { HecosStorage, DEFAULT_FEAT_CATEGORIES_CONFIG } from '../services/storage';
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
+import { TraitBadge } from './TraitBadge';
+import { renderContentWithMentions } from './MentionBadge';
 import {
   Award,
   Search,
@@ -77,8 +79,38 @@ export const MAIN_FEAT_CATEGORIES: {
     badgeBorder: 'border-amber-600/40',
   },
   {
+    id: 'ancestry',
+    name: 'Ancestralidade',
+    englishName: 'Ancestry',
+    description: 'Talentos biológicos e culturais herdados de seus povos.',
+    icon: Crown,
+    color: '#7eb897',
+    badgeBg: 'bg-emerald-950/40',
+    badgeBorder: 'border-emerald-600/40',
+  },
+  {
+    id: 'class',
+    name: 'Classe',
+    englishName: 'Class',
+    description: 'Técnicas exclusivas e especializações de cada classe.',
+    icon: Swords,
+    color: '#cb8394',
+    badgeBg: 'bg-rose-950/40',
+    badgeBorder: 'border-rose-600/40',
+  },
+  {
+    id: 'extras',
+    name: 'Extra',
+    englishName: 'Extra',
+    description: 'Talentos extras, bênçãos, rituais e homebrews especiais.',
+    icon: Sparkles,
+    color: '#e08ba8',
+    badgeBg: 'bg-pink-950/40',
+    badgeBorder: 'border-pink-600/40',
+  },
+  {
     id: 'general',
-    name: 'Gerais',
+    name: 'Geral',
     englishName: 'General',
     description: 'Talentos universais disponíveis para qualquer personagem.',
     icon: Shield,
@@ -97,44 +129,14 @@ export const MAIN_FEAT_CATEGORIES: {
     badgeBorder: 'border-amber-600/40',
   },
   {
-    id: 'class',
-    name: 'Classe',
-    englishName: 'Class',
-    description: 'Técnicas exclusivas e especializações de cada classe.',
-    icon: Swords,
-    color: '#cb8394',
-    badgeBg: 'bg-rose-950/40',
-    badgeBorder: 'border-rose-600/40',
-  },
-  {
     id: 'archetype',
-    name: 'Arquétipo',
-    englishName: 'Archetype',
-    description: 'Talentos de dedicação e caminhos multidisciplinares.',
+    name: 'Vocação',
+    englishName: 'Vocação / Dedication',
+    description: 'Talentos de vocação, dedicação e caminhos multidisciplinares.',
     icon: BookOpen,
     color: '#b19ecc',
     badgeBg: 'bg-purple-950/40',
     badgeBorder: 'border-purple-600/40',
-  },
-  {
-    id: 'ancestry',
-    name: 'Ancestralidade',
-    englishName: 'Ancestry',
-    description: 'Talentos biológicos e culturais herdados de seus povos.',
-    icon: Crown,
-    color: '#7eb897',
-    badgeBg: 'bg-emerald-950/40',
-    badgeBorder: 'border-emerald-600/40',
-  },
-  {
-    id: 'extras',
-    name: 'Extras',
-    englishName: 'Extras & Hecos',
-    description: 'Talentos de Hecos, bênçãos do eclipse, rituais e homebrews especiais.',
-    icon: Sparkles,
-    color: '#e08ba8',
-    badgeBg: 'bg-pink-950/40',
-    badgeBorder: 'border-pink-600/40',
   },
 ];
 
@@ -1029,7 +1031,7 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
         </div>
       ) : viewMode === 'grid' ? (
         /* --- MODE 1: GRID CARDS --- */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 min-[1080px]:grid-cols-5 gap-3">
           {filteredFeats.map((ent) => {
             const feat = parseFeatFromContent(ent.title, ent.content || '', ent.featData);
             const subcats = getEntitySubcategories(ent, feat);
@@ -1038,25 +1040,20 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
             return (
               <div
                 key={ent.id}
-                className="rounded-xl bg-[#0e0b17] hover:bg-[#130f20] border border-zinc-800/90 hover:border-amber-500/40 p-5 transition-all flex flex-col justify-between group shadow-lg space-y-4"
+                className="rounded-xl bg-[#0e0b17] hover:bg-[#130f20] border border-zinc-800/90 hover:border-amber-500/40 p-3.5 transition-all flex flex-col justify-between group shadow-md space-y-3"
               >
-                <div className="space-y-3">
-                  {/* Top Bar: Level, Rarity, Category & Actions */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                        Talento {feat.level}
-                      </span>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${getRarityBadgeStyle(feat.rarity)}`}>
-                        {feat.rarity}
-                      </span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-950/60 text-purple-300 border border-purple-800/40">
+                <div className="space-y-2.5">
+                  {/* Top Bar: Rarity Trait, Category & GM Actions */}
+                  <div className="flex items-center justify-between gap-1.5">
+                    <div className="flex flex-wrap items-center gap-1">
+                      <TraitBadge trait={feat.rarity || 'Comum'} />
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-950/60 text-purple-300 border border-purple-800/40">
                         {getFeatTypeLabel(feat.featType)}
                       </span>
                     </div>
 
                     {isActualGm && (
-                      <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-0.5 opacity-80 group-hover:opacity-100 transition-opacity shrink-0">
                         {/* 3-Level Granular Visibility Menu */}
                         <div onClick={(e) => e.stopPropagation()}>
                           <VisibilityBadgeMenu
@@ -1072,7 +1069,7 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
                         <button
                           type="button"
                           onClick={() => openAssignModal(ent)}
-                          className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-amber-300 transition-colors"
+                          className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-amber-300 transition-colors"
                           title="Organizar Pastas / Subcategorias deste talento"
                         >
                           <Folder className="w-3.5 h-3.5" />
@@ -1080,7 +1077,7 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
                         <button
                           type="button"
                           onClick={() => onEditEntity(ent.id)}
-                          className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-cyan-300 transition-colors"
+                          className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-cyan-300 transition-colors"
                           title="Editar Talento"
                         >
                           <Edit className="w-3.5 h-3.5" />
@@ -1088,7 +1085,7 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
                         <button
                           type="button"
                           onClick={() => onDeleteEntity(ent.id)}
-                          className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-rose-400 transition-colors"
+                          className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-rose-400 transition-colors"
                           title="Excluir Talento"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -1097,43 +1094,50 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
                     )}
                   </div>
 
-                  {/* Title & Action Glyph */}
-                  <div>
+                  {/* Title & Action Glyph on Left, Feat Level on Opposite Right */}
+                  <div className="flex items-start justify-between gap-2">
                     <button
                       type="button"
                       onClick={() => onSelectEntity(ent.id)}
-                      className="text-left w-full group/title"
+                      className="text-left flex-1 min-w-0 group/title focus:outline-none cursor-pointer"
+                      title={`Abrir talento ${ent.title}`}
                     >
-                      <h3 className="text-base sm:text-lg font-black text-amber-200 group-hover/title:text-amber-100 flex items-center gap-2 leading-snug">
-                        <span>{ent.title}</span>
+                      <h3 className="text-sm font-bold text-amber-200 group-hover/title:text-amber-300 group-hover/title:drop-shadow-[0_0_10px_rgba(245,158,11,0.85)] flex flex-wrap items-center gap-1.5 leading-snug transition-all">
+                        <span className="group-hover/title:underline decoration-amber-400/80 decoration-2 underline-offset-2 break-words">
+                          {ent.title}
+                        </span>
                         {action.show && <PF2eActionGlyph type={action.type} size="sm" />}
                         {feat.actionCost === 'passive' && (
-                          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">
+                          <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-zinc-900 text-zinc-400 border border-zinc-800 shrink-0">
                             Passivo
                           </span>
                         )}
                         {feat.actionCost === 'activity' && (
-                          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-purple-950/70 text-purple-300 border border-purple-800/60 flex items-center gap-1">
+                          <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-purple-950/70 text-purple-300 border border-purple-800/60 flex items-center gap-0.5 shrink-0">
                             <Clock className="w-2.5 h-2.5" />
                             <span>Ativ.</span>
                           </span>
                         )}
                       </h3>
+                      {ent.subtitle && (
+                        <p className="text-[11px] text-zinc-400 mt-0.5 italic break-words">{ent.subtitle}</p>
+                      )}
                     </button>
-                    {ent.subtitle && (
-                      <p className="text-xs text-zinc-400 mt-0.5 line-clamp-1 italic">{ent.subtitle}</p>
-                    )}
+
+                    <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0 ml-1">
+                      Nível {feat.level}
+                    </span>
                   </div>
 
                   {/* Subcategories (Folders) badges */}
                   {subcats.length > 0 && (
-                    <div className="flex flex-wrap gap-1 pt-1">
+                    <div className="flex flex-wrap gap-1">
                       {subcats.map((subcat) => (
                         <button
                           key={subcat}
                           type="button"
                           onClick={() => setSelectedSubcategory(subcat)}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-950/60 hover:bg-amber-900 text-amber-300 border border-amber-600/40 transition-colors"
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-950/60 hover:bg-amber-900 text-amber-300 border border-amber-600/40 transition-colors"
                         >
                           <Folder className="w-2.5 h-2.5 text-amber-400" />
                           <span>{subcat}</span>
@@ -1145,47 +1149,103 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
                   {/* Traits badges */}
                   {feat.traits && feat.traits.length > 0 && (
                     <div className="flex flex-wrap gap-1">
-                      {feat.traits.slice(0, 4).map((trait) => (
-                        <button
+                      {feat.traits.map((trait) => (
+                        <TraitBadge
                           key={trait}
-                          type="button"
-                          onClick={() => onTagClick && onTagClick(trait)}
-                          className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-[#181324] hover:bg-[#231a36] text-[#74b6c2] border border-[#74b6c2]/30 transition-colors"
-                        >
-                          {trait}
-                        </button>
+                          trait={trait}
+                          onClick={() => {
+                            window.dispatchEvent(new CustomEvent('hecos:open-trait-drawer', { detail: { trait } }));
+                          }}
+                        />
                       ))}
-                      {feat.traits.length > 4 && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-zinc-900 text-zinc-500">
-                          +{feat.traits.length - 4}
-                        </span>
-                      )}
                     </div>
                   )}
 
                   {/* Prerequisites */}
                   {feat.prerequisites && (
-                    <div className="text-[11px] text-zinc-400 line-clamp-1">
-                      <strong className="text-zinc-500 font-bold uppercase text-[10px] mr-1">Pré-req:</strong>
-                      <span>{feat.prerequisites}</span>
+                    <div className="text-[11px] text-zinc-400 break-words">
+                      <strong className="text-zinc-500 font-bold uppercase text-[9px] mr-1">Pré-req:</strong>
+                      <span>{renderContentWithMentions(feat.prerequisites, onSelectEntity)}</span>
                     </div>
                   )}
 
-                  {/* Description preview */}
-                  <p className="text-xs text-zinc-300 line-clamp-3 leading-relaxed">
-                    {feat.description || ent.summary || ent.content?.replace(/<[^>]+>/g, '') || ''}
-                  </p>
+                  {/* Requirements */}
+                  {feat.requirements && (
+                    <div className="text-[11px] text-zinc-400 break-words">
+                      <strong className="text-zinc-500 font-bold uppercase text-[9px] mr-1">Requisitos:</strong>
+                      <span>{renderContentWithMentions(feat.requirements, onSelectEntity)}</span>
+                    </div>
+                  )}
+
+                  {/* Trigger */}
+                  {feat.trigger && (
+                    <div className="text-[11px] text-rose-300 break-words">
+                      <strong className="text-rose-400 font-bold uppercase text-[9px] mr-1">Gatilho:</strong>
+                      <span>{renderContentWithMentions(feat.trigger, onSelectEntity)}</span>
+                    </div>
+                  )}
+
+                  {/* Frequency */}
+                  {feat.frequency && (
+                    <div className="text-[11px] text-zinc-300 break-words">
+                      <strong className="text-zinc-500 font-bold uppercase text-[9px] mr-1">Frequência:</strong>
+                      <span>{feat.frequency}</span>
+                    </div>
+                  )}
+
+                  {/* Description na íntegra (full text) */}
+                  <div className="text-xs text-zinc-300/90 leading-relaxed break-words">
+                    {renderContentWithMentions(feat.description || ent.summary || ent.content?.replace(/<[^>]+>/g, '') || '', onSelectEntity)}
+                  </div>
+
+                  {/* Degrees of Success if present */}
+                  {(feat.criticalSuccess || feat.success || feat.failure || feat.criticalFailure) && (
+                    <div className="text-[11px] space-y-1 pt-1.5 border-t border-zinc-800/60 text-zinc-300">
+                      {feat.criticalSuccess && (
+                        <div>
+                          <strong className="text-emerald-400 font-bold">Sucesso Crítico: </strong>
+                          <span>{renderContentWithMentions(feat.criticalSuccess, onSelectEntity)}</span>
+                        </div>
+                      )}
+                      {feat.success && (
+                        <div>
+                          <strong className="text-cyan-400 font-bold">Sucesso: </strong>
+                          <span>{renderContentWithMentions(feat.success, onSelectEntity)}</span>
+                        </div>
+                      )}
+                      {feat.failure && (
+                        <div>
+                          <strong className="text-amber-400 font-bold">Falha: </strong>
+                          <span>{renderContentWithMentions(feat.failure, onSelectEntity)}</span>
+                        </div>
+                      )}
+                      {feat.criticalFailure && (
+                        <div>
+                          <strong className="text-rose-400 font-bold">Falha Crítica: </strong>
+                          <span>{renderContentWithMentions(feat.criticalFailure, onSelectEntity)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Special if present */}
+                  {feat.special && (
+                    <div className="text-[11px] pt-1 text-zinc-400 break-words">
+                      <strong className="text-zinc-300 font-bold">Especial: </strong>
+                      <span>{renderContentWithMentions(feat.special, onSelectEntity)}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Footer: View Button */}
-                <div className="pt-3 border-t border-zinc-800/80 flex items-center justify-between">
+                <div className="pt-2.5 border-t border-zinc-800/80 flex items-center justify-between mt-auto">
                   <button
                     type="button"
                     onClick={() => openAssignModal(ent)}
-                    className="text-[11px] text-zinc-400 hover:text-amber-300 font-medium flex items-center gap-1 transition-colors"
+                    className="text-[10px] text-zinc-400 hover:text-amber-300 font-medium flex items-center gap-1 transition-colors"
                   >
                     <FolderPlus className="w-3 h-3 text-amber-400" />
-                    <span>Gerenciar Pastas</span>
+                    <span>Pastas</span>
                   </button>
 
                   <button
@@ -1227,8 +1287,7 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
                   return (
                     <tr
                       key={ent.id}
-                      className="hover:bg-[#151024] transition-colors group cursor-pointer"
-                      onClick={() => onSelectEntity(ent.id)}
+                      className="hover:bg-[#151024] transition-colors group"
                     >
                       {/* Level */}
                       <td className="py-3 px-4">
@@ -1250,12 +1309,18 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
 
                       {/* Title & Subtitle */}
                       <td className="py-3 px-4 font-medium">
-                        <div className="font-bold text-amber-200 group-hover:text-amber-100 text-sm">
-                          {ent.title}
-                        </div>
-                        {ent.subtitle && (
-                          <div className="text-[11px] text-zinc-400 line-clamp-1 italic">{ent.subtitle}</div>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => onSelectEntity(ent.id)}
+                          className="text-left font-bold text-amber-200 group-hover:text-amber-300 hover:drop-shadow-[0_0_10px_rgba(245,158,11,0.8)] transition-all cursor-pointer focus:outline-none"
+                        >
+                          <span className="hover:underline decoration-amber-400/80 decoration-2 underline-offset-2 text-sm">
+                            {ent.title}
+                          </span>
+                          {ent.subtitle && (
+                            <div className="text-[11px] text-zinc-400 italic font-normal break-words">{ent.subtitle}</div>
+                          )}
+                        </button>
                       </td>
 
                       {/* Feat Category */}
@@ -1290,23 +1355,19 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
                         </div>
                       </td>
 
-                      {/* Rarity */}
+                      {/* Rarity Trait */}
                       <td className="py-3 px-4">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getRarityBadgeStyle(feat.rarity)}`}>
-                          {feat.rarity}
-                        </span>
+                        <TraitBadge trait={feat.rarity || 'Comum'} />
                       </td>
 
                       {/* Traits */}
                       <td className="py-3 px-4">
                         <div className="flex flex-wrap gap-1">
-                          {feat.traits?.slice(0, 3).map((trait) => (
-                            <span
+                          {feat.traits?.map((trait) => (
+                            <TraitBadge
                               key={trait}
-                              className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-[#181324] text-[#74b6c2] border border-[#74b6c2]/30"
-                            >
-                              {trait}
-                            </span>
+                              trait={trait}
+                            />
                           ))}
                         </div>
                       </td>

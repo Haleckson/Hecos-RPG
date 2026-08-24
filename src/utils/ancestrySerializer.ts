@@ -5,6 +5,7 @@ import { AncestryAttributes, AncestryFeat, AncestryHeritage } from '../types';
  */
 export function getEmptyAncestryData(): AncestryAttributes {
   return {
+    album: [],
     hp: '',
     size: '',
     speed: '',

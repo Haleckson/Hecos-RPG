@@ -18,7 +18,8 @@ import {
   Scroll,
   History,
   Map as MapIcon,
-  Tag as TagIcon
+  Tag as TagIcon,
+  CheckSquare
 } from 'lucide-react';
 import { EntityCategory } from '../types';
 
@@ -39,7 +40,7 @@ export interface CategoryDefinition {
   accentColor: string; // 'malva' | 'ciano' | 'bordo'
   description: string;
   isCustomView?: boolean;
-  viewType?: 'entities' | 'map' | 'timeline' | 'tags';
+  viewType?: 'entities' | 'map' | 'timeline' | 'tags' | 'quests';
   children?: CategoryDefinition[];
   groups?: CategoryGroup[];
 }
@@ -151,17 +152,6 @@ export const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
             viewType: 'entities'
           },
           {
-            id: 'arquetipos',
-            name: 'Arquétipos',
-            categoryKey: 'archetype',
-            subcategory: 'Arquétipos',
-            icon: Layers,
-            color: '#cb8394', // pastel dusty rose
-            accentColor: 'bordo',
-            description: 'Dedicações e caminhos de prestígio no cenário.',
-            viewType: 'entities'
-          },
-          {
             id: 'classes',
             name: 'Classes',
             categoryKey: 'class',
@@ -170,17 +160,6 @@ export const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
             color: '#b19ecc', // pastel wisteria
             accentColor: 'malva',
             description: 'Classes adaptadas de Pathfinder 2e e suas disciplinas.',
-            viewType: 'entities'
-          },
-          {
-            id: 'criaturas',
-            name: 'Criaturas',
-            categoryKey: 'creature',
-            subcategory: 'Criaturas',
-            icon: Skull,
-            color: '#cb8394', // pastel dusty rose
-            accentColor: 'bordo',
-            description: 'Bestiário de Hecos com statblocks no formato Pathfinder 2e.',
             viewType: 'entities'
           },
           {
@@ -206,6 +185,28 @@ export const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
             viewType: 'entities'
           },
           {
+            id: 'perigos',
+            name: 'Perigos',
+            categoryKey: 'creature',
+            subcategory: 'Perigos',
+            icon: Skull,
+            color: '#cb8394', // pastel dusty rose
+            accentColor: 'bordo',
+            description: 'Bestiário, monstros, armadilhas, hazards e perigos ambientais de Hecos.',
+            viewType: 'entities'
+          },
+          {
+            id: 'quests',
+            name: 'Quests',
+            categoryKey: 'quest',
+            subcategory: 'Quests',
+            icon: CheckSquare,
+            color: '#cca862', // pastel gold
+            accentColor: 'malva',
+            description: 'Quadro Kanban de missões ativas, contratos, objetivos e recompensas.',
+            viewType: 'quests'
+          },
+          {
             id: 'regras',
             name: 'Regras',
             categoryKey: 'rule',
@@ -225,6 +226,17 @@ export const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
             color: '#cca862', // pastel antique gold
             accentColor: 'malva',
             description: 'Talentos de ancestralidade, classe, perícia e gerais.',
+            viewType: 'entities'
+          },
+          {
+            id: 'arquetipos',
+            name: 'Vocação',
+            categoryKey: 'archetype',
+            subcategory: 'Vocação',
+            icon: Layers,
+            color: '#cb8394', // pastel dusty rose
+            accentColor: 'bordo',
+            description: 'Dedicações, vocações e caminhos de prestígio no cenário.',
             viewType: 'entities'
           }
         ]
@@ -310,17 +322,6 @@ export const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
         viewType: 'entities'
       },
       {
-        id: 'arquetipos',
-        name: 'Arquétipos',
-        categoryKey: 'archetype',
-        subcategory: 'Arquétipos',
-        icon: Layers,
-        color: '#cb8394',
-        accentColor: 'bordo',
-        description: 'Dedicações e caminhos de prestígio no cenário.',
-        viewType: 'entities'
-      },
-      {
         id: 'classes',
         name: 'Classes',
         categoryKey: 'class',
@@ -329,17 +330,6 @@ export const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
         color: '#b19ecc',
         accentColor: 'malva',
         description: 'Classes adaptadas de Pathfinder 2e e suas disciplinas.',
-        viewType: 'entities'
-      },
-      {
-        id: 'criaturas',
-        name: 'Criaturas',
-        categoryKey: 'creature',
-        subcategory: 'Criaturas',
-        icon: Skull,
-        color: '#cb8394',
-        accentColor: 'bordo',
-        description: 'Bestiário de Hecos com statblocks no formato Pathfinder 2e.',
         viewType: 'entities'
       },
       {
@@ -365,6 +355,28 @@ export const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
         viewType: 'entities'
       },
       {
+        id: 'perigos',
+        name: 'Perigos',
+        categoryKey: 'creature',
+        subcategory: 'Perigos',
+        icon: Skull,
+        color: '#cb8394',
+        accentColor: 'bordo',
+        description: 'Bestiário, monstros, armadilhas, hazards e perigos ambientais de Hecos.',
+        viewType: 'entities'
+      },
+      {
+        id: 'quests',
+        name: 'Quests',
+        categoryKey: 'quest',
+        subcategory: 'Quests',
+        icon: CheckSquare,
+        color: '#cca862',
+        accentColor: 'malva',
+        description: 'Quadro Kanban de missões ativas, contratos, objetivos e recompensas.',
+        viewType: 'quests'
+      },
+      {
         id: 'regras',
         name: 'Regras',
         categoryKey: 'rule',
@@ -384,6 +396,17 @@ export const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
         color: '#cca862',
         accentColor: 'malva',
         description: 'Talentos de ancestralidade, classe, perícia e gerais.',
+        viewType: 'entities'
+      },
+      {
+        id: 'arquetipos',
+        name: 'Vocação',
+        categoryKey: 'archetype',
+        subcategory: 'Vocação',
+        icon: Layers,
+        color: '#cb8394',
+        accentColor: 'bordo',
+        description: 'Dedicações, vocações e caminhos de prestígio no cenário.',
         viewType: 'entities'
       }
     ]
@@ -463,8 +486,10 @@ export function getCategoryMeta(keyOrId?: string, subcategory?: string) {
     pc: 'PC',
     npc: 'NPC',
     codex: 'Codex',
-    creature: 'Criaturas',
-    criaturas: 'Criaturas',
+    creature: 'Perigos',
+    criaturas: 'Perigos',
+    perigos: 'Perigos',
+    perigo: 'Perigos',
     spell: 'Feitiços',
     feiticos: 'Feitiços',
     item: 'Itens',
@@ -479,8 +504,13 @@ export function getCategoryMeta(keyOrId?: string, subcategory?: string) {
     ancestralidades: 'Ancestralidades',
     class: 'Classes',
     classes: 'Classes',
-    archetype: 'Arquétipos',
-    arquetipos: 'Arquétipos',
+    archetype: 'Vocação',
+    arquetipos: 'Vocação',
+    arquetipo: 'Vocação',
+    vocacao: 'Vocação',
+    vocação: 'Vocação',
+    vocacoes: 'Vocação',
+    vocações: 'Vocação',
     session: 'Diário',
     diario: 'Diário',
     gm_note: 'Notas do GM',

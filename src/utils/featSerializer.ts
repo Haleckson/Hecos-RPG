@@ -243,20 +243,20 @@ export function getActionSymbol(cost: FeatActionCost): string {
 
 export function getFeatTypeLabel(type: FeatCategoryType): string {
   switch (type) {
+    case 'ancestry':
+      return 'Ancestralidade';
+    case 'class':
+      return 'Classe';
+    case 'extras':
+      return 'Extra';
     case 'general':
       return 'Geral';
     case 'skill':
       return 'Perícia';
-    case 'class':
-      return 'Classe';
     case 'archetype':
-      return 'Arquétipo';
-    case 'ancestry':
-      return 'Ancestralidade';
-    case 'extras':
-      return 'Extras';
+      return 'Vocação';
     case 'hecos':
-      return 'Hecos';
+      return 'Extra';
     default:
       return 'Geral';
   }

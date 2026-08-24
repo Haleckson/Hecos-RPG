@@ -297,10 +297,10 @@ export const FeatPickerModal: React.FC<FeatPickerModalProps> = ({
                 <option value="all">Todos os Tipos</option>
                 <option value="ancestry">Ancestralidade</option>
                 <option value="class">Classe</option>
+                <option value="extras">Extra</option>
                 <option value="general">Geral</option>
                 <option value="skill">Perícia</option>
-                <option value="archetype">Arquétipo</option>
-                <option value="hecos">Hecos Específico</option>
+                <option value="archetype">Vocação</option>
               </select>
             </div>
           </div>

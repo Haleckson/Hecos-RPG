@@ -177,103 +177,177 @@ export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNa
 /**
  * Helper to parse inline markdown formatting (**bold**, *italic*, ~~strike~~, `code`, <tag>)
  */
-function parseInlineFormatting(text: string): React.ReactNode {
+/**
+ * Robust inline formatting parser for Markdown (**bold**, *italic*, ~~strike~~, ++underline++, `code`),
+ * HTML tags (<span>, <mark>, <b>, <i>, <u>, <strong>, <em>, <font>), colors, traits, and action glyphs.
+ */
+function parseInlineFormatting(
+  text: string,
+  onNavigate?: (entityId: string) => void
+): React.ReactNode {
   if (!text) return null;
 
-  // If contains HTML tags like <span>, <mark>, <u>, <b>, <i>, <strong>, <em>, <font>
-  if (/<(span|mark|u|b|i|strong|em|font|del|sub|sup|code)[^>]*>.*?<\/\1>/i.test(text)) {
-    return <span dangerouslySetInnerHTML={{ __html: text }} />;
-  }
+  // Unified inline token regex covering:
+  // 1. Action glyphs: [1-action], [2-actions], [3-actions], [free-action], [reaction], [1-acao], [2-acoes], etc.
+  // 2. Wikilinks/traits: [[trait:Name]] or [[Article Name]]
+  // 3. Trait shortcuts: [trait:Name] or [tr:Name]
+  // 4. Mentions: @slug
+  // 5. HTML tags: <span style="...">...</span>, <mark>...</mark>, <b/i/u/strong/em/del/code>...
+  // 6. Markdown bold: **...** or __...__
+  // 7. Markdown underline: ++...++
+  // 8. Markdown strikethrough: ~~...~~
+  // 9. Markdown inline code: `...`
+  // 10. Markdown italic: *...* or _..._
+  const tokenRegex = /(<span[^>]*>[\s\S]*?<\/span>|<mark[^>]*>[\s\S]*?<\/mark>|<(?:b|strong|i|em|u|del|s|code|font)[^>]*>[\s\S]*?<\/(?:b|strong|i|em|u|del|s|code|font)>|\[(?:1-action|2-actions|3-actions|1-to-2-actions|1-to-3-actions|one-action|two-actions|three-actions|one-to-two-actions|one-to-three-actions|free-action|reaction|1-acao|2-acoes|3-acoes|acao-livre|reacao|1|2|3|r|f)\]|\[\[(?:trait:|tr:)?[\s\S]+?\]\]|\[(?:trait:|tr:)[\s\S]+?\]|@[a-zA-Z0-9_-]+|\*\*(?:[^*]|\*(?!\*))+\*\*|__(?:[^_]|_(?!_))+__|(?:\+\+(?:[^+]|\+(?!\+))+\+\+)|~~(?:[^~]|~(?!~))+~~|`[^`]+`|\*(?:[^*\n])+\*|_(?:[^_\n])+_)/gi;
 
-  // Regex to split by **bold**, *italic*, ~~strike~~, and `code`
-  const inlineRegex = /(\*\*[^*]+\*\*|\*[^*]+\*|~~[^~]+~~|`[^`]+`)/g;
-  const chunks = text.split(inlineRegex);
+  const parts = text.split(tokenRegex);
 
-  return chunks.map((chunk, idx) => {
-    if (chunk.startsWith('**') && chunk.endsWith('**') && chunk.length >= 4) {
-      return (
-        <strong key={idx} className="font-bold text-zinc-100">
-          {chunk.slice(2, -2)}
-        </strong>
-      );
-    }
-    if (chunk.startsWith('*') && chunk.endsWith('*') && chunk.length >= 2) {
-      return (
-        <em key={idx} className="italic text-zinc-300">
-          {chunk.slice(1, -1)}
-        </em>
-      );
-    }
-    if (chunk.startsWith('~~') && chunk.endsWith('~~') && chunk.length >= 4) {
-      return (
-        <del key={idx} className="line-through text-zinc-500">
-          {chunk.slice(2, -2)}
-        </del>
-      );
-    }
-    if (chunk.startsWith('`') && chunk.endsWith('`') && chunk.length >= 2) {
-      return (
-        <code key={idx} className="px-1.5 py-0.5 mx-0.5 rounded bg-black/60 border border-zinc-700/60 font-mono text-cyan-300 text-xs">
-          {chunk.slice(1, -1)}
-        </code>
-      );
-    }
-    return chunk;
-  });
-}
+  return parts.map((part, idx) => {
+    if (!part) return null;
 
-/**
- * Parser that replaces @slug, [[slug]] mentions, HTML blocks, and [action] glyphs in text
- */
-export function renderContentWithMentions(
-  content: string,
-  onNavigate: (entityId: string) => void
-): React.ReactNode[] {
-  if (!content) return [];
-
-  // Match mentions: @slug, [[slug]], and action glyphs: [1-action], [2-actions], [3-actions], [1-to-2-actions], [1-to-3-actions], [free-action], [reaction], etc.
-  const patternRegex = /(@[a-zA-Z0-9_-]+|\[\[[a-zA-Z0-9\s_-]+\]\]|\[(?:1-action|2-actions|3-actions|1-to-2-actions|1-to-3-actions|one-action|two-actions|three-actions|one-to-two-actions|one-to-three-actions|free-action|reaction|1-acao|2-acoes|3-acoes|acao-livre|reacao)\])/gi;
-  const parts = content.split(patternRegex);
-
-  return parts.map((part, index) => {
-    if (part.startsWith('@')) {
-      const slug = part.substring(1);
-      return <MentionBadge key={index} entityIdOrSlug={slug} onNavigate={onNavigate} />;
-    } else if (part.startsWith('[[') && part.endsWith(']]')) {
-      const slug = part.substring(2, part.length - 2).trim();
-      return <MentionBadge key={index} entityIdOrSlug={slug} onNavigate={onNavigate} displayText={slug} />;
-    }
-
-    // Check for PF2e Action tag [1-action], [2-actions], etc.
+    // 1. PF2e Action Glyphs [1-action], [2-actions], etc.
     if (part.startsWith('[') && part.endsWith(']')) {
-      const rawAction = part.substring(1, part.length - 1).toLowerCase();
+      const inner = part.slice(1, -1).trim().toLowerCase();
+      
       let actionType: ActionGlyphType | null = null;
-      if (rawAction === '1-action' || rawAction === 'one-action' || rawAction === '1-acao') actionType = '1-action';
-      else if (rawAction === '2-actions' || rawAction === 'two-actions' || rawAction === '2-acoes') actionType = '2-actions';
-      else if (rawAction === '3-actions' || rawAction === 'three-actions' || rawAction === '3-acoes') actionType = '3-actions';
-      else if (rawAction === '1-to-2-actions' || rawAction === 'one-to-two-actions') actionType = '1-to-2-actions';
-      else if (rawAction === '1-to-3-actions' || rawAction === 'one-to-three-actions') actionType = '1-to-3-actions';
-      else if (rawAction === 'free-action' || rawAction === 'acao-livre') actionType = 'free-action';
-      else if (rawAction === 'reaction' || rawAction === 'reacao') actionType = 'reaction';
+      if (['1-action', 'one-action', '1-acao', '1'].includes(inner)) actionType = '1-action';
+      else if (['2-actions', 'two-actions', '2-acoes', '2'].includes(inner)) actionType = '2-actions';
+      else if (['3-actions', 'three-actions', '3-acoes', '3'].includes(inner)) actionType = '3-actions';
+      else if (['1-to-2-actions', 'one-to-two-actions', '1-to-2'].includes(inner)) actionType = '1-to-2-actions';
+      else if (['1-to-3-actions', 'one-to-three-actions', '1-to-3'].includes(inner)) actionType = '1-to-3-actions';
+      else if (['free-action', 'acao-livre', 'free', 'f'].includes(inner)) actionType = 'free-action';
+      else if (['reaction', 'reacao', 'r'].includes(inner)) actionType = 'reaction';
 
       if (actionType) {
         return (
-          <span key={index} className="inline-flex mx-1 align-baseline">
-            <PF2eActionGlyph type={actionType} size="md" />
+          <span key={idx} className="inline-flex mx-0.5 align-baseline">
+            <PF2eActionGlyph type={actionType} size="sm" />
+          </span>
+        );
+      }
+
+      // Traits in [trait:Name] or [tr:Name]
+      if (inner.startsWith('trait:') || inner.startsWith('tr:')) {
+        const traitName = part.slice(1, -1).replace(/^(?:trait:|tr:)/i, '').trim();
+        return (
+          <span key={idx} className="inline-flex mx-0.5 align-baseline">
+            <TraitBadge trait={traitName} />
           </span>
         );
       }
     }
 
-    if (part.includes('<') && part.includes('>')) {
+    // 2. Wikilinks [[Article Name]] or [[trait:Name]]
+    if (part.startsWith('[[') && part.endsWith(']]')) {
+      const inner = part.slice(2, -2).trim();
+      if (inner.toLowerCase().startsWith('trait:') || inner.toLowerCase().startsWith('tr:')) {
+        const traitName = inner.replace(/^(?:trait:|tr:)/i, '').trim();
+        return (
+          <span key={idx} className="inline-flex mx-0.5 align-baseline">
+            <TraitBadge trait={traitName} />
+          </span>
+        );
+      }
+      if (onNavigate) {
+        return <MentionBadge key={idx} entityIdOrSlug={inner} onNavigate={onNavigate} displayText={inner} />;
+      }
       return (
-        <span
-          key={index}
-          dangerouslySetInnerHTML={{ __html: part }}
-        />
+        <span key={idx} className="font-semibold text-cyan-300 underline decoration-cyan-500/40">
+          {inner}
+        </span>
       );
     }
 
-    return <React.Fragment key={index}>{parseInlineFormatting(part)}</React.Fragment>;
+    // 3. Mentions @slug
+    if (part.startsWith('@') && part.length > 1) {
+      const slug = part.substring(1);
+      if (onNavigate) {
+        return <MentionBadge key={idx} entityIdOrSlug={slug} onNavigate={onNavigate} />;
+      }
+      return (
+        <span key={idx} className="font-semibold text-cyan-300">
+          @{slug}
+        </span>
+      );
+    }
+
+    // 4. HTML tags (span with style, mark, u, b, strong, i, em, del, code, font)
+    if (/^<(span|mark|b|strong|i|em|u|del|s|code|font)[^>]*>[\s\S]*<\/\1>$/i.test(part)) {
+      return <span key={idx} dangerouslySetInnerHTML={{ __html: part }} />;
+    }
+
+    // 5. Markdown Bold: **text** or __text__
+    if (
+      (part.startsWith('**') && part.endsWith('**') && part.length >= 4) ||
+      (part.startsWith('__') && part.endsWith('__') && part.length >= 4)
+    ) {
+      const inner = part.slice(2, -2);
+      return (
+        <strong key={idx} className="font-bold text-zinc-100 drop-shadow-sm">
+          {parseInlineFormatting(inner, onNavigate)}
+        </strong>
+      );
+    }
+
+    // 6. Markdown Underline: ++text++
+    if (part.startsWith('++') && part.endsWith('++') && part.length >= 4) {
+      const inner = part.slice(2, -2);
+      return (
+        <u key={idx} className="underline decoration-zinc-400 decoration-1 underline-offset-2">
+          {parseInlineFormatting(inner, onNavigate)}
+        </u>
+      );
+    }
+
+    // 7. Markdown Strikethrough: ~~text~~
+    if (part.startsWith('~~') && part.endsWith('~~') && part.length >= 4) {
+      const inner = part.slice(2, -2);
+      return (
+        <del key={idx} className="line-through text-zinc-500">
+          {parseInlineFormatting(inner, onNavigate)}
+        </del>
+      );
+    }
+
+    // 8. Markdown Inline Code: `text`
+    if (part.startsWith('`') && part.endsWith('`') && part.length >= 2) {
+      const inner = part.slice(1, -1);
+      return (
+        <code
+          key={idx}
+          className="px-1.5 py-0.5 mx-0.5 rounded bg-black/60 border border-zinc-700/60 font-mono text-cyan-300 text-xs"
+        >
+          {inner}
+        </code>
+      );
+    }
+
+    // 9. Markdown Italic: *text* or _text_
+    if (
+      (part.startsWith('*') && part.endsWith('*') && part.length >= 2) ||
+      (part.startsWith('_') && part.endsWith('_') && part.length >= 2)
+    ) {
+      const inner = part.slice(1, -1);
+      return (
+        <em key={idx} className="italic text-zinc-300">
+          {parseInlineFormatting(inner, onNavigate)}
+        </em>
+      );
+    }
+
+    return part;
   });
+}
+
+import { TraitBadge } from './TraitBadge';
+
+/**
+ * Parser that formats markdown, @slug, [[slug]], [trait:Nome], HTML blocks, and [action] glyphs in text
+ */
+export function renderContentWithMentions(
+  content: string,
+  onNavigate: (entityId: string) => void
+): React.ReactNode {
+  if (!content) return null;
+  return <>{parseInlineFormatting(content, onNavigate)}</>;
 }

@@ -9,6 +9,7 @@ import { getEmptySpellData, serializeSpellToHTML } from '../utils/spellSerialize
 import { HecosStorage } from '../services/storage';
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
+import { TraitBadge } from './TraitBadge';
 import {
   Sparkles,
   X,
@@ -851,9 +852,7 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                 </div>
 
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="px-2 py-0.5 rounded text-[11px] font-bold uppercase bg-zinc-800 text-zinc-300 border border-zinc-700">
-                    {spellData.rarity || 'Comum'}
-                  </span>
+                  <TraitBadge trait={spellData.rarity || 'Comum'} />
                   {(spellData.traditions || []).map((t) => (
                     <span
                       key={t}

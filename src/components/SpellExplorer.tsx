@@ -11,6 +11,7 @@ import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { Tooltip } from './Tooltip';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { SpellCreateModal } from './SpellCreateModal';
+import { TraitBadge } from './TraitBadge';
 import {
   Sparkles,
   Search,
@@ -40,7 +41,8 @@ import {
   Sun,
   Moon,
   Zap,
-  Tag
+  Tag,
+  ArrowRight
 } from 'lucide-react';
 
 interface SpellExplorerProps {
@@ -869,21 +871,30 @@ export function SpellExplorer({
             return (
               <div
                 key={sp.id}
-                onClick={() => onSelectEntity(sp.id)}
-                className="group/card bg-[#0e0c15] hover:bg-[#13101c] border border-zinc-800/80 hover:border-cyan-500/50 rounded-2xl p-5 transition-all shadow-md hover:shadow-[0_0_24px_rgba(6,182,212,0.15)] flex flex-col justify-between cursor-pointer relative"
+                className="group/card bg-[#0e0c15] hover:bg-[#13101c] border border-zinc-800/80 hover:border-cyan-500/50 rounded-2xl p-5 transition-all shadow-md hover:shadow-[0_0_24px_rgba(6,182,212,0.15)] flex flex-col justify-between relative"
               >
                 <div>
                   {/* Top Bar: Title, Rank, Actions Glyph */}
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <h3 className="text-base font-bold text-zinc-100 group-hover/card:text-cyan-300 transition-colors flex items-center gap-2">
-                        <span>{sp.title}</span>
-                        {data.castTime && (
-                          <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700/80 text-cyan-300 font-mono">
-                            {data.castTime}
+                      <button
+                        type="button"
+                        onClick={() => onSelectEntity(sp.id)}
+                        className="text-left group/title focus:outline-none cursor-pointer"
+                        title={`Abrir feitiço ${sp.title}`}
+                      >
+                        <h3 className="text-base font-bold text-zinc-100 group-hover/title:text-cyan-300 transition-all flex items-center gap-2 group-hover/title:drop-shadow-[0_0_12px_rgba(6,182,212,0.85)]">
+                          <span className="group-hover/title:underline decoration-cyan-400/80 decoration-2 underline-offset-2">
+                            {sp.title}
                           </span>
-                        )}
-                      </h3>
+                          {data.castTime && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700/80 text-cyan-300 font-mono">
+                              {data.castTime}
+                            </span>
+                          )}
+                          <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover/title:opacity-100 text-cyan-400 group-hover/title:translate-x-0.5 transition-all shrink-0" />
+                        </h3>
+                      </button>
                       <div className="flex items-center gap-2 mt-1 text-[11px] text-zinc-400 font-mono">
                         <span className="text-purple-300 font-bold">{rankLabel}</span>
                         {data.traditions && data.traditions.length > 0 && (
@@ -911,29 +922,21 @@ export function SpellExplorer({
 
                   {/* Traits & Rarity Badges */}
                   <div className="flex items-center gap-1.5 flex-wrap mt-3">
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
-                        (data.rarity || 'Comum') === 'Comum'
-                          ? 'bg-zinc-800 text-zinc-300 border border-zinc-700'
-                          : (data.rarity || 'Comum') === 'Incomum'
-                          ? 'bg-amber-950 text-amber-300 border border-amber-600/50'
-                          : 'bg-rose-950 text-rose-300 border border-rose-600/50'
-                      }`}
-                    >
-                      {data.rarity || 'Comum'}
-                    </span>
+                    <TraitBadge
+                      trait={data.rarity || 'Comum'}
+                      onClick={() => {
+                        window.dispatchEvent(new CustomEvent('hecos:open-trait-drawer', { detail: { trait: data.rarity || 'Comum' } }));
+                      }}
+                    />
 
                     {data.traits?.map((t, tIdx) => (
-                      <span
+                      <TraitBadge
                         key={`${sp.id}-trait-${t}-${tIdx}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onTagClick ? onTagClick(t) : setFilterTrait(t);
+                        trait={t}
+                        onClick={() => {
+                          window.dispatchEvent(new CustomEvent('hecos:open-trait-drawer', { detail: { trait: t } }));
                         }}
-                        className="text-[10px] px-2 py-0.5 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-800/40 hover:border-cyan-500 transition-colors uppercase font-medium cursor-pointer"
-                      >
-                        {t}
-                      </span>
+                      />
                     ))}
                   </div>
 
@@ -950,7 +953,7 @@ export function SpellExplorer({
                       </div>
                     )}
                     {data.targets && (
-                      <div className="col-span-2 truncate">
+                      <div className="col-span-2 break-words">
                         <strong className="text-zinc-300">Alvos:</strong> {data.targets}
                       </div>
                     )}
@@ -966,8 +969,8 @@ export function SpellExplorer({
                     )}
                   </div>
 
-                  {/* Description Preview */}
-                  <p className="text-xs text-zinc-400 line-clamp-3 mt-3 leading-relaxed">
+                  {/* Description na íntegra */}
+                  <p className="text-xs text-zinc-400 mt-3 leading-relaxed break-words whitespace-pre-wrap">
                     {data.description || sp.summary || 'Sem descrição fornecida.'}
                   </p>
                 </div>
@@ -1064,14 +1067,19 @@ export function SpellExplorer({
                   return (
                     <tr
                       key={sp.id}
-                      onClick={() => onSelectEntity(sp.id)}
-                      className="hover:bg-zinc-900/50 transition-colors cursor-pointer group"
+                      className="hover:bg-zinc-900/50 transition-colors group"
                     >
-                      <td className="py-3 px-4 font-bold text-zinc-200 group-hover:text-cyan-300 transition-colors">
-                        <div className="flex items-center gap-2">
-                          <span>{sp.title}</span>
+                      <td className="py-3 px-4">
+                        <button
+                          type="button"
+                          onClick={() => onSelectEntity(sp.id)}
+                          className="text-left font-bold text-zinc-200 group-hover:text-cyan-300 hover:drop-shadow-[0_0_10px_rgba(6,182,212,0.8)] transition-all flex items-center gap-2 cursor-pointer focus:outline-none"
+                        >
+                          <span className="hover:underline decoration-cyan-400/80 decoration-2 underline-offset-2">
+                            {sp.title}
+                          </span>
                           {perm.visibility === 'gm' && <EyeOff className="w-3.5 h-3.5 text-rose-400" />}
-                        </div>
+                        </button>
                       </td>
                       <td className="py-3 px-3 font-mono text-purple-300 font-bold">{rankLabel}</td>
                       <td className="py-3 px-3 text-cyan-400 capitalize">{data.traditions?.join(', ') || '—'}</td>
@@ -1080,15 +1088,12 @@ export function SpellExplorer({
                         {data.range || data.area || '—'}
                       </td>
                       <td className="py-3 px-3">
-                        <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                            (data.rarity || 'Comum') === 'Comum'
-                              ? 'bg-zinc-800 text-zinc-300'
-                              : 'bg-amber-950 text-amber-300'
-                          }`}
-                        >
-                          {data.rarity || 'Comum'}
-                        </span>
+                        <TraitBadge
+                          trait={data.rarity || 'Comum'}
+                          onClick={() => {
+                            window.dispatchEvent(new CustomEvent('hecos:open-trait-drawer', { detail: { trait: data.rarity || 'Comum' } }));
+                          }}
+                        />
                       </td>
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-1 flex-wrap max-w-[180px]">

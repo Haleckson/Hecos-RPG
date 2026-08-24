@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { InteractiveMapData, MapPin, HecosEntity } from '../types';
+import { InteractiveMapData, MapPin, HecosEntity, ItemVisibility } from '../types';
 import { HecosStorage } from '../services/storage';
 import { uploadToImgBB } from '../services/imgbb';
 import {
@@ -33,19 +33,28 @@ import {
   Upload,
   FolderPlus,
   Check,
-  Navigation
+  Navigation,
+  Users
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { renderContentWithMentions } from './MentionBadge';
 import { ConfirmModal } from './ConfirmModal';
+import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
+import { ImageUploadInput } from './ImageUploadInput';
 
 interface InteractiveMapProps {
   onNavigateEntity: (entityId: string) => void;
+  isGmMode?: boolean;
 }
 
-export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity }) => {
+export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity, isGmMode }) => {
   const [maps, setMaps] = useState<InteractiveMapData[]>(() => HecosStorage.getMaps());
   const [selectedMapId, setSelectedMapId] = useState<string>(() => maps[0]?.id || 'map-hecos-geral');
+
+  const currentUser = HecosStorage.getCurrentUser();
+  const isActualGm = Boolean(isGmMode || currentUser?.role === 'gm');
+  const allUsers = HecosStorage.getUsers();
+  const playerUsers = allUsers.filter((u) => u.role === 'player');
 
   const currentMap = useMemo(() => {
     return (
@@ -97,7 +106,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity
   const [pinColor, setPinColor] = useState('#00f0ff');
   const [pinDesc, setPinDesc] = useState('');
   const [pinLinkedEntity, setPinLinkedEntity] = useState('');
-  const [pinIsSecret, setPinIsSecret] = useState(false);
+  const [pinVisibility, setPinVisibility] = useState<ItemVisibility>('all');
+  const [pinAllowedUsers, setPinAllowedUsers] = useState<string[]>([]);
   const [pinGMNotes, setPinGMNotes] = useState('');
   const [pinRegion, setPinRegion] = useState('');
 
@@ -123,10 +133,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity
     return currentMap.pins.find((p) => p.id === selectedPinId) || null;
   }, [currentMap.pins, selectedPinId]);
 
-  // Filter pins
+  // Filter pins based on user permissions and search
   const visiblePins = useMemo(() => {
     return currentMap.pins.filter((pin) => {
-      if (!showGMSecrets && pin.isSecret) return false;
+      if (!HecosStorage.canUserAccess(pin.visibility, pin.allowedUserIds, currentUser, pin.isSecret)) {
+        return false;
+      }
+      if (isActualGm && !showGMSecrets && (pin.visibility === 'gm' || pin.isSecret)) return false;
       if (filterCategory !== 'all' && pin.category !== filterCategory) return false;
       if (filterDanger !== 'all' && pin.dangerLevel !== filterDanger) return false;
       if (searchQuery.trim()) {
@@ -139,7 +152,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity
       }
       return true;
     });
-  }, [currentMap.pins, showGMSecrets, filterCategory, filterDanger, searchQuery]);
+  }, [currentMap.pins, showGMSecrets, filterCategory, filterDanger, searchQuery, isActualGm, currentUser]);
 
   // Zoom handlers
   const handleZoom = (delta: number) => {
@@ -215,7 +228,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity
       setPinColor('#00f0ff');
       setPinDesc('');
       setPinLinkedEntity('');
-      setPinIsSecret(false);
+      setPinVisibility('all');
+      setPinAllowedUsers([]);
       setPinGMNotes('');
       setPinRegion('');
       setEditingPin(null);
@@ -240,7 +254,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity
       color: pinColor,
       description: pinDesc.trim(),
       linkedEntityId: pinLinkedEntity || undefined,
-      isSecret: pinIsSecret,
+      isSecret: pinVisibility === 'gm',
+      visibility: pinVisibility,
+      allowedUserIds: pinAllowedUsers,
       gmNotes: pinGMNotes.trim() || undefined,
       region: pinRegion.trim() || undefined,
     };
@@ -308,7 +324,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity
     setPinColor(pin.color || '#00f0ff');
     setPinDesc(pin.description);
     setPinLinkedEntity(pin.linkedEntityId || '');
-    setPinIsSecret(pin.isSecret || false);
+    setPinVisibility(pin.visibility || (pin.isSecret ? 'gm' : 'all'));
+    setPinAllowedUsers(pin.allowedUserIds || []);
     setPinGMNotes(pin.gmNotes || '');
     setPinRegion(pin.region || '');
     setNewPinCoord({ x: pin.x, y: pin.y });
@@ -492,6 +509,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800 font-mono">
                 {visiblePins.length} marcos
               </span>
+              {isActualGm && (
+                <VisibilityBadgeMenu
+                  visibility={HecosStorage.getFolderPermission('mapa').visibility}
+                  allowedUserIds={HecosStorage.getFolderPermission('mapa').allowedUserIds}
+                  onChange={(newVis, newAllowed) => {
+                    HecosStorage.setFolderPermission('mapa', newVis, newAllowed);
+                  }}
+                />
+              )}
             </div>
             <p className="text-xs text-zinc-400 line-clamp-1">{currentMap.description}</p>
           </div>
@@ -746,11 +772,27 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity
                       >
                         {getCategoryLabel(selectedPin.category)}
                       </span>
-                      {selectedPin.isSecret && (
-                        <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-rose-950 text-rose-300 border border-rose-800 flex items-center gap-1">
-                          <Lock className="w-2.5 h-2.5" />
-                          <span>GM Secret</span>
-                        </span>
+                      {isActualGm ? (
+                        <VisibilityBadgeMenu
+                          visibility={selectedPin.visibility || (selectedPin.isSecret ? 'gm' : 'all')}
+                          allowedUserIds={selectedPin.allowedUserIds || []}
+                          isSecret={selectedPin.isSecret}
+                          onChange={(newVis, newAllowed) => {
+                            const updatedPins = currentMap.pins.map((p) =>
+                              p.id === selectedPin.id
+                                ? { ...p, visibility: newVis, allowedUserIds: newAllowed, isSecret: newVis === 'gm' }
+                                : p
+                            );
+                            saveMapChanges({ ...currentMap, pins: updatedPins });
+                          }}
+                        />
+                      ) : (
+                        selectedPin.isSecret && (
+                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-rose-950 text-rose-300 border border-rose-800 flex items-center gap-1">
+                            <Lock className="w-2.5 h-2.5" />
+                            <span>GM Secret</span>
+                          </span>
+                        )
                       )}
                     </div>
 
@@ -1064,25 +1106,105 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity
                 />
               </div>
 
-              {/* GM Secret Note */}
-              <div className="p-3 rounded-xl bg-black/40 border border-rose-900/50 space-y-2">
-                <label className="flex items-center gap-2 text-xs text-rose-300 font-bold cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={pinIsSecret}
-                    onChange={(e) => setPinIsSecret(e.target.checked)}
-                    className="rounded border-zinc-700 text-rose-600 bg-zinc-900"
+              {/* Visibility & GM Notes Section */}
+              <div className="p-3.5 rounded-xl bg-black/40 border border-zinc-700/60 space-y-3">
+                <div>
+                  <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block mb-1.5 flex items-center gap-1.5">
+                    <Eye className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Permissão de Visualização</span>
+                  </label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setPinVisibility('all')}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                        pinVisibility === 'all'
+                          ? 'bg-emerald-950/80 text-emerald-300 border-emerald-600 shadow-sm'
+                          : 'bg-zinc-900/60 text-zinc-400 border-zinc-800 hover:text-zinc-200'
+                      }`}
+                    >
+                      <Eye className="w-3 h-3 text-emerald-400" />
+                      <span>Todos</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPinVisibility('gm')}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                        pinVisibility === 'gm'
+                          ? 'bg-rose-950/80 text-rose-300 border-rose-600 shadow-sm'
+                          : 'bg-zinc-900/60 text-zinc-400 border-zinc-800 hover:text-zinc-200'
+                      }`}
+                    >
+                      <Lock className="w-3 h-3 text-rose-400" />
+                      <span>Apenas GM</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPinVisibility('custom')}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                        pinVisibility === 'custom'
+                          ? 'bg-indigo-950/80 text-indigo-300 border-indigo-600 shadow-sm'
+                          : 'bg-zinc-900/60 text-zinc-400 border-zinc-800 hover:text-zinc-200'
+                      }`}
+                    >
+                      <Users className="w-3 h-3 text-indigo-400" />
+                      <span>Personalizado</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Custom Players selection */}
+                {pinVisibility === 'custom' && (
+                  <div className="pt-2 border-t border-zinc-800 space-y-1.5">
+                    <label className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider block">
+                      Jogadores com acesso ao marcador:
+                    </label>
+                    {playerUsers.length === 0 ? (
+                      <p className="text-[11px] text-zinc-500 italic">Nenhum jogador cadastrado no sistema.</p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-1 max-h-28 overflow-y-auto pr-1">
+                        {playerUsers.map((u) => {
+                          const isChecked = pinAllowedUsers.includes(u.id);
+                          return (
+                            <label
+                              key={u.id}
+                              className="flex items-center gap-2 p-1.5 rounded bg-zinc-900/80 border border-zinc-800 text-xs text-zinc-300 hover:bg-zinc-800 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setPinAllowedUsers([...pinAllowedUsers, u.id]);
+                                  } else {
+                                    setPinAllowedUsers(pinAllowedUsers.filter((id) => id !== u.id));
+                                  }
+                                }}
+                                className="rounded border-zinc-700 text-indigo-600 bg-zinc-900"
+                              />
+                              <span className="truncate">{u.name || u.username}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* GM Secret Note */}
+                <div className="pt-2 border-t border-zinc-800 space-y-1">
+                  <label className="text-[11px] font-bold text-rose-300 uppercase tracking-wider block flex items-center gap-1">
+                    <Lock className="w-3 h-3" />
+                    <span>Notas Confidenciais do GM</span>
+                  </label>
+                  <textarea
+                    value={pinGMNotes}
+                    onChange={(e) => setPinGMNotes(e.target.value)}
+                    placeholder="Notas confidenciais sobre armadilhas, segredos ou tesouros..."
+                    rows={2}
+                    className="w-full px-3 py-1.5 text-xs bg-black/80 border border-rose-900/60 rounded-lg text-rose-200 focus:outline-none focus:border-rose-500 resize-none"
                   />
-                  <Lock className="w-3.5 h-3.5" />
-                  <span>Marco Secreto (Visível Apenas para o GM)</span>
-                </label>
-                <textarea
-                  value={pinGMNotes}
-                  onChange={(e) => setPinGMNotes(e.target.value)}
-                  placeholder="Notas confidenciais sobre armadilhas, segredos ou tesouros..."
-                  rows={2}
-                  className="w-full px-3 py-1.5 text-xs bg-black/80 border border-rose-900/60 rounded-lg text-rose-200 focus:outline-none focus:border-rose-500 resize-none"
-                />
+                </div>
               </div>
             </div>
 
@@ -1150,42 +1272,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity
                 />
               </div>
 
-              {/* Map Image URL & File Upload */}
-              <div className="p-4 rounded-xl bg-black/60 border border-zinc-800 space-y-3">
-                <label className="text-[11px] font-bold text-zinc-300 uppercase tracking-wider block">
-                  Imagem do Mapa em Alta Qualidade
-                </label>
-                <p className="text-[11px] text-zinc-400">
-                  Insira o link da imagem (URL direta) ou faça upload da arte em alta resolução do seu computador.
-                </p>
-
-                <input
-                  type="text"
+              {/* Map Image URL & File Upload with ImageUploadInput */}
+              <div className="p-3.5 rounded-xl bg-black/60 border border-zinc-800 space-y-2">
+                <ImageUploadInput
                   value={editMapUrl}
-                  onChange={(e) => setEditMapUrl(e.target.value)}
-                  placeholder="https://exemplo.com/mapa-hecos-4k.jpg"
-                  className="w-full px-3 py-2 text-xs bg-black border border-zinc-700 rounded-lg text-cyan-300 font-mono focus:outline-none focus:border-cyan-400"
+                  onChange={setEditMapUrl}
+                  label="Imagem do Mapa em Alta Resolução"
+                  placeholder="https://... ou faça upload direto para o ImgBB"
+                  showPreview={true}
+                  previewHeight="h-36"
                 />
-
-                <div className="flex items-center gap-3 pt-1">
-                  <label className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold transition-colors flex items-center gap-2 cursor-pointer border border-zinc-700">
-                    <Upload className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Upload de Imagem Local (Alta Resolução)</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleMapImageFileUpload}
-                      className="hidden"
-                      disabled={isUploadingMapImage}
-                    />
-                  </label>
-                </div>
-
-                {mapImageUploadMsg && (
-                  <div className="text-xs text-cyan-300 p-2 rounded bg-cyan-950/80 border border-cyan-800">
-                    {mapImageUploadMsg}
-                  </div>
-                )}
               </div>
 
               {/* Map Actions */}

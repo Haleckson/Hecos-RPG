@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { HecosEntity, EntityCategory, HecosUser, FolderPermission } from './types';
 import { HecosStorage } from './services/storage';
 import { CATEGORY_DEFINITIONS, CategoryDefinition, getCategoryMeta } from './utils/categories';
@@ -26,6 +26,12 @@ import { SpellExplorer } from './components/SpellExplorer';
 import { ItemExplorer } from './components/ItemExplorer';
 import { SpellCreateModal } from './components/SpellCreateModal';
 import { ItemCreateModal } from './components/ItemCreateModal';
+import { AncestryCard } from './components/AncestryCard';
+import { EntityCard } from './components/EntityCard';
+import { QuestBoard } from './components/QuestBoard';
+import { PerilCreateModal } from './components/PerilCreateModal';
+import { ClassCreateModal } from './components/ClassCreateModal';
+import { TraitDrawer } from './components/TraitDrawer';
 import { FeatCategoryType, SpellCategoryType, ItemCategoryType } from './types';
 import { getEmptyAncestryData, serializeAncestryToHTML } from './utils/ancestrySerializer';
 import { getEmptyFeatData, serializeFeatToHTML } from './utils/featSerializer';
@@ -178,12 +184,33 @@ export function App() {
   const [itemModalPresetCategory, setItemModalPresetCategory] = useState<ItemCategoryType | undefined>(undefined);
   const [itemModalPresetSubcategory, setItemModalPresetSubcategory] = useState<string | undefined>(undefined);
 
+  const [isPerilCreateModalOpen, setIsPerilCreateModalOpen] = useState(false);
+  const [isClassCreateModalOpen, setIsClassCreateModalOpen] = useState(false);
+  const [classModalPresetKind, setClassModalPresetKind] = useState<'class' | 'archetype'>('class');
+
+  // Trait Drawer state
+  const [selectedDrawerTrait, setSelectedDrawerTrait] = useState<string | null>(null);
+  const [isTraitDrawerOpen, setIsTraitDrawerOpen] = useState(false);
+
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced'>('idle');
   const [firebaseStatus, setFirebaseStatus] = useState(getFirebaseConnectionState());
 
   const isActualGm = HecosStorage.isUserGm(currentUser);
+
+  // Trait Drawer Event Listener (hecos:open-trait-drawer)
+  useEffect(() => {
+    const handleOpenTraitDrawer = (e: Event) => {
+      const customEvent = e as CustomEvent<{ trait: string }>;
+      if (customEvent.detail?.trait) {
+        setSelectedDrawerTrait(customEvent.detail.trait);
+        setIsTraitDrawerOpen(true);
+      }
+    };
+    window.addEventListener('hecos:open-trait-drawer', handleOpenTraitDrawer);
+    return () => window.removeEventListener('hecos:open-trait-drawer', handleOpenTraitDrawer);
+  }, []);
 
   // Real-time subscriptions and Initial load
   useEffect(() => {
@@ -265,6 +292,17 @@ export function App() {
       return;
     }
 
+    if (category === 'creature' || (category as any) === 'peril') {
+      setIsPerilCreateModalOpen(true);
+      return;
+    }
+
+    if (category === 'class' || category === 'archetype') {
+      setClassModalPresetKind(category === 'archetype' ? 'archetype' : 'class');
+      setIsClassCreateModalOpen(true);
+      return;
+    }
+
     if (category === 'feat') {
       handleCreateFeatDirectly();
       return;
@@ -285,7 +323,7 @@ export function App() {
         summary: '',
         content: serializeAncestryToHTML(finalTitle, blankAncestry),
         ancestryData: blankAncestry,
-        tags: ['ancestry', 'pf2e'],
+        tags: ['ancestry'],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         isSecret: true,
@@ -337,7 +375,7 @@ export function App() {
       summary: '',
       content: serializeFeatToHTML('Novo Talento', blankFeat),
       featData: blankFeat,
-      tags: ['talento', 'pf2e', ...(presetSubcategory ? [presetSubcategory] : [])],
+      tags: ['talento', ...(presetSubcategory ? [presetSubcategory] : [])],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       isSecret: true,
@@ -417,7 +455,7 @@ export function App() {
       if (activeSubcategory === 'Criaturas' && e.category === 'creature') return true;
       if (activeSubcategory === 'Ancestralidades' && e.category === 'ancestry') return true;
       if (activeSubcategory === 'Classes' && e.category === 'class') return true;
-      if (activeSubcategory === 'Arquétipos' && e.category === 'archetype') return true;
+      if ((activeSubcategory === 'Vocação' || activeSubcategory === 'Arquétipos') && e.category === 'archetype') return true;
       if (activeSubcategory === 'Talentos' && e.category === 'feat') return true;
       if (activeSubcategory === 'Feitiços' && e.category === 'spell') return true;
       if (activeSubcategory === 'Itens' && e.category === 'item') return true;
@@ -471,6 +509,22 @@ export function App() {
 
     return true;
   });
+
+  // Ordenar alfabeticamente quando visualizando a categoria/subcategoria Ancestralidades
+  const sortedCategoryEntities = useMemo(() => {
+    const list = [...categoryEntities];
+    const isAncestryView =
+      selectedCategoryKey === 'ancestry' ||
+      selectedCategoryKey === 'ancestralidades' ||
+      activeSubcategory === 'Ancestralidades' ||
+      activeSubcategory === 'Ancestry' ||
+      (list.length > 0 && list.every((e) => e.category === 'ancestry'));
+
+    if (isAncestryView) {
+      list.sort((a, b) => a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' }));
+    }
+    return list;
+  }, [categoryEntities, selectedCategoryKey, activeSubcategory]);
 
   const handleManualSync = async () => {
     setSyncStatus('syncing');
@@ -577,6 +631,11 @@ export function App() {
             const isExpanded = expandedMenus[category.id];
             const isSelected = selectedCategoryKey === category.id && !activeSubcategory;
             const Icon = category.icon;
+            const folderPerm = HecosStorage.getFolderPermission(category.id);
+            const isActualGm = currentUser?.role === 'gm';
+            const canAccess = isActualGm || HecosStorage.canUserAccess(folderPerm.visibility, folderPerm.allowedUserIds, currentUser);
+
+            if (!canAccess) return null;
 
             return (
               <div key={category.id} className="space-y-0.5">
@@ -608,11 +667,30 @@ export function App() {
                     <span>{category.name}</span>
                   </div>
 
-                  {hasChildren && (
-                    <span className="text-zinc-500 hover:text-zinc-300 p-0.5">
-                      {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                    {isActualGm && category.id !== 'codex' && (
+                      <VisibilityBadgeMenu
+                        visibility={folderPerm.visibility}
+                        allowedUserIds={folderPerm.allowedUserIds}
+                        onChange={(newVis, newAllowed) => {
+                          HecosStorage.setFolderPermission(category.id, newVis, newAllowed);
+                          setExpandedMenus((prev) => ({ ...prev }));
+                        }}
+                      />
+                    )}
+                    {hasChildren && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedMenus((prev) => ({ ...prev, [category.id]: !prev[category.id] }));
+                        }}
+                        className="text-zinc-500 hover:text-zinc-300 p-0.5"
+                      >
+                        {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Grouped Submenus (Lore & Mecânicas) or Direct Children for Codex */}
@@ -1175,6 +1253,16 @@ export function App() {
                 }}
                 isGmMode={isGmMode}
               />
+            ) : selectedCategoryKey === 'quest' || activeSubcategory === 'Quests' || activeSubcategory === 'Missões' ? (
+              <QuestBoard
+                onNavigateEntity={handleNavigateEntity}
+                onEditEntity={(ent) => {
+                  setEditingEntity(ent);
+                  setActiveView('edit');
+                }}
+                onCreateQuest={() => handleCreateNewEntity('quest')}
+                isGmMode={isGmMode}
+              />
             ) : (
               <div className="space-y-6">
                 {/* Category Banner & Search */}
@@ -1242,7 +1330,7 @@ export function App() {
                 </div>
 
                 {/* Entities Cards Grid OR Compact Table */}
-                {categoryEntities.length === 0 ? (
+                {sortedCategoryEntities.length === 0 ? (
                   <div className="p-12 text-center rounded-2xl bg-[#09080d] border border-zinc-800/60 space-y-3">
                     <BookOpen className="w-8 h-8 text-zinc-600 mx-auto" />
                     <p className="text-sm text-zinc-400">Nenhum artigo encontrado nesta categoria com os filtros atuais.</p>
@@ -1270,7 +1358,7 @@ export function App() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-800/60">
-                          {categoryEntities.map((item) => {
+                          {sortedCategoryEntities.map((item) => {
                             const isCiano = ['pc', 'spell', 'ancestry', 'rule'].includes(item.category);
                             const isMalva = ['npc', 'item', 'flora', 'class', 'feat', 'timeline'].includes(item.category);
 
@@ -1355,95 +1443,39 @@ export function App() {
                     </div>
                   </div>
                 ) : (
-                  /* STANDARD CARDS GRID VIEW */
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {categoryEntities.map((item) => {
-                      const isCiano = ['pc', 'spell', 'ancestry', 'rule'].includes(item.category);
-                      const isMalva = ['npc', 'item', 'flora', 'class', 'feat', 'timeline'].includes(item.category);
+                  /* STANDARD CARDS GRID VIEW - 5 cols on >=1080p, 3 cols on smaller screens */
+                  <div
+                    className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 min-[1367px]:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5 gap-3 sm:gap-3.5 items-stretch"
+                  >
+                    {sortedCategoryEntities.map((item) => {
+                      if (item.category === 'ancestry') {
+                        return (
+                          <AncestryCard
+                            key={item.id}
+                            entity={item}
+                            onSelect={handleNavigateEntity}
+                            onEdit={(id) => {
+                              const ent = entities.find((e) => e.id === id);
+                              if (ent) {
+                                setEditingEntity(ent);
+                                setActiveView('edit');
+                              }
+                            }}
+                            onDelete={handleDeleteEntity}
+                            isGmMode={isActualGm}
+                          />
+                        );
+                      }
 
                       return (
-                        <div
+                        <EntityCard
                           key={item.id}
-                          onClick={() => handleNavigateEntity(item.id)}
-                          className="group relative flex flex-col justify-between p-5 rounded-2xl bg-[#0d0a15] hover:bg-[#140f21] border border-zinc-800/80 hover:border-cyan-500/50 transition-all duration-200 cursor-pointer shadow-lg hover:shadow-[0_0_30px_rgba(6,182,212,0.15)]"
-                        >
-                          <div className="space-y-3">
-                            {/* Card Top Pill & Actions */}
-                            <div className="flex items-center justify-between gap-2">
-                              <span
-                                className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-md border ${
-                                  isCiano
-                                    ? 'bg-cyan-950 text-cyan-300 border-cyan-800'
-                                    : isMalva
-                                    ? 'bg-purple-950 text-purple-300 border-purple-800'
-                                    : 'bg-rose-950 text-rose-300 border-rose-800'
-                                }`}
-                              >
-                                {getCategoryMeta(item.category).name} {item.statblock ? `• Nível ${item.statblock.level}` : ''}
-                              </span>
-
-                              {isActualGm && (
-                                <div className="flex items-center gap-1.5">
-                                  {/* 3-Level Granular Visibility Menu */}
-                                  <div onClick={(e) => e.stopPropagation()}>
-                                    <VisibilityBadgeMenu
-                                      visibility={item.visibility}
-                                      allowedUserIds={item.allowedUserIds}
-                                      isSecret={item.isSecret}
-                                      onChange={(newVis, newAllowed) => {
-                                        HecosStorage.setEntityVisibility(item.id, newVis, newAllowed);
-                                      }}
-                                    />
-                                  </div>
-
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteEntity(item.id);
-                                    }}
-                                    className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 rounded-lg hover:bg-rose-950/80 text-zinc-400 hover:text-rose-400 border border-transparent hover:border-rose-800 transition-all cursor-pointer"
-                                    title={`Excluir "${item.title}"`}
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Card Title & Subtitle */}
-                            <div>
-                              <h3 className="text-base font-bold text-zinc-100 group-hover:text-cyan-300 transition-colors line-clamp-1">
-                                {item.title}
-                              </h3>
-                              {item.subtitle && (
-                                <p className="text-xs text-zinc-400 line-clamp-1 mt-0.5">
-                                  {item.subtitle}
-                                </p>
-                              )}
-                            </div>
-
-                            {/* Card Summary */}
-                            <p className="text-xs text-zinc-300 line-clamp-2 leading-relaxed">
-                              {item.summary || 'Sem resumo cadastrado.'}
-                            </p>
-                          </div>
-
-                          {/* Card Footer: Tags & Arrow */}
-                          <div className="pt-4 mt-3 border-t border-zinc-800/80 flex items-center justify-between">
-                            <div className="flex flex-wrap gap-1">
-                              {item.tags.slice(0, 2).map((t, tIdx) => (
-                                <span
-                                  key={`${item.id}-crdtag-${t}-${tIdx}`}
-                                  className="text-[10px] px-1.5 py-0.5 rounded bg-black/60 text-zinc-400 border border-zinc-800"
-                                >
-                                  #{t}
-                                </span>
-                              ))}
-                            </div>
-                            <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
-                          </div>
-                        </div>
+                          entity={item}
+                          onSelect={handleNavigateEntity}
+                          onDelete={handleDeleteEntity}
+                          onTagClick={(tag) => setSelectedTagFilter(tag)}
+                          isGmMode={isActualGm}
+                        />
                       );
                     })}
                   </div>
@@ -1524,6 +1556,29 @@ export function App() {
         }}
       />
 
+      {/* Robust PF2e Perils & Hazards Creation Modal */}
+      <PerilCreateModal
+        isOpen={isPerilCreateModalOpen}
+        onClose={() => setIsPerilCreateModalOpen(false)}
+        onSave={(newPerilEntity) => {
+          refreshEntities();
+          handleNavigateEntity(newPerilEntity.id);
+          setIsPerilCreateModalOpen(false);
+        }}
+      />
+
+      {/* Robust PF2e Class & Archetype Creation Modal */}
+      <ClassCreateModal
+        isOpen={isClassCreateModalOpen}
+        initialKind={classModalPresetKind}
+        onClose={() => setIsClassCreateModalOpen(false)}
+        onSave={(newClassEntity) => {
+          refreshEntities();
+          handleNavigateEntity(newClassEntity.id);
+          setIsClassCreateModalOpen(false);
+        }}
+      />
+
       <FirebaseStatusModal
         isOpen={isFirebaseModalOpen}
         onClose={() => setIsFirebaseModalOpen(false)}
@@ -1547,6 +1602,15 @@ export function App() {
           refreshEntities();
           handleNavigateEntity(id);
         }}
+      />
+
+      {/* PF2e & Hecos Trait Drawer */}
+      <TraitDrawer
+        trait={selectedDrawerTrait}
+        isOpen={isTraitDrawerOpen}
+        onClose={() => setIsTraitDrawerOpen(false)}
+        onNavigate={handleNavigateEntity}
+        isGmMode={isGmMode}
       />
 
       {/* Global Tooltip that overlays all windows with highest z-index */}

@@ -6,7 +6,10 @@ import { renderContentWithMentions } from './MentionBadge';
 import { RichContentRenderer } from './RichContentRenderer';
 import { AncestryView } from './AncestryView';
 import { FeatView } from './FeatView';
+import { PerilView } from './PerilView';
+import { ClassView } from './ClassView';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
+import { AdjustableImage } from './AdjustableImage';
 import {
   Edit3,
   Trash2,
@@ -25,6 +28,9 @@ import {
   ArrowUpRight,
   Printer
 } from 'lucide-react';
+
+import { TraitBadge } from './TraitBadge';
+import { EntityIcon } from './EntityIcon';
 
 interface EntityViewProps {
   entity: HecosEntity;
@@ -60,25 +66,76 @@ export const EntityView: React.FC<EntityViewProps> = ({
 
   const isActualGm = HecosStorage.isUserGm();
 
+  // If this entity uses a specialized custom full layout (Ancestry, Class/Archetype, Feat, Peril), delegate directly without wrapping in a duplicate generic banner
+  if (entity.category === 'ancestry') {
+    return (
+      <AncestryView
+        entity={entity}
+        onEdit={onEdit}
+        onNavigate={onNavigate}
+        onTagClick={onTagClick}
+      />
+    );
+  }
+
+  if (entity.category === 'feat') {
+    return (
+      <FeatView
+        entity={entity}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onNavigate={onNavigate}
+        onTagClick={onTagClick}
+      />
+    );
+  }
+
+  if (entity.category === 'creature' || entity.category === 'peril' || entity.perilData) {
+    return (
+      <PerilView
+        entity={entity}
+        onEdit={onEdit}
+        onNavigate={onNavigate}
+        onTagClick={onTagClick}
+      />
+    );
+  }
+
+  if (entity.category === 'class' || entity.category === 'archetype' || entity.classData) {
+    return (
+      <ClassView
+        entity={entity}
+        onEdit={onEdit}
+        onNavigate={onNavigate}
+        onTagClick={onTagClick}
+      />
+    );
+  }
+
   return (
     <div className="bg-[#09080d] text-zinc-100 rounded-2xl border border-zinc-800/80 shadow-2xl overflow-hidden">
       {/* Cover / Header Banner */}
-      <div className="relative h-48 sm:h-64 w-full overflow-hidden bg-gradient-to-r from-[#170e24] via-[#09070f] to-[#200a12]">
+      <div className="relative h-52 sm:h-64 lg:h-72 w-full overflow-hidden bg-[#0c0915] border-b border-zinc-800/80">
         {entity.coverImage ? (
-          <img
+          <AdjustableImage
             src={entity.coverImage}
             alt={entity.title}
-            referrerPolicy="no-referrer"
-            className="w-full h-full object-cover object-center opacity-40 mix-blend-luminosity hover:opacity-60 transition-opacity duration-300"
+            imageKey={`entity-cover-${entity.id}`}
+            isGm={isActualGm}
+            containerClassName="relative w-full h-full overflow-hidden bg-[#0c0915]"
           />
         ) : (
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(184,119,219,0.15),transparent_60%),radial-gradient(circle_at_70%_50%,rgba(0,240,255,0.12),transparent_60%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(184,119,219,0.15),transparent_60%),radial-gradient(circle_at_70%_50%,rgba(0,240,255,0.12),transparent_60%)] flex items-center justify-center">
+            <div className="w-20 h-20 rounded-3xl bg-black/40 border border-zinc-800/80 flex items-center justify-center text-zinc-500">
+              <EntityIcon icon={entity.icon} category={entity.category} className="w-10 h-10" />
+            </div>
+          </div>
         )}
 
-        <div className="absolute inset-0 bg-gradient-to-t from-[#09080d] via-[#09080d]/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#09080d] via-[#09080d]/60 to-transparent pointer-events-none" />
 
         {/* Action buttons on top of banner */}
-        <div className="absolute top-4 right-4 flex items-center gap-2">
+        <div className="absolute top-4 right-4 flex items-center gap-2 z-20">
           {/* 3-Level Granular Visibility Menu (Apenas GM, Todos, Compartilhamento Seletivo) */}
           {isActualGm && (
             <VisibilityBadgeMenu
@@ -125,41 +182,48 @@ export const EntityView: React.FC<EntityViewProps> = ({
         </div>
 
         {/* Title area over banner */}
-        <div className="absolute bottom-4 left-6 right-6">
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span
-              className={`px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider rounded-md border shadow-sm ${
-                isCiano
-                  ? 'bg-cyan-950/90 text-cyan-300 border-cyan-700/80'
-                  : isMalva
-                  ? 'bg-purple-950/90 text-purple-300 border-purple-700/80'
-                  : 'bg-rose-950/90 text-rose-300 border-rose-700/80'
-              }`}
-            >
-              {getCategoryMeta(entity.category).name.toUpperCase()}
-            </span>
-
-            {entity.isSecret ? (
-              <span className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold bg-zinc-900/90 text-zinc-400 border border-zinc-700 rounded-md">
-                <EyeOff className="w-3.5 h-3.5 text-zinc-400" />
-                <span>CONFIDENCIAL (APENAS GM)</span>
-              </span>
-            ) : (
-              <span className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold bg-amber-950/70 text-amber-300 border border-amber-600/60 rounded-md shadow-sm">
-                <Eye className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
-                <span>PÚBLICO</span>
-              </span>
-            )}
+        <div className="absolute bottom-4 left-6 right-6 z-20 flex items-end gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-[#140e26] border-2 border-zinc-700/80 flex items-center justify-center shadow-2xl shrink-0 overflow-hidden">
+            <EntityIcon icon={entity.icon} category={entity.category} className="w-7 h-7 text-cyan-300" />
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-zinc-100 tracking-tight">
-            {entity.title}
-          </h1>
-          {entity.subtitle && (
-            <p className="text-sm sm:text-base text-zinc-300/90 mt-1 font-medium">
-              {entity.subtitle}
-            </p>
-          )}
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <span
+                className={`px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider rounded-md border shadow-sm flex items-center gap-1 ${
+                  isCiano
+                    ? 'bg-cyan-950/90 text-cyan-300 border-cyan-700/80'
+                    : isMalva
+                    ? 'bg-purple-950/90 text-purple-300 border-purple-700/80'
+                    : 'bg-rose-950/90 text-rose-300 border-rose-700/80'
+                }`}
+              >
+                <EntityIcon icon={entity.icon} category={entity.category} className="w-3 h-3" />
+                <span>{getCategoryMeta(entity.category).name.toUpperCase()}</span>
+              </span>
+
+              {entity.isSecret ? (
+                <span className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold bg-zinc-900/90 text-zinc-400 border border-zinc-700 rounded-md">
+                  <EyeOff className="w-3.5 h-3.5 text-zinc-400" />
+                  <span>CONFIDENCIAL (APENAS GM)</span>
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold bg-amber-950/70 text-amber-300 border border-amber-600/60 rounded-md shadow-sm">
+                  <Eye className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
+                  <span>PÚBLICO</span>
+                </span>
+              )}
+            </div>
+
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-zinc-100 tracking-tight font-serif">
+              {entity.title}
+            </h1>
+            {entity.subtitle && (
+              <p className="text-sm sm:text-base text-zinc-300/90 mt-1 font-medium">
+                {entity.subtitle}
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -172,24 +236,36 @@ export const EntityView: React.FC<EntityViewProps> = ({
           </span>
         </div>
 
-        {/* Tags */}
+        {/* Traits & Tags */}
         <div className="flex flex-wrap items-center gap-1.5">
-          <TagIcon className="w-3.5 h-3.5 text-zinc-500 mr-1" />
-          {entity.tags.map((tag) => (
-            <button
-              key={tag}
-              onClick={() => onTagClick(tag)}
-              className="px-2 py-0.5 rounded-md bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-cyan-300 transition-colors"
-            >
-              #{tag}
-            </button>
-          ))}
+          {entity.traits && entity.traits.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1 mr-2">
+              {entity.traits.map((tr) => (
+                <TraitBadge key={tr} trait={tr} />
+              ))}
+            </div>
+          )}
+
+          {entity.tags && entity.tags.length > 0 && (
+            <>
+              <TagIcon className="w-3.5 h-3.5 text-zinc-500 mr-1" />
+              {entity.tags.map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() => onTagClick(tag)}
+                  className="px-2 py-0.5 rounded-md bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-cyan-300 transition-colors"
+                >
+                  #{tag}
+                </button>
+              ))}
+            </>
+          )}
         </div>
       </div>
 
       {/* Main Content Layout */}
       <div className="p-6 sm:p-8 space-y-6">
-        {/* Specialized Views for Ancestry and Feat */}
+        {/* Specialized Views for Ancestry, Feat, Peril, and Class */}
         {entity.category === 'ancestry' ? (
           <AncestryView entity={entity} onEdit={onEdit} onNavigate={onNavigate} onTagClick={onTagClick} />
         ) : entity.category === 'feat' ? (
@@ -197,6 +273,20 @@ export const EntityView: React.FC<EntityViewProps> = ({
             entity={entity}
             onEdit={onEdit}
             onDelete={onDelete}
+            onNavigate={onNavigate}
+            onTagClick={onTagClick}
+          />
+        ) : entity.category === 'creature' || entity.category === 'peril' || entity.perilData ? (
+          <PerilView
+            entity={entity}
+            onEdit={onEdit}
+            onNavigate={onNavigate}
+            onTagClick={onTagClick}
+          />
+        ) : (entity.category === 'class' || entity.category === 'archetype' || entity.classData) ? (
+          <ClassView
+            entity={entity}
+            onEdit={onEdit}
             onNavigate={onNavigate}
             onTagClick={onTagClick}
           />

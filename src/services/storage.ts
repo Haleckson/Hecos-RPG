@@ -1,4 +1,4 @@
-import { HecosEntity, InteractiveMapData, YouTubeAmbianceTrack, GoogleDriveResource, TagInfo, HecosUser, FolderPermission, ItemVisibility, TrashedEntity } from '../types';
+import { HecosEntity, InteractiveMapData, YouTubeAmbianceTrack, GoogleDriveResource, TagInfo, HecosUser, FolderPermission, ItemVisibility, TrashedEntity, ImageAdjustment } from '../types';
 import { INITIAL_ENTITIES, INITIAL_MAPS, INITIAL_YOUTUBE_TRACKS, INITIAL_DRIVE_RESOURCES } from '../data/initialHecosData';
 import {
   syncEntityToFirebase,
@@ -6,6 +6,9 @@ import {
   loadEntitiesFromFirebase,
   subscribeToEntitiesRealtime,
   subscribeToDeletedEntitiesRealtime,
+  subscribeToTrashRealtime,
+  syncTrashToFirebase,
+  loadTrashFromFirebase,
   subscribeToMapsRealtime,
   syncMapToFirebase,
   loadMapsFromFirebase,
@@ -21,7 +24,10 @@ import {
   subscribeToUsersRealtime,
   syncFolderPermissionsToFirebase,
   loadFolderPermissionsFromFirebase,
-  subscribeToFolderPermissionsRealtime
+  subscribeToFolderPermissionsRealtime,
+  syncImageAdjustmentsToFirebase,
+  loadImageAdjustmentsFromFirebase,
+  subscribeToImageAdjustmentsRealtime
 } from './firebase';
 
 const STORAGE_KEYS = {
@@ -41,6 +47,8 @@ const STORAGE_KEYS = {
   USERS: 'hecos_users_v1',
   CURRENT_USER: 'hecos_current_user_v1',
   FOLDER_PERMISSIONS: 'hecos_folder_permissions_v1',
+  IMAGE_ADJUSTMENTS: 'hecos_image_adjustments_v1',
+  CUSTOM_TRAITS: 'hecos_custom_traits_v1',
 };
 
 export const INITIAL_ADMIN_USER: HecosUser = {
@@ -53,12 +61,12 @@ export const INITIAL_ADMIN_USER: HecosUser = {
 };
 
 export const DEFAULT_FEAT_CATEGORIES_CONFIG: Record<string, string[]> = {
+  ancestry: ['Humano', 'Elfo', 'Anão', 'Umbralis', 'Corine', 'Gnomo', 'Goblin', 'Golias', 'Meio-Elfo', 'Versátil'],
+  class: ['Fighter (Guerreiro)', 'Wizard (Mago)', 'Rogue (Ladino)', 'Cleric (Clérigo)', 'Champion (Campeão)', 'Barbarian (Bárbaro)', 'Bard (Bardo)', 'Druid (Druida)', 'Monk (Monge)', 'Ranger (Patrulheiro)', 'Sorcerer (Feiticeiro)', 'Thaumaturge', 'Guerreiro da Obsidiana'],
+  extras: ['Eclipse & Penumbra', 'Bênçãos do Vazio', 'Rituais de Obsidiana', 'Relíquias Vivas', 'Homebrew'],
   general: ['Combate', 'Defesa', 'Mobilidade', 'Sentidos & Percepção', 'Sobrevivência', 'Iniciativa', 'Utilitários'],
   skill: ['Acrobacia', 'Arcanismo', 'Atletismo', 'Diplomacia', 'Enganação', 'Furtividade', 'Intimidação', 'Ladrongagem', 'Manufatura', 'Medicina', 'Natureza', 'Ocultismo', 'Performance', 'Religião', 'Sociedade', 'Sobrevivência'],
-  class: ['Fighter (Guerreiro)', 'Wizard (Mago)', 'Rogue (Ladino)', 'Cleric (Clérigo)', 'Champion (Campeão)', 'Barbarian (Bárbaro)', 'Bard (Bardo)', 'Druid (Druida)', 'Monk (Monge)', 'Ranger (Patrulheiro)', 'Sorcerer (Feiticeiro)', 'Thaumaturge', 'Guerreiro da Obsidiana'],
-  archetype: ['Caminhante da Penumbra', 'Cavaleiro', 'Assassino', 'Duelista', 'Médico de Batalha', 'Mestre de Armas', 'Arquimago do Eclipse', 'Sentinela do Vazio'],
-  ancestry: ['Humano', 'Elfo', 'Anão', 'Umbralis', 'Corine', 'Gnomo', 'Goblin', 'Golias', 'Meio-Elfo', 'Versátil'],
-  extras: ['Eclipse & Penumbra', 'Bênçãos do Vazio', 'Rituais de Obsidiana', 'Relíquias Vivas', 'Homebrew']
+  archetype: ['Caminhante da Penumbra', 'Cavaleiro', 'Assassino', 'Duelista', 'Médico de Batalha', 'Mestre de Armas', 'Arquimago do Eclipse', 'Sentinela do Vazio']
 };
 
 export const DEFAULT_SPELL_CATEGORIES_CONFIG: Record<string, string[]> = {
@@ -105,6 +113,8 @@ export class HecosStorage {
   private static userSubscribers = new Set<(user: HecosUser | null) => void>();
   private static usersListSubscribers = new Set<(users: HecosUser[]) => void>();
   private static folderPermissionsSubscribers = new Set<(perms: Record<string, FolderPermission>) => void>();
+  private static imageAdjustmentSubscribers = new Set<(adjustments: Record<string, ImageAdjustment>) => void>();
+  private static imageAdjustmentsCache: Record<string, ImageAdjustment> | null = null;
   private static trashSubscribers = new Set<(trash: TrashedEntity[]) => void>();
   private static isRealtimeInitialized = false;
 
@@ -187,12 +197,14 @@ export class HecosStorage {
     seedDatabaseIfEmpty(INITIAL_ENTITIES).catch(() => {});
 
     // Listen for deleted entities in real-time from other devices
-    subscribeToDeletedEntitiesRealtime((deletedIds) => {
-      if (!deletedIds || deletedIds.length === 0) return;
+    subscribeToDeletedEntitiesRealtime((deletedMap) => {
+      if (!deletedMap || typeof deletedMap !== 'object') return;
       const currentDeleted = this.getDeletedEntityIds();
       let changed = false;
-      deletedIds.forEach((id) => {
-        if (!currentDeleted.has(id)) {
+      
+      Object.entries(deletedMap).forEach(([safeKey, delInfo]) => {
+        const id = delInfo?.id || safeKey;
+        if (id) {
           currentDeleted.add(id);
           currentDeleted.add(id.toLowerCase().trim());
           changed = true;
@@ -207,6 +219,18 @@ export class HecosStorage {
       }
     });
 
+    // Start real-time Realtime Database listener for trash
+    subscribeToTrashRealtime((remoteTrash) => {
+      if (!Array.isArray(remoteTrash)) return;
+      this.trashCache = remoteTrash;
+      try {
+        localStorage.setItem(STORAGE_KEYS.TRASH, JSON.stringify(remoteTrash));
+      } catch (e) {
+        console.warn("Error saving trash to localStorage:", e);
+      }
+      this.notifyTrashSubscribers();
+    });
+
     // Start real-time Realtime Database listener for entities
     subscribeToEntitiesRealtime((firebaseList) => {
       if (!firebaseList || firebaseList.length === 0) return;
@@ -215,17 +239,28 @@ export class HecosStorage {
       const map = new Map<string, HecosEntity>();
 
       current.forEach((e) => {
-        if (!this.isEntityDeleted(deletedIds, e.id, e.slug, e.title)) {
+        if (!this.isEntityDeleted(deletedIds, e.id, e.slug)) {
           map.set(e.id, e);
         }
       });
 
       let hasNewChanges = false;
       firebaseList.forEach((e: any) => {
-        if (e && e.id && !this.isEntityDeleted(deletedIds, e.id, e.slug, e.title)) {
+        if (e && e.id) {
+          // If remote entity was updated, un-delete it if it was erroneously marked
+          if (this.isEntityDeleted(deletedIds, e.id, e.slug)) {
+            deletedIds.delete(e.id);
+            deletedIds.delete(e.id.toLowerCase().trim());
+            if (e.slug) {
+              deletedIds.delete(e.slug);
+              deletedIds.delete(e.slug.toLowerCase().trim());
+            }
+            this.saveDeletedEntityIds(deletedIds);
+          }
+
           const existing = map.get(e.id);
           // If not existing or Firebase RTDB node has newer update
-          if (!existing || (e.updatedAt && (!existing.updatedAt || e.updatedAt > existing.updatedAt))) {
+          if (!existing || (e.updatedAt && (!existing.updatedAt || e.updatedAt >= existing.updatedAt))) {
             map.set(e.id, e);
             hasNewChanges = true;
           }
@@ -317,6 +352,16 @@ export class HecosStorage {
       } catch {}
       this.notifyEntitySubscribers();
     });
+
+    // Start real-time listener for image adjustments
+    subscribeToImageAdjustmentsRealtime((adjustments) => {
+      if (!adjustments) return;
+      this.imageAdjustmentsCache = adjustments;
+      try {
+        localStorage.setItem(STORAGE_KEYS.IMAGE_ADJUSTMENTS, JSON.stringify(adjustments));
+      } catch {}
+      this.notifyImageAdjustmentSubscribers();
+    });
   }
 
   /**
@@ -356,18 +401,16 @@ export class HecosStorage {
   }
 
   /**
-   * Checks if an entity is in the deleted set by id, slug or title
+   * Checks if an entity is in the deleted set by id or slug
    */
   static isEntityDeleted(
     deletedIds: Set<string>,
     id?: string,
-    slug?: string,
-    title?: string
+    slug?: string
   ): boolean {
     if (!deletedIds || deletedIds.size === 0) return false;
     if (id && (deletedIds.has(id) || deletedIds.has(id.toLowerCase().trim()))) return true;
     if (slug && (deletedIds.has(slug) || deletedIds.has(slug.toLowerCase().trim()))) return true;
-    if (title && (deletedIds.has(title) || deletedIds.has(title.toLowerCase().trim()))) return true;
     return false;
   }
 
@@ -379,32 +422,32 @@ export class HecosStorage {
     if (this.entitiesCache) {
       // Ensure cache does not contain deleted items
       return this.entitiesCache.filter(
-        (e) => !this.isEntityDeleted(deletedIds, e.id, e.slug, e.title)
+        (e) => Boolean(e && e.id && !this.isEntityDeleted(deletedIds, e.id, e.slug))
       );
     }
 
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.ENTITIES);
       if (stored) {
-        const parsed: HecosEntity[] = JSON.parse(stored);
-        // Filter out any entity that has been deleted
+        const rawParsed = JSON.parse(stored);
+        const parsed: HecosEntity[] = Array.isArray(rawParsed) ? rawParsed.filter(Boolean) : [];
+        // Filter out any entity that has been deleted or is invalid
         const activeEntities = parsed.filter(
-          (e) => !this.isEntityDeleted(deletedIds, e.id, e.slug, e.title)
+          (e) => Boolean(e && e.id && !this.isEntityDeleted(deletedIds, e.id, e.slug))
         );
         const existingIds = new Set(
           activeEntities.flatMap((e) => [
             e.id,
-            e.id.toLowerCase(),
+            e.id?.toLowerCase(),
             e.slug,
-            e.slug.toLowerCase(),
-            e.title.toLowerCase()
-          ])
+            e.slug?.toLowerCase()
+          ]).filter(Boolean)
         );
         let changed = false;
 
         // Ensure all entities have isSecret defined (default to true: secret mode)
         activeEntities.forEach((e) => {
-          if (e.isSecret === undefined) {
+          if (e && e.isSecret === undefined) {
             e.isSecret = true;
             changed = true;
           }
@@ -413,9 +456,11 @@ export class HecosStorage {
         for (const initEnt of INITIAL_ENTITIES) {
           // Never re-add if deleted or already present
           if (
+            initEnt &&
+            initEnt.id &&
             !existingIds.has(initEnt.id) &&
             !existingIds.has(initEnt.id.toLowerCase()) &&
-            !this.isEntityDeleted(deletedIds, initEnt.id, initEnt.slug, initEnt.title)
+            !this.isEntityDeleted(deletedIds, initEnt.id, initEnt.slug)
           ) {
             activeEntities.push({
               ...initEnt,
@@ -435,7 +480,7 @@ export class HecosStorage {
     }
     // Fallback to initial seed minus deleted (all secret by default)
     this.entitiesCache = INITIAL_ENTITIES.filter(
-      (e) => !this.isEntityDeleted(deletedIds, e.id, e.slug, e.title)
+      (e) => Boolean(e && e.id && !this.isEntityDeleted(deletedIds, e.id, e.slug))
     ).map((e) => ({
       ...e,
       isSecret: e.isSecret !== undefined ? e.isSecret : true
@@ -456,12 +501,12 @@ export class HecosStorage {
         const current = this.getEntities();
         const map = new Map<string, HecosEntity>();
         current.forEach((e) => {
-          if (!this.isEntityDeleted(deletedIds, e.id, e.slug, e.title)) {
+          if (!this.isEntityDeleted(deletedIds, e.id, e.slug)) {
             map.set(e.id, e);
           }
         });
         firebaseList.forEach((e) => {
-          if (e && e.id && !this.isEntityDeleted(deletedIds, e.id, e.slug, e.title)) {
+          if (e && e.id && !this.isEntityDeleted(deletedIds, e.id, e.slug)) {
             map.set(e.id, e);
           }
         });
@@ -495,7 +540,6 @@ export class HecosStorage {
     const deletedIds = this.getDeletedEntityIds();
     const cleanId = entity.id.toLowerCase().trim();
     const cleanSlug = entity.slug?.toLowerCase().trim();
-    const cleanTitle = entity.title?.toLowerCase().trim();
 
     deletedIds.delete(entity.id);
     deletedIds.delete(cleanId);
@@ -503,11 +547,13 @@ export class HecosStorage {
       deletedIds.delete(entity.slug);
       if (cleanSlug) deletedIds.delete(cleanSlug);
     }
-    if (entity.title) {
-      deletedIds.delete(entity.title);
-      if (cleanTitle) deletedIds.delete(cleanTitle);
-    }
     this.saveDeletedEntityIds(deletedIds);
+
+    // Remove from trash if present
+    const trash = this.getTrashedEntities().filter((t) => t.entity.id !== entity.id);
+    if (trash.length !== this.getTrashedEntities().length) {
+      this.saveTrashLocal(trash);
+    }
 
     const list = this.getEntities();
     const index = list.findIndex((e) => e.id === entity.id);
@@ -540,7 +586,7 @@ export class HecosStorage {
     const ent = this.getEntityById(id);
     const deletedIds = this.getDeletedEntityIds();
 
-    // Register all identifier variations to permanently mark as deleted
+    // Register identifier variations
     deletedIds.add(id);
     deletedIds.add(cleanId);
     if (ent?.id) {
@@ -551,34 +597,18 @@ export class HecosStorage {
       deletedIds.add(ent.slug);
       deletedIds.add(ent.slug.toLowerCase().trim());
     }
-    if (ent?.title) {
-      deletedIds.add(ent.title);
-      deletedIds.add(ent.title.toLowerCase().trim());
-    }
-
-    // Also look up in INITIAL_ENTITIES in case of static template matches
-    const initMatch = INITIAL_ENTITIES.find(
-      (ie) =>
-        ie.id === id ||
-        ie.slug === id ||
-        ie.id.toLowerCase() === cleanId ||
-        ie.slug.toLowerCase() === cleanId ||
-        (ent && (ie.id === ent.id || ie.slug === ent.slug))
-    );
-    if (initMatch) {
-      deletedIds.add(initMatch.id);
-      deletedIds.add(initMatch.id.toLowerCase());
-      deletedIds.add(initMatch.slug);
-      deletedIds.add(initMatch.slug.toLowerCase());
-      deletedIds.add(initMatch.title);
-      deletedIds.add(initMatch.title.toLowerCase());
-    }
 
     this.saveDeletedEntityIds(deletedIds);
 
+    // Remove from trash as well
+    const trash = this.getTrashedEntities().filter((t) => t.entity.id !== id);
+    if (trash.length !== this.getTrashedEntities().length) {
+      this.saveTrashLocal(trash);
+    }
+
     // Remove from in-memory cache and localStorage
     const list = this.getEntities().filter(
-      (e) => !this.isEntityDeleted(deletedIds, e.id, e.slug, e.title)
+      (e) => !this.isEntityDeleted(deletedIds, e.id, e.slug)
     );
     this.entitiesCache = list;
     this.saveEntitiesLocal(list);
@@ -591,9 +621,6 @@ export class HecosStorage {
     }
     if (ent?.slug && ent.slug !== id) {
       deleteEntityFromFirebase(ent.slug).catch((err) => console.warn(err));
-    }
-    if (initMatch?.id && initMatch.id !== id) {
-      deleteEntityFromFirebase(initMatch.id).catch((err) => console.warn(err));
     }
   }
 
@@ -625,6 +652,8 @@ export class HecosStorage {
     } catch (e) {
       console.warn("Error saving trash to localStorage:", e);
     }
+    // Sync trash state to Firebase RTDB for other devices
+    syncTrashToFirebase(trash).catch((err) => console.warn(err));
     this.notifyTrashSubscribers();
   }
 
@@ -662,18 +691,18 @@ export class HecosStorage {
       originalCategory: entity.category,
     };
 
-    // 1. Add to Trash list
+    // 1. Add to Trash list (syncs to Firebase)
     const currentTrash = this.getTrashedEntities().filter((t) => t.entity.id !== entity.id);
     currentTrash.unshift(trashedItem);
     this.saveTrashLocal(currentTrash);
 
-    // 2. Remove from active entities list (without adding to permanent blacklist)
+    // 2. Remove from active entities list
     const list = this.getEntities().filter((e) => e.id !== entity.id && e.slug !== entity.slug);
     this.entitiesCache = list;
     this.saveEntitiesLocal(list);
     this.notifyEntitySubscribers();
 
-    // 3. Sync deletion to Firebase so other clients don't see it active
+    // 3. Remove from Firebase active entities
     deleteEntityFromFirebase(entity.id).catch((err) => console.warn(err));
 
     return true;
@@ -697,10 +726,6 @@ export class HecosStorage {
     if (trashed.entity.slug) {
       deletedIds.delete(trashed.entity.slug);
       deletedIds.delete(trashed.entity.slug.toLowerCase().trim());
-    }
-    if (trashed.entity.title) {
-      deletedIds.delete(trashed.entity.title);
-      deletedIds.delete(trashed.entity.title.toLowerCase().trim());
     }
     this.saveDeletedEntityIds(deletedIds);
 
@@ -1405,8 +1430,27 @@ export class HecosStorage {
     const clean = folderId.trim().toLowerCase();
     const all = this.getFolderPermissions();
     if (all[clean]) return all[clean];
+    if (all[folderId]) return all[folderId];
 
-    // Fallback to legacy isFolderSecret
+    // Special default for GM Notes: only GM by default
+    if (clean === 'gm-notes' || clean === 'gm_note' || clean === 'notas do gm' || clean === 'gm') {
+      return {
+        folderId,
+        visibility: 'gm',
+        allowedUserIds: []
+      };
+    }
+
+    // Top-level public menus by default: PC, Diário, Mapa, Tags, Codex
+    if (['pc', 'diario', 'session', 'mapa', 'map', 'tags', 'codex'].includes(clean)) {
+      return {
+        folderId,
+        visibility: 'all',
+        allowedUserIds: []
+      };
+    }
+
+    // Fallback to legacy isFolderSecret for subcategories
     const isSecret = this.isFolderSecret(folderId);
     return {
       folderId,
@@ -1878,8 +1922,381 @@ export class HecosStorage {
       maps: this.getMaps(),
       tracks: this.getTracks(),
       driveResources: this.getDriveResources(),
+      imageAdjustments: this.getImageAdjustments(),
       deletedEntityIds: Array.from(this.getDeletedEntityIds())
     }, null, 2);
+  }
+
+  // ==========================================
+  // IMAGE ADJUSTMENTS MANAGEMENT (GM Position & Zoom)
+  // ==========================================
+
+  static getImageAdjustments(): Record<string, ImageAdjustment> {
+    if (this.imageAdjustmentsCache) return this.imageAdjustmentsCache;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.IMAGE_ADJUSTMENTS);
+      if (stored) {
+        this.imageAdjustmentsCache = JSON.parse(stored);
+        return this.imageAdjustmentsCache || {};
+      }
+    } catch (e) {
+      console.warn("Error reading image adjustments:", e);
+    }
+    this.imageAdjustmentsCache = {};
+    return this.imageAdjustmentsCache;
+  }
+
+  static getImageAdjustment(imageKeyOrUrl: string): ImageAdjustment | null {
+    if (!imageKeyOrUrl) return null;
+    const all = this.getImageAdjustments();
+    const clean = imageKeyOrUrl.trim();
+    if (all[clean]) return all[clean];
+    if (all[imageKeyOrUrl]) return all[imageKeyOrUrl];
+    return null;
+  }
+
+  static saveImageAdjustment(imageKeyOrUrl: string, adjustment: ImageAdjustment): void {
+    if (!imageKeyOrUrl) return;
+    const clean = imageKeyOrUrl.trim();
+    const all = { ...this.getImageAdjustments() };
+    all[clean] = adjustment;
+    this.imageAdjustmentsCache = all;
+    try {
+      localStorage.setItem(STORAGE_KEYS.IMAGE_ADJUSTMENTS, JSON.stringify(all));
+    } catch (e) {
+      console.warn("Error saving image adjustments:", e);
+    }
+    syncImageAdjustmentsToFirebase(all).catch(() => {});
+    this.notifyImageAdjustmentSubscribers();
+  }
+
+  static subscribeImageAdjustments(callback: (adjustments: Record<string, ImageAdjustment>) => void): () => void {
+    this.ensureRealtimeInitialized();
+    this.imageAdjustmentSubscribers.add(callback);
+    callback(this.getImageAdjustments());
+    return () => this.imageAdjustmentSubscribers.delete(callback);
+  }
+
+  private static notifyImageAdjustmentSubscribers(): void {
+    const all = this.getImageAdjustments();
+    this.imageAdjustmentSubscribers.forEach((cb) => {
+      try {
+        cb(all);
+      } catch (e) {
+        console.error(e);
+      }
+    });
+  }
+
+  // ==========================================
+  // TRAIT & TAG GLOBAL MANAGEMENT (GM Edit & Delete)
+  // ==========================================
+
+  private static customTraitsCache: Record<string, { category: string; description: string; color: string }> | null = null;
+  private static traitSubscribers = new Set<() => void>();
+
+  static getCustomTraits(): Record<string, { category: string; description: string; color: string }> {
+    if (this.customTraitsCache) return this.customTraitsCache;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.CUSTOM_TRAITS);
+      if (stored) {
+        this.customTraitsCache = JSON.parse(stored);
+        return this.customTraitsCache || {};
+      }
+    } catch (e) {
+      console.warn("Error reading custom traits:", e);
+    }
+    this.customTraitsCache = {};
+    return this.customTraitsCache;
+  }
+
+  static saveCustomTrait(
+    traitName: string,
+    data: { category: string; description: string; color?: string }
+  ): void {
+    if (!traitName) return;
+    const cleanKey = traitName.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const all = { ...this.getCustomTraits() };
+    all[cleanKey] = {
+      category: data.category || 'Mecânica Hecos',
+      description: data.description || 'Traço customizado do mundo de Hecos.',
+      color: data.color || 'border-[#3a2e4c] bg-[#1a1426] text-[#cca862]',
+    };
+    this.customTraitsCache = all;
+    try {
+      localStorage.setItem(STORAGE_KEYS.CUSTOM_TRAITS, JSON.stringify(all));
+    } catch (e) {
+      console.warn("Error saving custom trait:", e);
+    }
+    this.traitSubscribers.forEach((cb) => cb());
+  }
+
+  static deleteCustomTrait(traitName: string): void {
+    if (!traitName) return;
+    const cleanKey = traitName.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const all = { ...this.getCustomTraits() };
+    delete all[cleanKey];
+    this.customTraitsCache = all;
+    try {
+      localStorage.setItem(STORAGE_KEYS.CUSTOM_TRAITS, JSON.stringify(all));
+    } catch (e) {
+      console.warn("Error deleting custom trait:", e);
+    }
+    this.traitSubscribers.forEach((cb) => cb());
+  }
+
+  static subscribeTraits(callback: () => void): () => void {
+    this.traitSubscribers.add(callback);
+    return () => this.traitSubscribers.delete(callback);
+  }
+
+  /**
+   * Delete a Trait globally from ALL entities and custom definitions
+   */
+  static deleteTraitGlobally(traitName: string): { affectedCount: number } {
+    if (!traitName) return { affectedCount: 0 };
+    const target = traitName.trim().toLowerCase();
+    const entities = this.getEntities();
+    let affectedCount = 0;
+
+    const updatedEntities = entities.map((ent) => {
+      let modified = false;
+
+      // Filter ent.traits
+      if (ent.traits && Array.isArray(ent.traits)) {
+        const filtered = ent.traits.filter((t) => typeof t === 'string' && t.trim().toLowerCase() !== target);
+        if (filtered.length !== ent.traits.length) {
+          ent.traits = filtered;
+          modified = true;
+        }
+      }
+
+      // Filter ent.statblock.traits
+      if (ent.statblock && ent.statblock.traits && Array.isArray(ent.statblock.traits)) {
+        const filtered = ent.statblock.traits.filter((t) => typeof t === 'string' && t.trim().toLowerCase() !== target);
+        if (filtered.length !== ent.statblock.traits.length) {
+          ent.statblock.traits = filtered;
+          modified = true;
+        }
+      }
+
+      // Filter ent.ancestryData.traits
+      if (ent.ancestryData && ent.ancestryData.traits) {
+        if (Array.isArray(ent.ancestryData.traits)) {
+          const filtered = (ent.ancestryData.traits as string[]).filter((t) => typeof t === 'string' && t.trim().toLowerCase() !== target);
+          if (filtered.length !== ent.ancestryData.traits.length) {
+            ent.ancestryData.traits = filtered.join(', ');
+            modified = true;
+          }
+        } else if (typeof ent.ancestryData.traits === 'string') {
+          const parts = ent.ancestryData.traits.split(',').map((s) => s.trim()).filter((s) => s.toLowerCase() !== target);
+          const newStr = parts.join(', ');
+          if (newStr !== ent.ancestryData.traits) {
+            ent.ancestryData.traits = newStr;
+            modified = true;
+          }
+        }
+      }
+
+      // Filter ent.featData.traits
+      if (ent.featData && ent.featData.traits && Array.isArray(ent.featData.traits)) {
+        const filtered = ent.featData.traits.filter((t) => typeof t === 'string' && t.trim().toLowerCase() !== target);
+        if (filtered.length !== ent.featData.traits.length) {
+          ent.featData.traits = filtered;
+          modified = true;
+        }
+      }
+
+      // Filter ent.spellData.traits
+      if (ent.spellData && ent.spellData.traits && Array.isArray(ent.spellData.traits)) {
+        const filtered = ent.spellData.traits.filter((t) => typeof t === 'string' && t.trim().toLowerCase() !== target);
+        if (filtered.length !== ent.spellData.traits.length) {
+          ent.spellData.traits = filtered;
+          modified = true;
+        }
+      }
+
+      // Filter ent.itemData.traits
+      if (ent.itemData && ent.itemData.traits && Array.isArray(ent.itemData.traits)) {
+        const filtered = ent.itemData.traits.filter((t) => typeof t === 'string' && t.trim().toLowerCase() !== target);
+        if (filtered.length !== ent.itemData.traits.length) {
+          ent.itemData.traits = filtered;
+          modified = true;
+        }
+      }
+
+      if (modified) {
+        affectedCount++;
+        return { ...ent, updatedAt: new Date().toISOString() };
+      }
+      return ent;
+    });
+
+    if (affectedCount > 0) {
+      this.entitiesCache = updatedEntities;
+      this.saveEntitiesLocal(updatedEntities);
+      updatedEntities.forEach((ent) => {
+        syncEntityToFirebase(ent).catch(() => {});
+      });
+      this.notifyEntitySubscribers();
+    }
+
+    this.deleteCustomTrait(traitName);
+    return { affectedCount };
+  }
+
+  /**
+   * Rename a Trait globally in ALL entities and custom definitions
+   */
+  static renameTraitGlobally(oldName: string, newName: string): { affectedCount: number } {
+    if (!oldName || !newName || oldName.trim() === newName.trim()) return { affectedCount: 0 };
+    const oldTarget = oldName.trim().toLowerCase();
+    const cleanNew = newName.trim();
+    const entities = this.getEntities();
+    let affectedCount = 0;
+
+    const updatedEntities = entities.map((ent) => {
+      let modified = false;
+
+      if (ent.traits && Array.isArray(ent.traits)) {
+        const updated = ent.traits.map((t) => (t.toLowerCase() === oldTarget ? cleanNew : t));
+        if (JSON.stringify(updated) !== JSON.stringify(ent.traits)) {
+          ent.traits = updated;
+          modified = true;
+        }
+      }
+
+      if (ent.ancestryData && ent.ancestryData.traits) {
+        if (Array.isArray(ent.ancestryData.traits)) {
+          const updated = (ent.ancestryData.traits as string[]).map((t) => (t.toLowerCase() === oldTarget ? cleanNew : t));
+          const newStr = updated.join(', ');
+          if (newStr !== ent.ancestryData.traits) {
+            ent.ancestryData.traits = newStr;
+            modified = true;
+          }
+        } else if (typeof ent.ancestryData.traits === 'string') {
+          const parts = ent.ancestryData.traits.split(',').map((s) => (s.trim().toLowerCase() === oldTarget ? cleanNew : s.trim()));
+          const newStr = parts.join(', ');
+          if (newStr !== ent.ancestryData.traits) {
+            ent.ancestryData.traits = newStr;
+            modified = true;
+          }
+        }
+      }
+
+      if (ent.featData && ent.featData.traits && Array.isArray(ent.featData.traits)) {
+        const updated = ent.featData.traits.map((t) => (t.toLowerCase() === oldTarget ? cleanNew : t));
+        if (JSON.stringify(updated) !== JSON.stringify(ent.featData.traits)) {
+          ent.featData.traits = updated;
+          modified = true;
+        }
+      }
+
+      if (ent.spellData && ent.spellData.traits && Array.isArray(ent.spellData.traits)) {
+        const updated = ent.spellData.traits.map((t) => (t.toLowerCase() === oldTarget ? cleanNew : t));
+        if (JSON.stringify(updated) !== JSON.stringify(ent.spellData.traits)) {
+          ent.spellData.traits = updated;
+          modified = true;
+        }
+      }
+
+      if (ent.itemData && ent.itemData.traits && Array.isArray(ent.itemData.traits)) {
+        const updated = ent.itemData.traits.map((t) => (t.toLowerCase() === oldTarget ? cleanNew : t));
+        if (JSON.stringify(updated) !== JSON.stringify(ent.itemData.traits)) {
+          ent.itemData.traits = updated;
+          modified = true;
+        }
+      }
+
+      if (modified) {
+        affectedCount++;
+        return { ...ent, updatedAt: new Date().toISOString() };
+      }
+      return ent;
+    });
+
+    if (affectedCount > 0) {
+      this.entitiesCache = updatedEntities;
+      this.saveEntitiesLocal(updatedEntities);
+      updatedEntities.forEach((ent) => {
+        syncEntityToFirebase(ent).catch(() => {});
+      });
+      this.notifyEntitySubscribers();
+    }
+
+    // Rename in custom definitions
+    const oldKey = oldName.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const customTraits = this.getCustomTraits();
+    if (customTraits[oldKey]) {
+      const data = customTraits[oldKey];
+      this.deleteCustomTrait(oldName);
+      this.saveCustomTrait(cleanNew, data);
+    }
+
+    return { affectedCount };
+  }
+
+  /**
+   * Rename a Tag globally in ALL entities
+   */
+  static renameTagGlobally(oldName: string, newName: string): { affectedCount: number } {
+    if (!oldName || !newName || oldName.trim() === newName.trim()) return { affectedCount: 0 };
+    const oldTarget = oldName.trim().toLowerCase().replace(/^#/, '');
+    const cleanNew = newName.trim().replace(/^#/, '');
+    const entities = this.getEntities();
+    let affectedCount = 0;
+
+    const updatedEntities = entities.map((ent) => {
+      if (ent.tags && Array.isArray(ent.tags)) {
+        const updated = ent.tags.map((t) => (t.toLowerCase() === oldTarget ? cleanNew : t));
+        if (JSON.stringify(updated) !== JSON.stringify(ent.tags)) {
+          affectedCount++;
+          return { ...ent, tags: updated, updatedAt: new Date().toISOString() };
+        }
+      }
+      return ent;
+    });
+
+    if (affectedCount > 0) {
+      this.entitiesCache = updatedEntities;
+      this.saveEntitiesLocal(updatedEntities);
+      updatedEntities.forEach((ent) => {
+        syncEntityToFirebase(ent).catch(() => {});
+      });
+      this.notifyEntitySubscribers();
+    }
+    return { affectedCount };
+  }
+
+  /**
+   * Delete a Tag globally from ALL entities
+   */
+  static deleteTagGlobally(tagName: string): { affectedCount: number } {
+    if (!tagName) return { affectedCount: 0 };
+    const target = tagName.trim().toLowerCase().replace(/^#/, '');
+    const entities = this.getEntities();
+    let affectedCount = 0;
+
+    const updatedEntities = entities.map((ent) => {
+      if (ent.tags && Array.isArray(ent.tags)) {
+        const filtered = ent.tags.filter((t) => typeof t === 'string' && t.trim().toLowerCase() !== target);
+        if (filtered.length !== ent.tags.length) {
+          affectedCount++;
+          return { ...ent, tags: filtered, updatedAt: new Date().toISOString() };
+        }
+      }
+      return ent;
+    });
+
+    if (affectedCount > 0) {
+      this.entitiesCache = updatedEntities;
+      this.saveEntitiesLocal(updatedEntities);
+      updatedEntities.forEach((ent) => {
+        syncEntityToFirebase(ent).catch(() => {});
+      });
+      this.notifyEntitySubscribers();
+    }
+    return { affectedCount };
   }
 
   /**

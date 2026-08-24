@@ -4,6 +4,7 @@ import { parseFeatFromContent, getFeatTypeLabel } from '../utils/featSerializer'
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { RichContentRenderer } from './RichContentRenderer';
 import { renderContentWithMentions } from './MentionBadge';
+import { TraitBadge } from './TraitBadge';
 import {
   Copy,
   Check,
@@ -101,15 +102,11 @@ export const FeatView: React.FC<FeatViewProps> = ({
       {/* CARD PRINCIPAL DO TALENTO PF2E */}
       <div className="rounded-2xl bg-[#0e0b17] border border-zinc-800 shadow-xl overflow-hidden">
         {/* CABEÇALHO DO STATBLOCK */}
-        <div className="p-6 bg-gradient-to-r from-[#171124] via-[#120d1c] to-[#1a1220] border-b border-zinc-800/80">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <div className="p-6 bg-gradient-to-r from-[#171124] via-[#120d1c] to-[#1a1220] border-b border-zinc-800/80 space-y-4">
+          {/* Top Bar: Rarity Trait, Category & Copy Action */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="px-2.5 py-0.5 text-[11px] font-mono font-bold uppercase rounded-md bg-[#251e33] text-amber-300 border border-amber-600/40">
-                Talento {featData.level}
-              </span>
-              <span className={`px-2.5 py-0.5 text-[11px] font-bold uppercase rounded-md border ${getRarityBadgeStyle(featData.rarity)}`}>
-                {featData.rarity}
-              </span>
+              <TraitBadge trait={featData.rarity || 'Comum'} />
               <span className="px-2.5 py-0.5 text-[11px] font-bold uppercase rounded-md bg-purple-950/60 text-purple-300 border border-purple-800/50">
                 {getFeatTypeLabel(featData.featType)}
               </span>
@@ -125,7 +122,7 @@ export const FeatView: React.FC<FeatViewProps> = ({
               <button
                 type="button"
                 onClick={handleCopyStatblock}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-300 text-xs font-semibold transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-300 text-xs font-semibold transition-colors cursor-pointer"
                 title="Copiar texto do talento para área de transferência"
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-zinc-400" />}
@@ -134,28 +131,36 @@ export const FeatView: React.FC<FeatViewProps> = ({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-2xl sm:text-3xl font-black text-amber-200 tracking-tight flex items-center gap-3">
-              <span>{entity.title}</span>
-              {actionGlyph.show && (
-                <PF2eActionGlyph type={actionGlyph.type} size="lg" />
+          {/* Title Row: Title & Action Glyphs on the Left, Nível X on the Extreme Right */}
+          <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-2xl sm:text-3xl font-black text-amber-200 tracking-tight flex items-center gap-3">
+                <span>{entity.title}</span>
+                {actionGlyph.show && (
+                  <PF2eActionGlyph type={actionGlyph.type} size="lg" />
+                )}
+              </h2>
+              {featData.actionCost === 'passive' && (
+                <span className="text-xs font-mono font-bold uppercase px-2 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">
+                  Passivo
+                </span>
               )}
-            </h2>
-            {featData.actionCost === 'passive' && (
-              <span className="text-xs font-mono font-bold uppercase px-2 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">
-                Passivo
-              </span>
-            )}
-            {featData.actionCost === 'activity' && (
-              <span className="text-xs font-mono font-bold uppercase px-2 py-0.5 rounded bg-purple-950/70 text-purple-300 border border-purple-800/60 flex items-center gap-1">
-                <Clock className="w-3 h-3" />
-                <span>Atividade</span>
-              </span>
-            )}
+              {featData.actionCost === 'activity' && (
+                <span className="text-xs font-mono font-bold uppercase px-2 py-0.5 rounded bg-purple-950/70 text-purple-300 border border-purple-800/60 flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  <span>Atividade</span>
+                </span>
+              )}
+            </div>
+
+            {/* Nível do Talento na Extrema Direita */}
+            <div className="px-3.5 py-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono font-bold text-sm uppercase shadow-sm shrink-0">
+              Nível {featData.level}
+            </div>
           </div>
 
           {entity.subtitle && (
-            <p className="text-sm text-zinc-400 mt-1 font-medium italic">
+            <p className="text-sm text-zinc-400 font-medium italic">
               {entity.subtitle}
             </p>
           )}
@@ -185,14 +190,10 @@ export const FeatView: React.FC<FeatViewProps> = ({
           {featData.traits && featData.traits.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-zinc-800/60">
               {featData.traits.map((trait) => (
-                <button
+                <TraitBadge
                   key={trait}
-                  type="button"
-                  onClick={() => onTagClick(trait)}
-                  className="px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-[#1d1729] hover:bg-[#282038] text-[#74b6c2] border border-[#74b6c2]/30 shadow-sm transition-colors cursor-pointer"
-                >
-                  {trait}
-                </button>
+                  trait={trait}
+                />
               ))}
             </div>
           )}

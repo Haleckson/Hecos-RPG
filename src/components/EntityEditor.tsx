@@ -49,6 +49,8 @@ import { NotionSlashMenu } from './NotionSlashMenu';
 import { ColorPickerMenu } from './ColorPickerMenu';
 import { ImageUploadInput } from './ImageUploadInput';
 import { ImgBBUploadModal } from './ImgBBUploadModal';
+import { IconPicker } from './IconPicker';
+import { TraitBadge } from './TraitBadge';
 import { getFullAncestryTemplate } from '../utils/ancestryTemplate';
 import { AncestryEditor } from './AncestryEditor';
 import { FeatEditor } from './FeatEditor';
@@ -75,7 +77,9 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
   const [summary, setSummary] = useState(entity.summary || '');
   const [content, setContent] = useState(entity.content || '');
   const [coverImage, setCoverImage] = useState(entity.coverImage || '');
-  const [tagsString, setTagsString] = useState(entity.tags.join(', '));
+  const [icon, setIcon] = useState(entity.icon || '');
+  const [tagsString, setTagsString] = useState((entity.tags || []).join(', '));
+  const [traitsString, setTraitsString] = useState((entity.traits || []).join(', '));
   const [isSecret, setIsSecret] = useState(entity.isSecret !== undefined ? entity.isSecret : true);
   const [visibility, setVisibility] = useState<ItemVisibility>(entity.visibility || (entity.isSecret ? 'gm' : 'public'));
   const [allowedUserIds, setAllowedUserIds] = useState<string[]>(entity.allowedUserIds || []);
@@ -573,6 +577,11 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
       .map((t) => t.trim())
       .filter(Boolean);
 
+    const traits = traitsString
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
+
     const updated: HecosEntity = {
       ...entity,
       title: title.trim() || 'Sem Título',
@@ -581,8 +590,12 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
       summary: summary.trim(),
       content,
       coverImage: coverImage.trim(),
+      icon: icon.trim() || undefined,
       tags,
+      traits,
       isSecret,
+      visibility,
+      allowedUserIds,
       updatedAt: new Date().toISOString(),
     };
 
@@ -603,6 +616,7 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
       summary: summary.trim(),
       content,
       coverImage: coverImage.trim(),
+      icon: icon.trim() || undefined,
       tags: tagsString.split(',').map((t) => t.trim()).filter(Boolean),
       isSecret,
       ancestryData: entity.ancestryData,
@@ -779,9 +793,17 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
 
       {/* Metadata Configuration Bar */}
       {/* Metadata Configuration Bar */}
-      <div className="p-3.5 bg-[#0d0b14] border-b border-zinc-800/80 space-y-2.5">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5">
-          <div className="md:col-span-8">
+      <div className="p-3.5 bg-[#0d0b14] border-b border-zinc-800/80 space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center">
+          <div className="md:col-span-1 flex items-center justify-start">
+            <IconPicker
+              value={icon}
+              onChange={setIcon}
+              category={category}
+            />
+          </div>
+
+          <div className="md:col-span-7">
             <input
               type="text"
               value={title}
@@ -832,7 +854,7 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center">
-          <div className="md:col-span-4">
+          <div className="md:col-span-3">
             <input
               type="text"
               value={subtitle}
@@ -841,16 +863,27 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
               className="w-full px-3 py-1.5 text-xs bg-black/60 border border-zinc-700/70 rounded-lg text-zinc-200 focus:outline-none focus:border-purple-400"
             />
           </div>
-          <div className="md:col-span-3">
+          <div className="md:col-span-2">
             <input
               type="text"
               value={tagsString}
               onChange={(e) => setTagsString(e.target.value)}
-              placeholder="Tags: Eclipse, Chefe, Nível 5..."
-              className="w-full px-3 py-1.5 text-xs bg-black/60 border border-zinc-700/70 rounded-lg text-zinc-200 focus:outline-none focus:border-rose-400"
+              placeholder="Tags: #Eclipse, #Chefe..."
+              className="w-full px-3 py-1.5 text-xs bg-black/60 border border-zinc-700/70 rounded-lg text-cyan-200 focus:outline-none focus:border-cyan-400"
+              title="Tags de identificação e categorização"
             />
           </div>
-          <div className="md:col-span-5">
+          <div className="md:col-span-3">
+            <input
+              type="text"
+              value={traitsString}
+              onChange={(e) => setTraitsString(e.target.value)}
+              placeholder="Traços PF2e: Humanoide, Incomum, Fogo..."
+              className="w-full px-3 py-1.5 text-xs bg-black/60 border border-amber-800/60 rounded-lg text-amber-200 focus:outline-none focus:border-amber-400 font-mono"
+              title="Traços de mecânica PF2e (Traits)"
+            />
+          </div>
+          <div className="md:col-span-4">
             <ImageUploadInput
               value={coverImage}
               onChange={setCoverImage}
@@ -859,6 +892,37 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
             />
           </div>
         </div>
+
+        {/* Dynamic Trait Chips with deletion and quick suggestions */}
+        {traitsString.trim() && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            <span className="text-[10px] text-amber-400/80 font-mono uppercase font-bold mr-1">Traços ativos:</span>
+            {traitsString.split(',').map((t, idx) => {
+              const clean = t.trim();
+              if (!clean) return null;
+              return (
+                <span
+                  key={`edit-trait-chip-${clean}-${idx}`}
+                  className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-md text-[11px] font-mono font-bold tracking-wide uppercase bg-amber-950/80 border border-amber-800 text-amber-200 shadow-sm"
+                >
+                  <span>{clean}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const list = traitsString.split(',').map((s) => s.trim()).filter(Boolean);
+                      list.splice(idx, 1);
+                      setTraitsString(list.join(', '));
+                    }}
+                    className="p-0.5 rounded hover:bg-amber-900/80 text-amber-400/70 hover:text-amber-100 transition-colors cursor-pointer"
+                    title={`Remover traço "${clean}"`}
+                  >
+                    <Trash2 className="w-3 h-3 text-amber-400 hover:text-rose-300" />
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Robust Notion-Style Floating & Top Formatting Toolbar */}

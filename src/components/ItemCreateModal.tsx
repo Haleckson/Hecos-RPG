@@ -9,6 +9,7 @@ import { getEmptyItemData, serializeItemToHTML } from '../utils/itemSerializer';
 import { HecosStorage } from '../services/storage';
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
+import { TraitBadge } from './TraitBadge';
 import {
   Package,
   X,
@@ -1167,9 +1168,7 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                 </div>
 
                 <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                  <span className="px-2.5 py-1 rounded text-xs font-bold uppercase bg-zinc-800 text-zinc-200 border border-zinc-700">
-                    {itemData.rarity || 'Comum'}
-                  </span>
+                  <TraitBadge trait={itemData.rarity || 'Comum'} />
                   {(itemData.traits || []).map((tr) => (
                     <span
                       key={tr}

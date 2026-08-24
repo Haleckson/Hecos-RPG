@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { renderContentWithMentions } from './MentionBadge';
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { HecosStorage } from '../services/storage';
+import { AdjustableImage } from './AdjustableImage';
 import {
   Info,
   ShieldAlert,
@@ -561,13 +562,16 @@ export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
       if (imgMatch) {
         const alt = imgMatch[1];
         const src = imgMatch[2];
+        const isActualGm = HecosStorage.isUserGm();
         elements.push(
-          <div key={`img-${i}`} className="my-4 rounded-xl overflow-hidden border border-zinc-800 bg-black/60 shadow-xl group">
-            <img
+          <div key={`img-${i}`} className="my-4 rounded-xl overflow-hidden border border-zinc-800 bg-black/60 shadow-xl">
+            <AdjustableImage
               src={src}
               alt={alt}
-              referrerPolicy="no-referrer"
-              className="w-full max-h-[450px] object-cover object-center group-hover:scale-[1.01] transition-transform duration-300"
+              imageKey={`md-img-${encodeURIComponent(src).slice(0, 80)}`}
+              isGm={isActualGm}
+              containerClassName="relative w-full max-h-[480px] h-80 sm:h-96 overflow-hidden"
+              imgClassName="w-full h-full object-cover object-center"
             />
             {alt && (
               <div className="p-2 bg-[#100d18] border-t border-zinc-800/80 text-center text-xs text-zinc-400 italic">

@@ -27,7 +27,8 @@ import {
   Zap,
   Sword,
   Wand2,
-  FileText
+  FileText,
+  Award
 } from 'lucide-react';
 import { PF2eActionGlyph } from './PF2eActionGlyph';
 
@@ -201,7 +202,16 @@ export const NotionSlashMenu: React.FC<NotionSlashMenuProps> = ({
       execute: () => onInsertSnippet('> 🔒 **SEGREDO DO MESTRE:** O líder do culto é na verdade o irmão do taverneiro. Ele possui a chave da masmorra no colar.\n\n'),
     },
 
-    // PATHFINDER 2E MACROS & GLYPHS
+    // PATHFINDER 2E MACROS, GLYPHS & TRAITS
+    {
+      id: 'insert_trait',
+      title: 'Traço / Trait PF2e (/tr)',
+      subtitle: 'Inserir distintivo de Traço oficial (ex: [tr:Humanoide], [tr:Incomum], [tr:Fogo])',
+      category: 'pf2e',
+      icon: <Award className="w-4 h-4 text-amber-400" />,
+      keywords: ['tr', 'trait', 'traco', 'traço', 'pf2e', 'badge', 'tag', 'raridade', 'escola'],
+      execute: () => onInsertSnippet('[tr:Incomum] '),
+    },
     {
       id: 'glyph_1_action',
       title: 'Glifo: 1 Ação [1-action]',

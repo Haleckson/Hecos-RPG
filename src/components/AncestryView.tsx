@@ -1,11 +1,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { HecosEntity, AncestryAttributes } from '../types';
+import { HecosEntity, AncestryAttributes, AncestryAlbumImage } from '../types';
 import { RichContentRenderer } from './RichContentRenderer';
 import { renderContentWithMentions } from './MentionBadge';
 import { PF2eActionGlyph } from './PF2eActionGlyph';
 import { parseAncestryFromContent, serializeAncestryToHTML } from '../utils/ancestrySerializer';
 import { HecosStorage } from '../services/storage';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
+import { AdjustableImage } from './AdjustableImage';
+import { EntityIcon } from './EntityIcon';
+import { TraitBadge } from './TraitBadge';
+import { ImageUploadInput } from './ImageUploadInput';
 import {
   Swords,
   Dna,
@@ -37,7 +41,17 @@ import {
   AlertTriangle,
   ExternalLink,
   Code,
-  Flame
+  Flame,
+  Tag,
+  Image as ImageIcon,
+  Images,
+  Plus,
+  Trash2,
+  Maximize2,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Camera
 } from 'lucide-react';
 
 interface AncestryViewProps {
@@ -58,6 +72,13 @@ export const AncestryView: React.FC<AncestryViewProps> = ({
   const [copiedStatblock, setCopiedStatblock] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
+  // Album (Lore) state
+  const [isAlbumOpen, setIsAlbumOpen] = useState(false);
+  const [isAddingImage, setIsAddingImage] = useState(false);
+  const [newImageUrl, setNewImageUrl] = useState('');
+  const [newImageCaption, setNewImageCaption] = useState('');
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+
   // Real-time GM mode tracking
   const [isGmMode, setIsGmMode] = useState<boolean>(() => HecosStorage.getGmMode());
 
@@ -150,6 +171,52 @@ export const AncestryView: React.FC<AncestryViewProps> = ({
     setTimeout(() => setGmSaveSuccess(false), 2500);
   };
 
+  const handleAddImageToAlbum = () => {
+    if (!newImageUrl.trim()) return;
+    const newImg: AncestryAlbumImage = {
+      id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      url: newImageUrl.trim(),
+      caption: newImageCaption.trim() || undefined,
+      createdAt: Date.now(),
+    };
+    const currentAlbum = Array.isArray(data.album) ? data.album : [];
+    const updatedAlbum = [...currentAlbum, newImg];
+    const updatedData: AncestryAttributes = {
+      ...data,
+      album: updatedAlbum,
+    };
+    const updatedEntity: HecosEntity = {
+      ...entity,
+      ancestryData: updatedData,
+      content: serializeAncestryToHTML(entity.title, updatedData),
+      updatedAt: new Date().toISOString(),
+    };
+    HecosStorage.saveEntity(updatedEntity);
+    setNewImageUrl('');
+    setNewImageCaption('');
+    setIsAddingImage(false);
+  };
+
+  const handleRemoveImageFromAlbum = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const currentAlbum = Array.isArray(data.album) ? data.album : [];
+    const updatedAlbum = currentAlbum.filter((img) => img.id !== id);
+    const updatedData: AncestryAttributes = {
+      ...data,
+      album: updatedAlbum,
+    };
+    const updatedEntity: HecosEntity = {
+      ...entity,
+      ancestryData: updatedData,
+      content: serializeAncestryToHTML(entity.title, updatedData),
+      updatedAt: new Date().toISOString(),
+    };
+    HecosStorage.saveEntity(updatedEntity);
+    if (selectedImageIndex !== null && selectedImageIndex >= updatedAlbum.length) {
+      setSelectedImageIndex(updatedAlbum.length > 0 ? updatedAlbum.length - 1 : null);
+    }
+  };
+
   const copyStatblockText = () => {
     const text = `=== ${entity.title.toUpperCase()} ===
 HP: ${data.hp || '8 PV'} | TAMANHO: ${data.size || 'Médio'} | VELOCIDADE: ${data.speed || '25 pés'}
@@ -165,60 +232,81 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
   return (
     <div className="space-y-6 text-zinc-100 font-sans w-full max-w-full overflow-hidden">
-      {/* ═══════════════════════════════════════════════════════════════════════════ */}
-      {/* CABEÇALHO DA ANCESTRALIDADE (ESTILIZADO, CONCISO & MODERNO PF2E) */}
-      {/* ═══════════════════════════════════════════════════════════════════════════ */}
-      <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-b from-[#110e1c] to-[#0a0910] border border-[#272338] shadow-xl relative overflow-hidden group">
-        {/* Subtle accent corner glow */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-[#74b6c2]/5 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#b19ecc]/5 rounded-full blur-3xl pointer-events-none" />
+      {/* Optional Ancestry Cover Banner */}
+      {entity.coverImage && (
+        <div className="relative h-48 sm:h-64 lg:h-72 w-full rounded-2xl overflow-hidden border border-[#272338] bg-[#0c0915] shadow-xl">
+          <AdjustableImage
+            src={entity.coverImage}
+            alt={entity.title}
+            imageKey={`ancestry-cover-${entity.id}`}
+            isGm={isActualGm}
+            containerClassName="relative w-full h-full overflow-hidden bg-[#0c0915]"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0e0a17] via-[#0e0a17]/40 to-transparent pointer-events-none" />
+        </div>
+      )}
 
-        <div className="flex flex-wrap items-start justify-between gap-4 pb-4 border-b border-zinc-800/80">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#18262b] text-[#74b6c2] border border-[#74b6c2]/30 font-mono">
-                Ancestralidade PF2e
-              </span>
-              {entity.isSecret && (
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-950/80 text-rose-300 border border-rose-600/40 flex items-center gap-1">
-                  <Lock className="w-3 h-3" /> Secreto GM
-                </span>
-              )}
+      {/* ═══════════════════════════════════════════════════════════════════════════ */}
+      {/* CABEÇALHO PERMANENTE DA ANCESTRALIDADE (FORA DAS ABAS & SEMPRE ACESSÍVEL)   */}
+      {/* ═══════════════════════════════════════════════════════════════════════════ */}
+      <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-b from-[#120e1e] to-[#0a0812] border border-[#272338] shadow-xl relative overflow-hidden group">
+        {/* Glow de fundo */}
+        <div className="absolute top-0 right-0 w-72 h-72 bg-[#74b6c2]/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-72 h-72 bg-[#b19ecc]/5 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 flex-1 flex items-start gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-[#1b1430] border border-cyan-500/40 flex items-center justify-center text-cyan-300 shrink-0 shadow-lg mt-0.5 group-hover:scale-105 transition-all">
+              <EntityIcon icon={entity.icon} category="ancestry" className="w-7 h-7" />
             </div>
 
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-zinc-100 via-cyan-100 to-[#74b6c2] tracking-tight font-serif break-words">
-              {entity.title || '[NOME DA ANCESTRALIDADE]'}
-            </h2>
-            {entity.subtitle && (
-              <p className="text-xs sm:text-sm text-[#b19ecc] font-medium mt-1 break-words">
-                {entity.subtitle}
-              </p>
-            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#18262b] text-[#74b6c2] border border-[#74b6c2]/30 font-mono flex items-center gap-1">
+                  <EntityIcon icon={entity.icon} category="ancestry" className="w-3 h-3 text-cyan-400" />
+                  Ancestralidade PF2e
+                </span>
+                {entity.isSecret && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-950/80 text-rose-300 border border-rose-600/40 flex items-center gap-1">
+                    <Lock className="w-3 h-3" /> Secreto GM
+                  </span>
+                )}
+              </div>
+
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-zinc-100 via-cyan-100 to-[#74b6c2] tracking-tight font-serif break-words">
+                {entity.title || '[NOME DA ANCESTRALIDADE]'}
+              </h1>
+              {entity.subtitle && (
+                <p className="text-sm sm:text-base text-[#b19ecc] font-medium mt-1 break-words">
+                  {entity.subtitle}
+                </p>
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-              {isActualGm && (
-                <VisibilityBadgeMenu
-                  visibility={entity.visibility}
-                  allowedUserIds={entity.allowedUserIds}
-                  isSecret={entity.isSecret}
-                  onChange={(newVis, newAllowed) => {
-                    HecosStorage.setEntityVisibility(entity.id, newVis, newAllowed);
-                  }}
-                />
-              )}
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            {isActualGm && (
+              <VisibilityBadgeMenu
+                visibility={entity.visibility}
+                allowedUserIds={entity.allowedUserIds}
+                isSecret={entity.isSecret}
+                onChange={(newVis, newAllowed) => {
+                  HecosStorage.setEntityVisibility(entity.id, newVis, newAllowed);
+                }}
+              />
+            )}
 
-              {isActualGm && onEdit && (
-                <button
-                  type="button"
-                  onClick={() => onEdit('mechanics')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-500/40 text-cyan-200 text-xs font-semibold transition-all cursor-pointer shadow-sm hover:shadow-[0_0_12px_rgba(6,182,212,0.3)]"
-                  title="Editar Cabeçalho e Atributos da Ancestralidade"
-                >
-                  <Edit3 className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Editar</span>
-                </button>
-              )}
+            {isActualGm && onEdit && (
+              <button
+                type="button"
+                onClick={() => onEdit(activeMainTab === 'gm' ? 'gm' : activeMainTab === 'lore' ? 'lore' : 'mechanics')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-950/70 hover:bg-cyan-900/90 border border-cyan-500/50 text-cyan-200 text-xs font-bold transition-all cursor-pointer shadow-sm hover:shadow-[0_0_15px_rgba(6,182,212,0.35)]"
+                title="Editar Artigo de Ancestralidade"
+              >
+                <Edit3 className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Editar Artigo</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -231,157 +319,246 @@ IDIOMAS: ${data.languages || 'Humani'}`;
             </button>
           </div>
         </div>
-
-        {/* Compact, High-Craft PF2e Stats Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-4">
-          {/* Card 1: HP */}
-          <div className="p-3 rounded-xl bg-[#130f1d]/80 border border-rose-900/30 hover:border-rose-600/40 transition-colors flex flex-col justify-between">
-            <span className="text-[11px] font-bold text-rose-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
-              <Heart className="w-3.5 h-3.5 text-rose-400 fill-rose-400/20" />
-              <span>Pontos de Vida</span>
-            </span>
-            <span className="text-base sm:text-lg font-bold text-zinc-100 mt-1">
-              {data.hp || '8 PV'}
-            </span>
-          </div>
-
-          {/* Card 2: Tamanho */}
-          <div className="p-3 rounded-xl bg-[#0f141a]/80 border border-cyan-900/30 hover:border-cyan-600/40 transition-colors flex flex-col justify-between">
-            <span className="text-[11px] font-bold text-cyan-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
-              <Scale className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Tamanho</span>
-            </span>
-            <span className="text-base sm:text-lg font-bold text-zinc-100 mt-1">
-              {data.size || 'Médio'}
-            </span>
-          </div>
-
-          {/* Card 3: Velocidade */}
-          <div className="p-3 rounded-xl bg-[#14101e]/80 border border-purple-900/30 hover:border-purple-600/40 transition-colors flex flex-col justify-between">
-            <span className="text-[11px] font-bold text-purple-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5 text-purple-400" />
-              <span>Velocidade</span>
-            </span>
-            <span className="text-base sm:text-lg font-bold text-zinc-100 mt-1">
-              {data.speed || '25 pés (≈ 7,5 m)'}
-            </span>
-          </div>
-
-          {/* Card 4: Sentidos */}
-          <div className="p-3 rounded-xl bg-[#0f141a]/80 border border-cyan-900/30 hover:border-cyan-600/40 transition-colors flex flex-col justify-between">
-            <span className="text-[11px] font-bold text-[#88c5d0] uppercase tracking-wider font-mono flex items-center gap-1.5">
-              <Eye className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Sentidos</span>
-            </span>
-            <span className="text-sm sm:text-base font-bold text-[#88c5d0] mt-1 truncate" title={data.senses || 'Visão na Penumbra'}>
-              {data.senses || 'Visão na Penumbra'}
-            </span>
-          </div>
-        </div>
-
-        {/* Row 2: Secondary Attributes in clean bar */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-2.5">
-          {/* Atributos */}
-          <div className="p-3 rounded-xl bg-[#14121a]/90 border border-amber-900/30 flex items-start gap-2.5">
-            <span className="text-amber-400 font-bold text-xs shrink-0 font-mono mt-0.5">🧠 Modificadores:</span>
-            <span className="text-xs sm:text-sm font-semibold text-amber-200 font-mono flex-1">
-              {renderContentWithMentions(data.attributes || '+2 Des, +2 Int, +2 Livre, -2 For', onNavigate)}
-            </span>
-          </div>
-
-          {/* Traços */}
-          <div className="p-3 rounded-xl bg-[#14121a]/90 border border-purple-900/30 flex items-start gap-2.5">
-            <span className="text-purple-300 font-bold text-xs shrink-0 font-mono mt-0.5">🏷️ Traços:</span>
-            <div className="flex flex-wrap gap-1.5 flex-1">
-              {(data.traits || 'Humanoide').split(',').map((t, idx) => (
-                <span
-                  key={idx}
-                  className="text-[11px] px-2 py-0.5 rounded-md bg-[#251e33] text-[#b19ecc] border border-[#b19ecc]/30 font-mono font-semibold"
-                >
-                  {t.trim()}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Row 3: Inato & Idiomas */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-2.5 text-xs text-zinc-300">
-          <div className="p-2.5 rounded-lg bg-[#0e0c16] border border-zinc-800/80 flex items-baseline gap-2">
-            <span className="text-cyan-400 font-bold font-mono shrink-0">🛠️ Inato:</span>
-            <span className="text-zinc-300 flex-1 truncate" title={data.innate || '—'}>
-              {renderContentWithMentions(data.innate || '—', onNavigate)}
-            </span>
-          </div>
-          <div className="p-2.5 rounded-lg bg-[#0e0c16] border border-zinc-800/80 flex items-baseline gap-2">
-            <span className="text-[#b19ecc] font-bold font-mono shrink-0">🗣️ Idiomas:</span>
-            <span className="text-zinc-300 flex-1 truncate" title={data.languages || 'Humani'}>
-              {renderContentWithMentions(data.languages || 'Humani', onNavigate)}
-            </span>
-          </div>
-        </div>
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
-      {/* NAVEGAÇÃO DAS ABAS (MECÂNICAS, LORE, GM) */}
+      {/* NAVEGAÇÃO DAS ABAS (MECÂNICAS, LORE, GM) COM ALTÍSSIMO DESTAQUE & CLAREZA  */}
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
-      <div className="flex items-center border-b border-[#272438] bg-[#0c0b14] rounded-t-2xl p-1.5 gap-1.5 shadow-lg">
-        {/* Tab 1: Mecânicas */}
-        <button
-          type="button"
-          onClick={() => setActiveMainTab('mechanics')}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer ${
-            activeMainTab === 'mechanics'
-              ? 'bg-[#18262b] text-[#74b6c2] border border-[#74b6c2]/50 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
-              : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#141220]'
-          }`}
-        >
-          <Swords className="w-4 h-4 text-[#74b6c2]" />
-          <span>Mecânicas</span>
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#74b6c2]/20 text-[#74b6c2] font-mono">
-            {totalFeatsCount + (data.heritages?.length || 0)}
+      <div className="p-2 sm:p-2.5 rounded-2xl bg-[#0a0814] border-2 border-[#362f4c] shadow-2xl space-y-2">
+        <div className="flex items-center justify-between px-2 pt-1 pb-0.5">
+          <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-[#74b6c2] font-mono flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+            Abas de Navegação do Artigo
           </span>
-        </button>
+          <span className="text-[10px] text-zinc-500 font-mono hidden sm:inline-block">
+            Clique para alternar entre Mecânicas, Lore & Álbum e Segredos GM
+          </span>
+        </div>
 
-        {/* Tab 2: Lore */}
-        <button
-          type="button"
-          onClick={() => setActiveMainTab('lore')}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer ${
-            activeMainTab === 'lore'
-              ? 'bg-[#251e33] text-[#b19ecc] border border-[#b19ecc]/50 shadow-[0_0_15px_rgba(177,158,204,0.15)]'
-              : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#141220]'
-          }`}
-        >
-          <BookOpen className="w-4 h-4 text-[#b19ecc]" />
-          <span>Lore</span>
-        </button>
-
-        {/* Tab 3: GM (Apenas visível para o Mestre!) */}
-        {isGmMode && (
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:flex items-center gap-2">
+          {/* Tab 1: Mecânicas */}
           <button
             type="button"
-            onClick={() => setActiveMainTab('gm')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer ${
-              activeMainTab === 'gm'
-                ? 'bg-rose-950/80 text-rose-200 border border-rose-500/70 shadow-[0_0_20px_rgba(244,63,94,0.3)]'
-                : 'text-rose-400/80 hover:text-rose-200 hover:bg-rose-950/30'
+            onClick={() => setActiveMainTab('mechanics')}
+            className={`flex-1 flex items-center justify-center gap-2.5 py-3 sm:py-3.5 px-4 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all cursor-pointer select-none font-serif ${
+              activeMainTab === 'mechanics'
+                ? 'bg-gradient-to-r from-[#132e36] via-[#10242b] to-[#173842] text-cyan-200 border-2 border-cyan-400 shadow-[0_0_25px_rgba(6,182,212,0.45)] ring-1 ring-cyan-300/40 scale-[1.01]'
+                : 'bg-[#120f1f]/80 hover:bg-[#19152b] text-zinc-400 hover:text-cyan-200 border border-[#2d2740] hover:border-cyan-600/50'
             }`}
           >
-            <Crown className="w-4 h-4 text-rose-400" />
-            <span>GM</span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-mono font-bold">
-              Segredos
+            <div className={`p-1.5 rounded-lg shrink-0 ${activeMainTab === 'mechanics' ? 'bg-cyan-950/90 text-cyan-300 border border-cyan-400/60' : 'bg-black/40 text-zinc-400'}`}>
+              <Swords className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+            </div>
+            <div className="flex flex-col items-start leading-tight">
+              <span className="font-extrabold tracking-wide">Mecânicas</span>
+              <span className={`text-[9px] font-mono font-normal lowercase tracking-normal ${activeMainTab === 'mechanics' ? 'text-cyan-300' : 'text-zinc-500'}`}>
+                regras & talentos
+              </span>
+            </div>
+            <span className={`ml-auto text-[11px] px-2 py-0.5 rounded-full font-mono font-bold border ${
+              activeMainTab === 'mechanics'
+                ? 'bg-cyan-950 text-cyan-300 border-cyan-400/70 shadow-sm'
+                : 'bg-black/50 text-zinc-400 border-zinc-700/50'
+            }`}>
+              {totalFeatsCount + (data.heritages?.length || 0)}
             </span>
           </button>
-        )}
+
+          {/* Tab 2: Lore & Álbum */}
+          <button
+            type="button"
+            onClick={() => setActiveMainTab('lore')}
+            className={`flex-1 flex items-center justify-center gap-2.5 py-3 sm:py-3.5 px-4 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all cursor-pointer select-none font-serif ${
+              activeMainTab === 'lore'
+                ? 'bg-gradient-to-r from-[#2a1b42] via-[#201433] to-[#341f52] text-purple-200 border-2 border-purple-400 shadow-[0_0_25px_rgba(168,85,247,0.45)] ring-1 ring-purple-300/40 scale-[1.01]'
+                : 'bg-[#120f1f]/80 hover:bg-[#19152b] text-zinc-400 hover:text-purple-200 border border-[#2d2740] hover:border-purple-600/50'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg shrink-0 ${activeMainTab === 'lore' ? 'bg-purple-950/90 text-purple-300 border border-purple-400/60' : 'bg-black/40 text-zinc-400'}`}>
+              <BookOpen className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+            </div>
+            <div className="flex flex-col items-start leading-tight">
+              <span className="font-extrabold tracking-wide">Lore & Álbum</span>
+              <span className={`text-[9px] font-mono font-normal lowercase tracking-normal ${activeMainTab === 'lore' ? 'text-purple-300' : 'text-zinc-500'}`}>
+                história & imagens
+              </span>
+            </div>
+            {(data.album || []).length > 0 && (
+              <span className={`ml-auto text-[11px] px-2 py-0.5 rounded-full font-mono font-bold border ${
+                activeMainTab === 'lore'
+                  ? 'bg-purple-950 text-purple-300 border-purple-400/70 shadow-sm'
+                  : 'bg-black/50 text-zinc-400 border-zinc-700/50'
+              }`}>
+                {(data.album || []).length} 📷
+              </span>
+            )}
+          </button>
+
+          {/* Tab 3: GM (Apenas para o Mestre) */}
+          {isGmMode && (
+            <button
+              type="button"
+              onClick={() => setActiveMainTab('gm')}
+              className={`col-span-2 sm:col-span-1 md:flex-1 flex items-center justify-center gap-2.5 py-3 sm:py-3.5 px-4 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all cursor-pointer select-none font-serif ${
+                activeMainTab === 'gm'
+                  ? 'bg-gradient-to-r from-[#3d1323] via-[#2d0d19] to-[#4a162b] text-rose-200 border-2 border-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.5)] ring-1 ring-rose-400/40 scale-[1.01]'
+                  : 'bg-[#1c0d16]/80 hover:bg-[#28121f] text-rose-300 hover:text-rose-100 border border-rose-900/60 hover:border-rose-500/70'
+              }`}
+            >
+              <div className={`p-1.5 rounded-lg shrink-0 ${activeMainTab === 'gm' ? 'bg-rose-950/90 text-rose-300 border border-rose-500/60' : 'bg-black/40 text-rose-400'}`}>
+                <Crown className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+              </div>
+              <div className="flex flex-col items-start leading-tight">
+                <span className="font-extrabold tracking-wide">Área do GM</span>
+                <span className={`text-[9px] font-mono font-normal lowercase tracking-normal ${activeMainTab === 'gm' ? 'text-rose-300' : 'text-rose-400/70'}`}>
+                  segredos & notas
+                </span>
+              </div>
+              <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border ${
+                activeMainTab === 'gm'
+                  ? 'bg-rose-900/90 text-rose-200 border-rose-500/80 shadow-sm'
+                  : 'bg-black/50 text-rose-400 border-rose-800/50'
+              }`}>
+                Privado
+              </span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
-      {/* ABA DE MECÂNICAS */}
+      {/* ABA DE MECÂNICAS                                                            */}
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
       {activeMainTab === 'mechanics' && (
-        <div className="space-y-6 animate-in fade-in duration-150 p-4 sm:p-6 rounded-b-2xl bg-[#09080e] border border-t-0 border-[#272438]">
+        <div className="space-y-6 animate-in fade-in duration-150 p-4 sm:p-6 rounded-2xl bg-[#09080e] border border-[#272438]">
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+          {/* ÍNDICE TÉCNICO DA ANCESTRALIDADE (COMPACTO, DESTACADO E FUNCIONAL)    */}
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+          <section className="p-4 sm:p-5 rounded-2xl bg-gradient-to-b from-[#120f1e] to-[#0c0a15] border border-cyan-500/30 shadow-lg space-y-3.5">
+            <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2.5">
+              <span className="text-xs font-black uppercase tracking-wider text-cyan-300 font-mono flex items-center gap-1.5">
+                <Scale className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Índice de Atributos & Características Básicas</span>
+              </span>
+              {isActualGm && onEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit('mechanics')}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-700/50 text-cyan-300 text-[11px] font-semibold transition-colors cursor-pointer"
+                >
+                  <Edit3 className="w-3 h-3" />
+                  <span>Editar Atributos</span>
+                </button>
+              )}
+            </div>
+
+            {/* DESTAQUE PRINCIPAL: PV, TAMANHO, VELOCIDADES E MODIFICADORES COM MESMO TAMANHO DE FONTE E ESPAÇAMENTO COMPACTO */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+              {/* PV */}
+              <div className="p-3 rounded-xl bg-[#170e1c] border border-rose-600/40 hover:border-rose-500/70 transition-all flex flex-col justify-start gap-0.5 shadow-sm">
+                <span className="text-[11px] font-bold text-rose-300 uppercase tracking-wider font-mono flex items-center gap-1.5 leading-none">
+                  <Heart className="w-3.5 h-3.5 text-rose-400 fill-rose-400/20 shrink-0" />
+                  <span>Pontos de Vida</span>
+                </span>
+                <span className="text-lg sm:text-xl font-black text-rose-100 break-words leading-tight">
+                  {data.hp ? (data.hp.toString().includes('PV') ? data.hp : `${data.hp} PV`) : '8 PV'}
+                </span>
+              </div>
+
+              {/* Tamanho */}
+              <div className="p-3 rounded-xl bg-[#0e1620] border border-cyan-600/40 hover:border-cyan-500/70 transition-all flex flex-col justify-start gap-0.5 shadow-sm">
+                <span className="text-[11px] font-bold text-cyan-300 uppercase tracking-wider font-mono flex items-center gap-1.5 leading-none">
+                  <Scale className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span>Tamanho</span>
+                </span>
+                <span className="text-lg sm:text-xl font-black text-cyan-100 break-words leading-tight">
+                  {data.size || 'Médio'}
+                </span>
+              </div>
+
+              {/* Velocidades */}
+              <div className="p-3 rounded-xl bg-[#161025] border border-purple-600/40 hover:border-purple-500/70 transition-all flex flex-col justify-start gap-0.5 shadow-sm">
+                <span className="text-[11px] font-bold text-purple-300 uppercase tracking-wider font-mono flex items-center gap-1.5 leading-none">
+                  <Zap className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                  <span>Velocidades</span>
+                </span>
+                <span className="text-lg sm:text-xl font-black text-purple-100 break-words leading-tight">
+                  {data.speed || '9m (6 quadrados)'}
+                </span>
+              </div>
+
+              {/* Modificadores (mesmo tamanho de fonte text-lg sm:text-xl dos demais) */}
+              <div className="p-3 rounded-xl bg-[#1c140d] border border-amber-600/40 hover:border-amber-500/70 transition-all flex flex-col justify-start gap-0.5 shadow-sm">
+                <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider font-mono flex items-center gap-1.5 leading-none">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>Modificadores</span>
+                </span>
+                <div className="text-lg sm:text-xl font-black text-amber-100 break-words font-mono leading-tight">
+                  {renderContentWithMentions(data.attributes || '+2 Des, +2 Int, +2 Livre, -2 For', onNavigate)}
+                </div>
+              </div>
+            </div>
+
+            {/* ESPECIFICAÇÕES SECUNDÁRIAS (Sentidos, Inato, Traços, Idiomas - texto acomodado na íntegra sem cortes) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1 text-xs">
+              {/* Sentidos */}
+              <div className="p-3 rounded-xl bg-[#0e0c18] border border-zinc-800 flex items-start gap-2.5 min-w-0">
+                <Eye className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-300 font-mono block">
+                    Sentidos
+                  </span>
+                  <div className="text-zinc-200 text-xs sm:text-sm font-medium break-words leading-relaxed">
+                    {renderContentWithMentions(data.senses || 'Visão Padrão', onNavigate)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Inatos */}
+              <div className="p-3 rounded-xl bg-[#0e0c18] border border-zinc-800 flex items-start gap-2.5 min-w-0">
+                <Sparkles className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-purple-300 font-mono block">
+                    Inatos & Habilidades
+                  </span>
+                  <div className="text-zinc-200 text-xs sm:text-sm font-medium break-words leading-relaxed">
+                    {renderContentWithMentions(data.innate || '—', onNavigate)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Traços */}
+              <div className="p-3 rounded-xl bg-[#0e0c18] border border-zinc-800 flex items-start gap-2.5 min-w-0">
+                <Tag className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-amber-300 font-mono block">
+                    Traços de Ancestralidade
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(Array.isArray(data.traits) ? data.traits : (typeof data.traits === 'string' ? data.traits.split(',') : ['Humanoide'])).map((t, idx) => (
+                      <TraitBadge
+                        key={idx}
+                        trait={typeof t === 'string' ? t.trim() : String(t)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Idiomas */}
+              <div className="p-3 rounded-xl bg-[#0e0c18] border border-zinc-800 flex items-start gap-2.5 min-w-0">
+                <Globe className="w-4 h-4 text-[#74b6c2] shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#74b6c2] font-mono block">
+                    Idiomas
+                  </span>
+                  <div className="text-zinc-200 text-xs sm:text-sm font-medium break-words leading-relaxed">
+                    {renderContentWithMentions(data.languages || 'Humani', onNavigate)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
           {/* HERANÇAS DE LINHAGEM */}
           <section className="p-5 rounded-2xl bg-[#0f0e18] border border-[#272438] space-y-4">
             <div className="flex items-center justify-between border-b border-[#272438] pb-3">
@@ -617,12 +794,10 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                             {feat.traits && feat.traits.length > 0 && (
                               <div className="flex flex-wrap gap-1">
                                 {feat.traits.map((t, ti) => (
-                                  <span
+                                  <TraitBadge
                                     key={ti}
-                                    className="text-[10px] px-1.5 py-0.5 rounded bg-[#18262b] text-[#74b6c2] border border-[#2d3a42] font-mono"
-                                  >
-                                    {t}
-                                  </span>
+                                    trait={typeof t === 'string' ? t.trim() : String(t)}
+                                  />
                                 ))}
                               </div>
                             )}
@@ -652,6 +827,208 @@ IDIOMAS: ${data.languages || 'Humani'}`;
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
       {activeMainTab === 'lore' && (
         <div className="space-y-6 animate-in fade-in duration-150 p-4 sm:p-6 rounded-b-2xl bg-[#09080e] border border-t-0 border-[#272438]">
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+          {/* 1. SUBCATEGORIA COLAPSÁVEL: ÁLBUM & GALERIA VISUAL DA ANCESTRALIDADE   */}
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+          <section className="rounded-2xl bg-[#0f0e18] border-2 border-purple-500/30 overflow-hidden shadow-lg transition-all">
+            {/* Header Colapsável */}
+            <div
+              onClick={() => setIsAlbumOpen(!isAlbumOpen)}
+              className="flex items-center justify-between p-4 sm:p-5 bg-gradient-to-r from-[#171226] via-[#120d20] to-[#1a132c] cursor-pointer hover:bg-[#1f1833] transition-colors select-none"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-purple-950/80 text-purple-300 border border-purple-500/40">
+                  <Images className="w-5 h-5 text-purple-300" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-purple-200 flex items-center gap-2 font-serif">
+                    <span>Álbum & Galeria Visual</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-purple-900/60 text-purple-300 font-mono font-normal border border-purple-700/50">
+                      {(data.album || []).length} {(data.album || []).length === 1 ? 'imagem' : 'imagens'}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-zinc-400 font-sans">
+                    Galeria ilustrada com variações, retratos, vestimentas e cenas desta ancestralidade
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {isActualGm && isAlbumOpen && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsAddingImage(!isAddingImage);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-900/70 hover:bg-purple-800 border border-purple-500/60 text-purple-200 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Adicionar Imagem</span>
+                  </button>
+                )}
+                <div className="p-1 rounded-lg text-purple-400 hover:text-purple-200">
+                  {isAlbumOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                </div>
+              </div>
+            </div>
+
+            {/* Conteúdo do Álbum (quando expandido) */}
+            {isAlbumOpen && (
+              <div className="p-4 sm:p-5 border-t border-[#272438] space-y-4 bg-[#0a0912]">
+                {/* Form para adicionar nova imagem ao Álbum (Apenas GM) */}
+                {isAddingImage && isActualGm && (
+                  <div className="p-4 rounded-xl bg-[#141022] border border-purple-500/50 space-y-3 animate-in fade-in">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-purple-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>Nova Imagem no Álbum</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingImage(false)}
+                        className="text-zinc-400 hover:text-zinc-200 p-1"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-[11px] font-bold text-zinc-300 block mb-1">
+                          URL da Imagem ou Upload Direto
+                        </label>
+                        <ImageUploadInput
+                          value={newImageUrl}
+                          onChange={(url) => setNewImageUrl(url)}
+                          placeholder="https://exemplo.com/imagem-ancestralidade.jpg ou selecione um arquivo..."
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-bold text-zinc-300 block mb-1">
+                          Legenda ou Descrição (opcional)
+                        </label>
+                        <input
+                          type="text"
+                          value={newImageCaption}
+                          onChange={(e) => setNewImageCaption(e.target.value)}
+                          placeholder="Ex: Guerreiro de elite com armadura cerimonial..."
+                          className="w-full px-3 py-2 text-xs rounded-xl bg-[#0a0812] border border-zinc-700 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+
+                      {newImageUrl && (
+                        <div className="h-32 w-full rounded-xl overflow-hidden bg-black/50 border border-zinc-800 flex items-center justify-center">
+                          <img
+                            src={newImageUrl}
+                            alt="Pré-visualização"
+                            className="max-h-full max-w-full object-contain"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-end gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAddingImage(false);
+                            setNewImageUrl('');
+                            setNewImageCaption('');
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleAddImageToAlbum}
+                          disabled={!newImageUrl.trim()}
+                          className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-purple-700 hover:bg-purple-600 disabled:opacity-50 text-purple-100 text-xs font-bold shadow-md cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Salvar no Álbum</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Grid de Imagens do Álbum */}
+                {(data.album || []).length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
+                    {(data.album || []).map((img, idx) => (
+                      <div
+                        key={img.id || idx}
+                        onClick={() => setSelectedImageIndex(idx)}
+                        className="group relative rounded-xl overflow-hidden bg-[#141122] border border-purple-500/20 hover:border-purple-400 transition-all duration-200 aspect-[3/4] flex flex-col cursor-pointer shadow-md hover:shadow-purple-500/10 hover:scale-[1.02]"
+                      >
+                        <div className="w-full flex-1 overflow-hidden relative bg-black/60">
+                          <img
+                            src={img.url}
+                            alt={img.caption || `Imagem ${idx + 1}`}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            referrerPolicy="no-referrer"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-2">
+                            <span className="text-[10px] text-purple-200 font-mono flex items-center gap-1">
+                              <Maximize2 className="w-3 h-3" />
+                              Ampliar
+                            </span>
+                            {isActualGm && (
+                              <button
+                                type="button"
+                                onClick={(e) => handleRemoveImageFromAlbum(img.id, e)}
+                                title="Remover imagem do álbum"
+                                className="p-1 rounded-lg bg-rose-950/90 text-rose-300 hover:bg-rose-900 border border-rose-600/50 hover:text-white transition-colors"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {img.caption && (
+                          <div className="p-2 bg-[#120f1f] border-t border-purple-950/60">
+                            <p className="text-[11px] text-zinc-300 leading-snug font-sans break-words">
+                              {img.caption}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-8 rounded-xl border border-dashed border-purple-900/40 text-center space-y-3 bg-[#0d0a17]/50">
+                    <div className="w-12 h-12 rounded-2xl bg-purple-950/60 border border-purple-800/40 flex items-center justify-center mx-auto text-purple-400">
+                      <ImageIcon className="w-6 h-6" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-zinc-300">
+                        Nenhuma imagem no álbum desta ancestralidade
+                      </p>
+                      <p className="text-xs text-zinc-500 max-w-md mx-auto">
+                        Adicione retratos, conceitos visuais, brasões, esquemas anatômicos e ilustrações da linhagem para enriquecer o artigo.
+                      </p>
+                    </div>
+                    {isActualGm && !isAddingImage && (
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingImage(true)}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-purple-900/80 hover:bg-purple-800 border border-purple-600/60 text-purple-200 text-xs font-bold transition-all shadow cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Adicionar Primeira Imagem</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
           {/* FISIOLOGIA & ANATOMIA */}
           <section className="p-5 rounded-2xl bg-[#0f0e18] border border-[#272438] space-y-4">
             <div className="flex items-center justify-between border-b border-[#272438] pb-3">
@@ -1150,6 +1527,82 @@ IDIOMAS: ${data.languages || 'Humani'}`;
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════════ */}
+      {/* MODAL LIGHTBOX PARA O ÁLBUM DE IMAGENS                                      */}
+      {/* ═══════════════════════════════════════════════════════════════════════════ */}
+      {selectedImageIndex !== null && (data.album || [])[selectedImageIndex] && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in"
+          onClick={() => setSelectedImageIndex(null)}
+        >
+          <div
+            className="relative max-w-5xl w-full max-h-[90vh] flex flex-col items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Fechar */}
+            <button
+              type="button"
+              onClick={() => setSelectedImageIndex(null)}
+              className="absolute top-2 right-2 z-10 p-2.5 rounded-full bg-black/80 text-white hover:bg-rose-600 transition-colors shadow-lg cursor-pointer"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            {/* Navegação Anterior */}
+            {(data.album || []).length > 1 && (
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedImageIndex((prev) =>
+                    prev !== null && prev > 0 ? prev - 1 : (data.album || []).length - 1
+                  )
+                }
+                className="absolute left-2 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-black/80 text-white hover:bg-purple-600 transition-colors shadow-lg cursor-pointer"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+            )}
+
+            {/* Imagem Ampliada */}
+            <div className="relative max-h-[75vh] w-full flex items-center justify-center overflow-hidden rounded-2xl border border-purple-500/30 bg-black/60 shadow-2xl">
+              <img
+                src={(data.album || [])[selectedImageIndex].url}
+                alt={(data.album || [])[selectedImageIndex].caption || 'Imagem do Álbum'}
+                className="max-h-[75vh] max-w-full object-contain"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+
+            {/* Legenda e Contador */}
+            <div className="mt-3 text-center space-y-1 max-w-2xl px-4">
+              {((data.album || [])[selectedImageIndex].caption) && (
+                <p className="text-sm text-purple-200 font-medium">
+                  {(data.album || [])[selectedImageIndex].caption}
+                </p>
+              )}
+              <p className="text-xs text-zinc-400 font-mono">
+                {selectedImageIndex + 1} de {(data.album || []).length}
+              </p>
+            </div>
+
+            {/* Navegação Próxima */}
+            {(data.album || []).length > 1 && (
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedImageIndex((prev) =>
+                    prev !== null && prev < (data.album || []).length - 1 ? prev + 1 : 0
+                  )
+                }
+                className="absolute right-2 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-black/80 text-white hover:bg-purple-600 transition-colors shadow-lg cursor-pointer"
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

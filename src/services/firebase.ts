@@ -8,7 +8,6 @@ import {
   remove,
   update,
   onValue,
-  off,
   Database,
   Unsubscribe
 } from 'firebase/database';
@@ -167,9 +166,9 @@ export function cleanForFirebase(obj: any): any {
 }
 
 /**
- * Helper to race a promise against a timeout
+ * Helper to race a promise against a timeout (Aumentado para 20s para evitar falso timeout em redes lentas)
  */
-function withTimeout<T>(promise: Promise<T>, ms: number = 10000): Promise<T> {
+function withTimeout<T>(promise: Promise<T>, ms: number = 20000): Promise<T> {
   return Promise.race([
     promise,
     new Promise<T>((_, reject) =>
@@ -236,10 +235,82 @@ export function subscribeToEntitiesRealtime(
 }
 
 /**
+ * Real-time listener for 'hecos_trash'
+ */
+export function subscribeToTrashRealtime(
+  onUpdate: (trash: any[]) => void
+): Unsubscribe | null {
+  if (!isFirebaseAvailable || !db) return null;
+
+  try {
+    const trashRef = ref(db, 'hecos_trash');
+    return onValue(
+      trashRef,
+      (snapshot) => {
+        const val = snapshot.val();
+        const list: any[] = [];
+        if (val) {
+          if (Array.isArray(val)) {
+            val.forEach((t) => { if (t && t.entity && t.entity.id) list.push(t); });
+          } else if (typeof val === 'object') {
+            Object.values(val).forEach((t: any) => { if (t && t.entity && t.entity.id) list.push(t); });
+          }
+        }
+        onUpdate(list);
+      },
+      (error) => {
+        console.warn("Real-time trash error:", error);
+      }
+    );
+  } catch (err) {
+    return null;
+  }
+}
+
+/**
+ * Sync entire trash array to Firebase Realtime Database
+ */
+export async function syncTrashToFirebase(trash: any[]): Promise<boolean> {
+  if (!isFirebaseAvailable || !db || !trash) return false;
+  try {
+    const trashRef = ref(db, 'hecos_trash');
+    const payload = cleanForFirebase(trash);
+    await withTimeout(set(trashRef, payload), 15000);
+    return true;
+  } catch (err) {
+    console.error("Error syncing trash to Firebase:", err);
+    return false;
+  }
+}
+
+/**
+ * Loads trash from Firebase Realtime Database
+ */
+export async function loadTrashFromFirebase(): Promise<any[] | null> {
+  if (!isFirebaseAvailable || !db) return null;
+  try {
+    const trashRef = ref(db, 'hecos_trash');
+    const snap = await withTimeout(get(trashRef), 15000);
+    if (!snap.exists()) return [];
+    const val = snap.val();
+    const list: any[] = [];
+    if (Array.isArray(val)) {
+      val.forEach((t) => { if (t && t.entity && t.entity.id) list.push(t); });
+    } else if (typeof val === 'object') {
+      Object.values(val).forEach((t: any) => { if (t && t.entity && t.entity.id) list.push(t); });
+    }
+    return list;
+  } catch (err) {
+    console.error("Error loading trash from Firebase:", err);
+    return null;
+  }
+}
+
+/**
  * Real-time listener for 'hecos_deleted_entities'
  */
 export function subscribeToDeletedEntitiesRealtime(
-  onUpdate: (deletedIds: string[]) => void
+  onUpdate: (deletedMap: Record<string, { id: string; deletedAt: string }>) => void
 ): Unsubscribe | null {
   if (!isFirebaseAvailable || !db) return null;
 
@@ -248,8 +319,9 @@ export function subscribeToDeletedEntitiesRealtime(
     return onValue(deletedRef, (snapshot) => {
       const val = snapshot.val();
       if (val && typeof val === 'object') {
-        const ids = Object.keys(val);
-        onUpdate(ids);
+        onUpdate(val);
+      } else {
+        onUpdate({});
       }
     });
   } catch (err) {
@@ -327,9 +399,10 @@ export async function syncFeatCategoriesToFirebase(config: Record<string, string
   try {
     const categoriesRef = ref(db, 'hecos_feat_categories');
     const payload = cleanForFirebase(config);
-    await withTimeout(set(categoriesRef, payload), 6000);
+    await withTimeout(set(categoriesRef, payload), 15000);
     return true;
   } catch (err) {
+    console.error("Error syncing feat categories to Firebase:", err);
     return false;
   }
 }
@@ -370,9 +443,10 @@ export async function syncPublicFoldersToFirebase(folders: string[]): Promise<bo
   if (!isFirebaseAvailable || !db || !folders) return false;
   try {
     const publicRef = ref(db, 'hecos_public_folders');
-    await withTimeout(set(publicRef, folders), 6000);
+    await withTimeout(set(publicRef, folders), 15000);
     return true;
   } catch (err) {
+    console.error("Error syncing public folders to Firebase:", err);
     return false;
   }
 }
@@ -413,9 +487,10 @@ export async function syncSecretFoldersToFirebase(folders: string[]): Promise<bo
   if (!isFirebaseAvailable || !db || !folders) return false;
   try {
     const secretsRef = ref(db, 'hecos_secret_folders');
-    await withTimeout(set(secretsRef, folders), 6000);
+    await withTimeout(set(secretsRef, folders), 15000);
     return true;
   } catch (err) {
+    console.error("Error syncing secret folders to Firebase:", err);
     return false;
   }
 }
@@ -436,7 +511,7 @@ export async function syncEntityToFirebase(entity: any): Promise<boolean> {
     });
 
     // Save to RTDB
-    await withTimeout(set(entityRef, payload), 8000);
+    await withTimeout(set(entityRef, payload), 20000);
 
     // Unmark from deleted if it was previously marked as deleted
     try {
@@ -452,7 +527,7 @@ export async function syncEntityToFirebase(entity: any): Promise<boolean> {
     });
     return true;
   } catch (err: any) {
-    console.warn("Sync entity to Realtime Database info:", err?.message || err);
+    console.error("Sync entity to Realtime Database error:", err?.message || err);
     updateConnectionState({
       lastError: err?.message || 'Sync failed'
     });
@@ -471,7 +546,7 @@ export async function deleteEntityFromFirebase(entityId: string): Promise<boolea
     const deletedRef = ref(db, `hecos_deleted_entities/${safeKey}`);
 
     // Remove entity from RTDB
-    await withTimeout(remove(entityRef), 8000);
+    await withTimeout(remove(entityRef), 20000);
 
     // Record in deleted entities so other clients stay in sync
     await set(deletedRef, {
@@ -485,7 +560,7 @@ export async function deleteEntityFromFirebase(entityId: string): Promise<boolea
     });
     return true;
   } catch (err: any) {
-    console.warn("Delete entity from RTDB info:", err?.message || err);
+    console.error("Delete entity from RTDB error:", err?.message || err);
     return false;
   }
 }
@@ -497,7 +572,7 @@ export async function loadEntitiesFromFirebase(): Promise<any[] | null> {
   if (!isFirebaseAvailable || !db) return null;
   try {
     const entitiesRef = ref(db, 'hecos_entities');
-    const snapshot = await withTimeout(get(entitiesRef), 8000);
+    const snapshot = await withTimeout(get(entitiesRef), 20000);
     if (!snapshot.exists()) return null;
 
     const val = snapshot.val();
@@ -539,9 +614,10 @@ export async function syncMapToFirebase(mapData: any): Promise<boolean> {
     const safeKey = toSafeKey(mapData.id);
     const mapRef = ref(db, `hecos_maps/${safeKey}`);
     const payload = cleanForFirebase(mapData);
-    await withTimeout(set(mapRef, payload), 6000);
+    await withTimeout(set(mapRef, payload), 15000);
     return true;
-  } catch {
+  } catch (err) {
+    console.error("Error syncing map to Firebase:", err);
     return false;
   }
 }
@@ -553,7 +629,7 @@ export async function loadMapsFromFirebase(): Promise<any[] | null> {
   if (!isFirebaseAvailable || !db) return null;
   try {
     const mapsRef = ref(db, 'hecos_maps');
-    const snap = await withTimeout(get(mapsRef), 6000);
+    const snap = await withTimeout(get(mapsRef), 15000);
     if (!snap.exists()) return null;
     const val = snap.val();
     const list: any[] = [];
@@ -581,9 +657,10 @@ export async function syncUsersToFirebase(users: any[]): Promise<boolean> {
         batch[toSafeKey(u.id)] = cleanForFirebase(u);
       }
     });
-    await withTimeout(set(usersRef, batch), 6000);
+    await withTimeout(set(usersRef, batch), 15000);
     return true;
-  } catch {
+  } catch (err) {
+    console.error("Error syncing users to Firebase:", err);
     return false;
   }
 }
@@ -595,7 +672,7 @@ export async function loadUsersFromFirebase(): Promise<any[] | null> {
   if (!isFirebaseAvailable || !db) return null;
   try {
     const usersRef = ref(db, 'hecos_users');
-    const snap = await withTimeout(get(usersRef), 6000);
+    const snap = await withTimeout(get(usersRef), 15000);
     if (!snap.exists()) return null;
     const val = snap.val();
     const list: any[] = [];
@@ -611,13 +688,13 @@ export async function loadUsersFromFirebase(): Promise<any[] | null> {
 }
 
 /**
- * Subscribe to Users in Realtime
+ * Subscribe to Users in Realtime (Corrigido unsubscribe do SDK v9/v10)
  */
 export function subscribeToUsersRealtime(callback: (users: any[]) => void): Unsubscribe {
   if (!isFirebaseAvailable || !db) return () => {};
   try {
     const usersRef = ref(db, 'hecos_users');
-    const listener = (snap: any) => {
+    return onValue(usersRef, (snap) => {
       if (!snap.exists()) return;
       const val = snap.val();
       const list: any[] = [];
@@ -627,9 +704,9 @@ export function subscribeToUsersRealtime(callback: (users: any[]) => void): Unsu
         Object.values(val).forEach((u: any) => { if (u && u.id) list.push(u); });
       }
       callback(list);
-    };
-    onValue(usersRef, listener);
-    return () => off(usersRef, 'value', listener);
+    }, (error) => {
+      console.warn("Real-time users error:", error);
+    });
   } catch {
     return () => {};
   }
@@ -642,9 +719,10 @@ export async function syncFolderPermissionsToFirebase(permissions: Record<string
   if (!isFirebaseAvailable || !db) return false;
   try {
     const permsRef = ref(db, 'hecos_folder_permissions');
-    await withTimeout(set(permsRef, cleanForFirebase(permissions)), 6000);
+    await withTimeout(set(permsRef, cleanForFirebase(permissions)), 15000);
     return true;
-  } catch {
+  } catch (err) {
+    console.error("Error syncing folder permissions to Firebase:", err);
     return false;
   }
 }
@@ -656,7 +734,7 @@ export async function loadFolderPermissionsFromFirebase(): Promise<Record<string
   if (!isFirebaseAvailable || !db) return null;
   try {
     const permsRef = ref(db, 'hecos_folder_permissions');
-    const snap = await withTimeout(get(permsRef), 6000);
+    const snap = await withTimeout(get(permsRef), 15000);
     if (!snap.exists()) return null;
     return snap.val();
   } catch {
@@ -665,18 +743,86 @@ export async function loadFolderPermissionsFromFirebase(): Promise<Record<string
 }
 
 /**
- * Subscribe to Folder Permissions in Realtime
+ * Subscribe to Folder Permissions in Realtime (Corrigido unsubscribe do SDK v9/v10)
  */
 export function subscribeToFolderPermissionsRealtime(callback: (perms: Record<string, any>) => void): Unsubscribe {
   if (!isFirebaseAvailable || !db) return () => {};
   try {
     const permsRef = ref(db, 'hecos_folder_permissions');
-    const listener = (snap: any) => {
+    return onValue(permsRef, (snap) => {
       if (!snap.exists()) return;
       callback(snap.val() || {});
-    };
-    onValue(permsRef, listener);
-    return () => off(permsRef, 'value', listener);
+    }, (error) => {
+      console.warn("Real-time folder permissions error:", error);
+    });
+  } catch {
+    return () => {};
+  }
+}
+
+/**
+ * Sync Image Adjustments to Firebase Realtime Database
+ */
+export async function syncImageAdjustmentsToFirebase(adjustments: Record<string, any>): Promise<boolean> {
+  if (!isFirebaseAvailable || !db) return false;
+  try {
+    const adjRef = ref(db, 'hecos_image_adjustments');
+    const safeObj: Record<string, any> = {};
+    for (const [key, val] of Object.entries(adjustments)) {
+      safeObj[toSafeKey(key)] = cleanForFirebase({ key, ...val });
+    }
+    await withTimeout(set(adjRef, safeObj), 15000);
+    return true;
+  } catch (err) {
+    console.error("Error syncing image adjustments to Firebase:", err);
+    return false;
+  }
+}
+
+/**
+ * Load Image Adjustments from Firebase
+ */
+export async function loadImageAdjustmentsFromFirebase(): Promise<Record<string, any> | null> {
+  if (!isFirebaseAvailable || !db) return null;
+  try {
+    const adjRef = ref(db, 'hecos_image_adjustments');
+    const snap = await withTimeout(get(adjRef), 15000);
+    if (!snap.exists()) return null;
+    const raw = snap.val();
+    const result: Record<string, any> = {};
+    for (const item of Object.values(raw || {})) {
+      if (item && typeof item === 'object' && (item as any).key) {
+        const { key, ...rest } = item as any;
+        result[key] = rest;
+      }
+    }
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Subscribe to Image Adjustments in Realtime
+ */
+export function subscribeToImageAdjustmentsRealtime(callback: (adjustments: Record<string, any>) => void): Unsubscribe {
+  if (!isFirebaseAvailable || !db) return () => {};
+  try {
+    const adjRef = ref(db, 'hecos_image_adjustments');
+    return onValue(adjRef, (snap) => {
+      if (!snap.exists()) return;
+      const raw = snap.val() || {};
+      const result: Record<string, any> = {};
+      for (const item of Object.values(raw)) {
+        if (item && typeof item === 'object' && (item as any).key) {
+          const { key, ...rest } = item as any;
+          result[key] = rest;
+        }
+      }
+      callback(result);
+    }, (error) => {
+      console.warn("Real-time image adjustments error:", error);
+    });
   } catch {
     return () => {};
   }
@@ -689,7 +835,7 @@ export async function seedDatabaseIfEmpty(initialEntities: any[]): Promise<boole
   if (!isFirebaseAvailable || !db) return false;
   try {
     const entitiesRef = ref(db, 'hecos_entities');
-    const snap = await withTimeout(get(entitiesRef), 6000);
+    const snap = await withTimeout(get(entitiesRef), 15000);
     if (!snap.exists() || !snap.val() || Object.keys(snap.val()).length === 0) {
       console.info("Firebase Realtime Database is empty. Seeding initial world data...");
       const batchObj: Record<string, any> = {};

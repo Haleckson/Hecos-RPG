@@ -18,6 +18,7 @@ import { ReferenceField } from './ReferenceField';
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { ImageUploadInput } from './ImageUploadInput';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
+import { TraitBadge } from './TraitBadge';
 import {
   Award,
   Sparkles,
@@ -89,7 +90,7 @@ export const FeatEditor: React.FC<FeatEditorProps> = ({
   const [subtitle, setSubtitle] = useState(entity.subtitle || '');
   const [coverImage, setCoverImage] = useState(entity.coverImage || '');
   const [tagsString, setTagsString] = useState(
-    entity.tags.length > 0 ? entity.tags.join(', ') : 'talento, pf2e'
+    entity.tags.length > 0 ? entity.tags.join(', ') : 'talento'
   );
   const [isSecret, setIsSecret] = useState(entity.isSecret || false);
   const [visibility, setVisibility] = useState<ItemVisibility>(entity.visibility || (entity.isSecret ? 'gm' : 'public'));
@@ -182,6 +183,31 @@ export const FeatEditor: React.FC<FeatEditorProps> = ({
       ...prev,
       traits: prev.traits.filter((t) => t !== trait),
     }));
+  };
+
+  const handleDegreeKeyDown = (
+    e: React.KeyboardEvent<HTMLTextAreaElement>,
+    field: 'criticalSuccess' | 'success' | 'failure' | 'criticalFailure'
+  ) => {
+    if (e.ctrlKey || e.metaKey) {
+      const key = e.key.toLowerCase();
+      if (key === 'b' || key === 'i' || key === 'u') {
+        e.preventDefault();
+        const el = e.currentTarget;
+        const start = el.selectionStart;
+        const end = el.selectionEnd;
+        const text = el.value;
+        const prefix = key === 'b' ? '**' : key === 'i' ? '*' : '<u>';
+        const suffix = key === 'b' ? '**' : key === 'i' ? '*' : '</u>';
+        const selected = text.substring(start, end) || 'texto';
+        const newVal = text.substring(0, start) + prefix + selected + suffix + text.substring(end);
+        updateField(field, newVal);
+        setTimeout(() => {
+          el.focus();
+          el.setSelectionRange(start + prefix.length, start + prefix.length + selected.length);
+        }, 20);
+      }
+    }
   };
 
   const handleApplyTemplate = () => {
@@ -445,21 +471,23 @@ export const FeatEditor: React.FC<FeatEditorProps> = ({
                     onChange={(e) => updateField('featType', e.target.value as FeatCategoryType)}
                     className="w-full px-3 py-2 rounded-lg bg-zinc-900/90 border border-zinc-700 text-zinc-200 font-semibold outline-none focus:border-amber-400"
                   >
-                    <option value="general">Geral (General Feat)</option>
-                    <option value="skill">Perícia (Skill Feat)</option>
-                    <option value="class">Classe (Class Feat)</option>
-                    <option value="archetype">Arquétipo / Dedicação</option>
-                    <option value="ancestry">Ancestralidade (Ancestry Feat)</option>
-                    <option value="extras">Extras & Homebrew</option>
-                    <option value="hecos">Específico de Hecos</option>
+                    <option value="ancestry">Ancestralidade</option>
+                    <option value="class">Classe</option>
+                    <option value="extras">Extra</option>
+                    <option value="general">Geral</option>
+                    <option value="skill">Perícia</option>
+                    <option value="archetype">Vocação</option>
                   </select>
                 </div>
 
-                {/* Raridade */}
+                {/* Raridade (Traço PF2e) */}
                 <div className="space-y-1.5">
-                  <label className="text-zinc-400 font-bold uppercase font-mono block">
-                    Raridade
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-zinc-400 font-bold uppercase font-mono block">
+                      Raridade (Traço)
+                    </label>
+                    <TraitBadge trait={data.rarity || 'Comum'} />
+                  </div>
                   <select
                     value={data.rarity}
                     onChange={(e) => updateField('rarity', e.target.value as FeatRarity)}
@@ -802,6 +830,7 @@ export const FeatEditor: React.FC<FeatEditorProps> = ({
                       rows={2}
                       value={data.criticalSuccess || ''}
                       onChange={(e) => updateField('criticalSuccess', e.target.value)}
+                      onKeyDown={(e) => handleDegreeKeyDown(e, 'criticalSuccess')}
                       placeholder="Efeito no sucesso crítico..."
                       className="w-full p-2.5 rounded-lg bg-zinc-950 border border-zinc-800 focus:border-emerald-500 text-zinc-200 outline-none"
                     />
@@ -813,6 +842,7 @@ export const FeatEditor: React.FC<FeatEditorProps> = ({
                       rows={2}
                       value={data.success || ''}
                       onChange={(e) => updateField('success', e.target.value)}
+                      onKeyDown={(e) => handleDegreeKeyDown(e, 'success')}
                       placeholder="Efeito no sucesso regular..."
                       className="w-full p-2.5 rounded-lg bg-zinc-950 border border-zinc-800 focus:border-cyan-500 text-zinc-200 outline-none"
                     />
@@ -824,6 +854,7 @@ export const FeatEditor: React.FC<FeatEditorProps> = ({
                       rows={2}
                       value={data.failure || ''}
                       onChange={(e) => updateField('failure', e.target.value)}
+                      onKeyDown={(e) => handleDegreeKeyDown(e, 'failure')}
                       placeholder="Efeito na falha..."
                       className="w-full p-2.5 rounded-lg bg-zinc-950 border border-zinc-800 focus:border-amber-500 text-zinc-200 outline-none"
                     />
@@ -835,6 +866,7 @@ export const FeatEditor: React.FC<FeatEditorProps> = ({
                       rows={2}
                       value={data.criticalFailure || ''}
                       onChange={(e) => updateField('criticalFailure', e.target.value)}
+                      onKeyDown={(e) => handleDegreeKeyDown(e, 'criticalFailure')}
                       placeholder="Efeito na falha crítica..."
                       className="w-full p-2.5 rounded-lg bg-zinc-950 border border-zinc-800 focus:border-rose-500 text-zinc-200 outline-none"
                     />

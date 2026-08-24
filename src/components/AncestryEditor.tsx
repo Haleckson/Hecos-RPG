@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { AncestryAttributes, AncestryFeat, AncestryHeritage, HecosEntity, ItemVisibility } from '../types';
+import { AncestryAttributes, AncestryFeat, AncestryHeritage, AncestryAlbumImage, HecosEntity, ItemVisibility } from '../types';
 import { getEmptyAncestryData, serializeAncestryToHTML, parseAncestryFromContent } from '../utils/ancestrySerializer';
 import { ReferenceField } from './ReferenceField';
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { ImageUploadInput } from './ImageUploadInput';
+import { IconPicker } from './IconPicker';
 import { FeatPickerModal } from './FeatPickerModal';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { HecosStorage } from '../services/storage';
@@ -33,6 +34,10 @@ import {
   Lock,
   Tag as TagIcon,
   Image as ImageIcon,
+  Images,
+  ChevronDown,
+  ChevronUp,
+  Camera,
   Search,
   Link2,
   ExternalLink,
@@ -56,6 +61,7 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
   const [title, setTitle] = useState(entity.title === 'Novo Artigo de Hecos' ? '' : entity.title || '');
   const [subtitle, setSubtitle] = useState(entity.subtitle === 'Conceito ou linhagem...' ? '' : entity.subtitle || '');
   const [coverImage, setCoverImage] = useState(entity.coverImage || '');
+  const [icon, setIcon] = useState(entity.icon || '');
   const [tagsString, setTagsString] = useState(entity.tags.join(', '));
   const [isSecret, setIsSecret] = useState(entity.isSecret || false);
   const [visibility, setVisibility] = useState<ItemVisibility>(entity.visibility || (entity.isSecret ? 'gm' : 'public'));
@@ -69,10 +75,41 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
   const [activeMainTab, setActiveMainTab] = useState<'mechanics' | 'lore' | 'gm'>('mechanics');
   const [activeFeatRank, setActiveFeatRank] = useState<1 | 5 | 9 | 13 | 17>(1);
   const [isFeatPickerOpen, setIsFeatPickerOpen] = useState(false);
+  const [isAlbumEditorOpen, setIsAlbumEditorOpen] = useState(false);
 
   // Field change helpers
   const updateHeader = (field: keyof AncestryAttributes, val: string) => {
     setData((prev) => ({ ...prev, [field]: val }));
+  };
+
+  // Album helper functions
+  const addAlbumImage = () => {
+    const newImg: AncestryAlbumImage = {
+      id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      url: '',
+      caption: '',
+      createdAt: Date.now(),
+    };
+    setData((prev) => ({
+      ...prev,
+      album: [...(prev.album || []), newImg],
+    }));
+  };
+
+  const updateAlbumImage = (index: number, field: keyof AncestryAlbumImage, val: any) => {
+    setData((prev) => {
+      const list = [...(prev.album || [])];
+      list[index] = { ...list[index], [field]: val };
+      return { ...prev, album: list };
+    });
+  };
+
+  const removeAlbumImage = (index: number) => {
+    setData((prev) => {
+      const list = [...(prev.album || [])];
+      list.splice(index, 1);
+      return { ...prev, album: list };
+    });
   };
 
   const updateNestedField = (
@@ -354,8 +391,9 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
       title: finalTitle,
       subtitle: subtitle.trim() || undefined,
       category: 'ancestry',
-      tags: tags.length > 0 ? tags : ['ancestry', 'pf2e'],
+      tags: tags.length > 0 ? tags : ['ancestry'],
       coverImage: coverImage.trim() || undefined,
+      icon: icon.trim() || undefined,
       isSecret: visibility === 'gm',
       visibility,
       allowedUserIds,
@@ -366,7 +404,7 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
     };
 
     onSave(updatedEntity);
-  }, [title, subtitle, tagsString, coverImage, visibility, allowedUserIds, data, entity, onSave]);
+  }, [title, subtitle, tagsString, coverImage, icon, visibility, allowedUserIds, data, entity, onSave]);
 
   // Keyboard shortcut: Ctrl + S / Cmd + S to save
   React.useEffect(() => {
@@ -469,9 +507,18 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
       </div>
 
       <div className="p-4 sm:p-6 md:p-8 space-y-6">
-        {/* Basic Article Meta Details (Title, Subtitle, Cover Image, Tags) */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 bg-[#13111b] p-5 rounded-2xl border border-zinc-800/80">
-          <div className="md:col-span-6 space-y-1.5">
+        {/* Basic Article Meta Details (Title, Subtitle, Cover Image, Tags, Icon) */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 bg-[#13111b] p-5 rounded-2xl border border-zinc-800/80 items-start">
+          <div className="md:col-span-1 flex flex-col items-center justify-center pt-1">
+            <label className="text-[10px] font-bold text-[#74b6c2] mb-1.5">Ícone</label>
+            <IconPicker
+              value={icon}
+              onChange={setIcon}
+              category="ancestry"
+            />
+          </div>
+
+          <div className="md:col-span-5 space-y-1.5">
             <label htmlFor="ancestry-title-input" className="text-xs font-bold text-[#74b6c2] flex items-center gap-1.5">
               <span>Nome da Ancestralidade *</span>
             </label>
@@ -624,7 +671,7 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
               />
             </div>
 
-            <div className="p-3.5 rounded-xl bg-[#0e0d14] border border-zinc-800/80 flex flex-col justify-start">
+            <div className="p-3.5 rounded-xl bg-[#0e0d14] border border-zinc-800/80 flex flex-col justify-start space-y-2">
               <ReferenceField
                 id="ancestry-traits"
                 label="🏷️ TRAÇOS DA ESPÉCIE"
@@ -634,6 +681,34 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
                 multiline={false}
                 onNavigate={onNavigate}
               />
+              {data.traits && data.traits.trim() && (
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  {data.traits.split(',').map((t, idx) => {
+                    const clean = t.trim();
+                    if (!clean) return null;
+                    return (
+                      <span
+                        key={`ancestry-trait-chip-${clean}-${idx}`}
+                        className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-md text-[11px] font-mono font-bold tracking-wide uppercase bg-amber-950/80 border border-amber-800 text-amber-200 shadow-sm"
+                      >
+                        <span>{clean}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const list = data.traits.split(',').map((s) => s.trim()).filter(Boolean);
+                            list.splice(idx, 1);
+                            updateHeader('traits', list.join(', '));
+                          }}
+                          className="p-0.5 rounded hover:bg-amber-900/80 text-amber-400 hover:text-rose-300 transition-colors cursor-pointer"
+                          title={`Remover traço "${clean}"`}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -669,53 +744,103 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
         </div>
 
         {/* ═══════════════════════════════════════════════════════════════════════════ */}
-        {/* NAVEGAÇÃO ENTRE AS TRÊS ABAS: MECÂNICAS, LORE & GM */}
+        {/* NAVEGAÇÃO ENTRE AS TRÊS ABAS: MECÂNICAS, LORE & GM (EXTREMAMENTE DESTACADA) */}
         {/* ═══════════════════════════════════════════════════════════════════════════ */}
-        <div className="flex border-b border-zinc-800 bg-[#14121d] rounded-t-xl overflow-hidden p-1.5 gap-1.5 shadow-md">
-          <button
-            type="button"
-            onClick={() => setActiveMainTab('mechanics')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 font-extrabold text-xs sm:text-sm tracking-wide rounded-lg transition-all cursor-pointer ${
-              activeMainTab === 'mechanics'
-                ? 'bg-[#1b2a32] text-[#74b6c2] border border-[#2e4f5a] shadow-[0_0_12px_rgba(6,182,212,0.2)]'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#191724]'
-            }`}
-          >
-            <Swords className="w-4 h-4 text-[#74b6c2]" />
-            <span>Mecânicas</span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#142229] text-[#74b6c2] font-mono">
-              {totalFeatsCount + (data.heritages?.length || 0)}
+        <div className="p-2 sm:p-2.5 rounded-2xl bg-[#0a0814] border-2 border-[#362f4c] shadow-2xl space-y-2">
+          <div className="flex items-center justify-between px-2 pt-1 pb-0.5">
+            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-[#74b6c2] font-mono flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+              Abas de Edição do Artigo
             </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveMainTab('lore')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 font-extrabold text-xs sm:text-sm tracking-wide rounded-lg transition-all cursor-pointer ${
-              activeMainTab === 'lore'
-                ? 'bg-[#241e33] text-[#b19ecc] border border-[#493b61] shadow-[0_0_12px_rgba(177,158,204,0.2)]'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#191724]'
-            }`}
-          >
-            <BookOpen className="w-4 h-4 text-[#b19ecc]" />
-            <span>Lore</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveMainTab('gm')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 font-extrabold text-xs sm:text-sm tracking-wide rounded-lg transition-all cursor-pointer ${
-              activeMainTab === 'gm'
-                ? 'bg-[#2e1320] text-rose-300 border border-[#701a2d] shadow-[0_0_15px_rgba(244,63,94,0.3)]'
-                : 'text-rose-400/80 hover:text-rose-200 hover:bg-[#1a0f19]'
-            }`}
-          >
-            <Crown className="w-4 h-4 text-rose-400" />
-            <span>GM</span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#3b1220] text-rose-300 font-mono font-bold">
-              Segredos
+            <span className="text-[10px] text-zinc-500 font-mono hidden sm:inline-block">
+              Alterne entre regras mecânicas, lore narrativo e notas confidenciais
             </span>
-          </button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveMainTab('mechanics')}
+              className={`flex-1 flex items-center justify-center gap-2.5 py-3 sm:py-3.5 px-4 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all cursor-pointer font-serif ${
+                activeMainTab === 'mechanics'
+                  ? 'bg-gradient-to-r from-[#132e36] via-[#10242b] to-[#173842] text-cyan-200 border-2 border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.4)] ring-1 ring-cyan-300/40'
+                  : 'bg-[#120f1f]/80 hover:bg-[#19152b] text-zinc-400 hover:text-cyan-200 border border-[#2d2740] hover:border-cyan-600/50'
+              }`}
+            >
+              <div className={`p-1.5 rounded-lg shrink-0 ${activeMainTab === 'mechanics' ? 'bg-cyan-950/90 text-cyan-300 border border-cyan-400/60' : 'bg-black/40 text-zinc-400'}`}>
+                <Swords className="w-4 h-4" />
+              </div>
+              <div className="flex flex-col items-start leading-tight">
+                <span className="font-extrabold tracking-wide">Mecânicas</span>
+                <span className={`text-[9px] font-mono font-normal lowercase ${activeMainTab === 'mechanics' ? 'text-cyan-300' : 'text-zinc-500'}`}>
+                  regras & talentos
+                </span>
+              </div>
+              <span className={`ml-auto text-[11px] px-2 py-0.5 rounded-full font-mono font-bold border ${
+                activeMainTab === 'mechanics'
+                  ? 'bg-cyan-950 text-cyan-300 border-cyan-400/70'
+                  : 'bg-black/50 text-zinc-400 border-zinc-700/50'
+              }`}>
+                {totalFeatsCount + (data.heritages?.length || 0)}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveMainTab('lore')}
+              className={`flex-1 flex items-center justify-center gap-2.5 py-3 sm:py-3.5 px-4 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all cursor-pointer font-serif ${
+                activeMainTab === 'lore'
+                  ? 'bg-gradient-to-r from-[#2a1b42] via-[#201433] to-[#341f52] text-purple-200 border-2 border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.4)] ring-1 ring-purple-300/40'
+                  : 'bg-[#120f1f]/80 hover:bg-[#19152b] text-zinc-400 hover:text-purple-200 border border-[#2d2740] hover:border-purple-600/50'
+              }`}
+            >
+              <div className={`p-1.5 rounded-lg shrink-0 ${activeMainTab === 'lore' ? 'bg-purple-950/90 text-purple-300 border border-purple-400/60' : 'bg-black/40 text-zinc-400'}`}>
+                <BookOpen className="w-4 h-4" />
+              </div>
+              <div className="flex flex-col items-start leading-tight">
+                <span className="font-extrabold tracking-wide">Lore & Álbum</span>
+                <span className={`text-[9px] font-mono font-normal lowercase ${activeMainTab === 'lore' ? 'text-purple-300' : 'text-zinc-500'}`}>
+                  história & galeria
+                </span>
+              </div>
+              {(data.album || []).length > 0 && (
+                <span className={`ml-auto text-[11px] px-2 py-0.5 rounded-full font-mono font-bold border ${
+                  activeMainTab === 'lore'
+                    ? 'bg-purple-950 text-purple-300 border-purple-400/70'
+                    : 'bg-black/50 text-zinc-400 border-zinc-700/50'
+                }`}>
+                  {(data.album || []).length} 📷
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveMainTab('gm')}
+              className={`col-span-2 sm:col-span-1 md:flex-1 flex items-center justify-center gap-2.5 py-3 sm:py-3.5 px-4 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all cursor-pointer font-serif ${
+                activeMainTab === 'gm'
+                  ? 'bg-gradient-to-r from-[#3d1323] via-[#2d0d19] to-[#4a162b] text-rose-200 border-2 border-rose-500 shadow-[0_0_25px_rgba(244,63,94,0.4)] ring-1 ring-rose-400/40'
+                  : 'bg-[#1c0d16]/80 hover:bg-[#28121f] text-rose-300 hover:text-rose-100 border border-rose-900/60 hover:border-rose-500/70'
+              }`}
+            >
+              <div className={`p-1.5 rounded-lg shrink-0 ${activeMainTab === 'gm' ? 'bg-rose-950/90 text-rose-300 border border-rose-500/60' : 'bg-black/40 text-rose-400'}`}>
+                <Crown className="w-4 h-4" />
+              </div>
+              <div className="flex flex-col items-start leading-tight">
+                <span className="font-extrabold tracking-wide">Área do GM</span>
+                <span className={`text-[9px] font-mono font-normal lowercase ${activeMainTab === 'gm' ? 'text-rose-300' : 'text-rose-400/70'}`}>
+                  segredos & notas
+                </span>
+              </div>
+              <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border ${
+                activeMainTab === 'gm'
+                  ? 'bg-rose-900/90 text-rose-200 border-rose-500/80'
+                  : 'bg-black/50 text-rose-400 border-rose-800/50'
+              }`}>
+                Privado
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* ═══════════════════════════════════════════════════════════════════════════ */}
@@ -1066,6 +1191,129 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
         {/* ═══════════════════════════════════════════════════════════════════════════ */}
         {activeMainTab === 'lore' && (
           <div className="space-y-6">
+            {/* 1. SUBCATEGORIA COLAPSÁVEL: ÁLBUM & GALERIA VISUAL DA ANCESTRALIDADE */}
+            <div className="rounded-2xl bg-[#13111b] border-2 border-purple-500/40 overflow-hidden shadow-lg space-y-0">
+              <div
+                onClick={() => setIsAlbumEditorOpen(!isAlbumEditorOpen)}
+                className="flex items-center justify-between p-4 sm:p-5 bg-gradient-to-r from-[#1d1630] via-[#161026] to-[#241a3c] cursor-pointer hover:bg-[#281c44] transition-colors select-none"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-purple-950/90 text-purple-300 border border-purple-500/50">
+                    <Images className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-purple-200 flex items-center gap-2 font-serif">
+                      <span>Álbum & Galeria Visual</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-purple-900/80 text-purple-300 font-mono font-normal border border-purple-700/60">
+                        {(data.album || []).length} {(data.album || []).length === 1 ? 'imagem' : 'imagens'}
+                      </span>
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      Adicione múltiplas artes, variantes étnicas, esquemas e retratos visuais da espécie.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {isAlbumEditorOpen && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addAlbumImage();
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-800 hover:bg-purple-700 text-purple-100 text-xs font-bold transition-all shadow cursor-pointer border border-purple-500/60"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Adicionar Imagem</span>
+                    </button>
+                  )}
+                  <div className="p-1 rounded-lg text-purple-400 hover:text-purple-200">
+                    {isAlbumEditorOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                  </div>
+                </div>
+              </div>
+
+              {isAlbumEditorOpen && (
+                <div className="p-4 sm:p-5 border-t border-purple-900/40 space-y-4 bg-[#0c0a15]">
+                  {(data.album || []).length > 0 ? (
+                    <div className="space-y-3">
+                      {(data.album || []).map((img, idx) => (
+                        <div
+                          key={img.id || idx}
+                          className="p-3.5 rounded-xl bg-[#141122] border border-purple-900/50 hover:border-purple-600/50 transition-colors grid grid-cols-1 md:grid-cols-12 gap-3 items-start"
+                        >
+                          <div className="md:col-span-3">
+                            {img.url ? (
+                              <div className="h-28 w-full rounded-lg overflow-hidden bg-black/60 border border-zinc-800 flex items-center justify-center">
+                                <img
+                                  src={img.url}
+                                  alt="Preview"
+                                  className="max-h-full max-w-full object-contain"
+                                  referrerPolicy="no-referrer"
+                                />
+                              </div>
+                            ) : (
+                              <div className="h-28 w-full rounded-lg bg-black/40 border border-dashed border-zinc-800 flex flex-col items-center justify-center text-zinc-600">
+                                <ImageIcon className="w-6 h-6 mb-1" />
+                                <span className="text-[10px]">Sem imagem</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="md:col-span-8 space-y-2">
+                            <ImageUploadInput
+                              value={img.url}
+                              onChange={(url) => updateAlbumImage(idx, 'url', url)}
+                              label={`Imagem #${idx + 1} (URL ou Upload)`}
+                              placeholder="https://... ou faça upload"
+                            />
+                            <div>
+                              <label className="text-[11px] font-bold text-zinc-400 block mb-1">
+                                Legenda / Descrição Visual
+                              </label>
+                              <input
+                                type="text"
+                                value={img.caption || ''}
+                                onChange={(e) => updateAlbumImage(idx, 'caption', e.target.value)}
+                                placeholder="Ex: Guerreira com veste cerimonial do sol..."
+                                className="w-full px-3 py-1.5 text-xs rounded-lg bg-[#0a0812] border border-zinc-700 text-zinc-200 focus:outline-none focus:border-purple-500"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="md:col-span-1 flex md:flex-col items-center justify-end md:justify-center pt-2 md:pt-0">
+                            <button
+                              type="button"
+                              onClick={() => removeAlbumImage(idx)}
+                              title="Remover imagem do álbum"
+                              className="p-2 rounded-lg bg-rose-950/80 text-rose-300 hover:bg-rose-900 border border-rose-800/50 hover:text-white transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-6 rounded-xl border border-dashed border-purple-900/40 text-center space-y-2 bg-[#090810]">
+                      <p className="text-xs text-zinc-400">
+                        Nenhuma imagem no álbum desta ancestralidade ainda.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={addAlbumImage}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-900/70 hover:bg-purple-800 border border-purple-600/50 text-purple-200 text-xs font-bold transition-all shadow cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Adicionar Imagem ao Álbum</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* FISIOLOGIA E ANATOMIA */}
             <div className="p-5 sm:p-6 rounded-2xl bg-[#13111b] border border-[#493b61]/60 space-y-4">
               <div className="flex items-center gap-2.5 pb-3 border-b border-zinc-800/80">
