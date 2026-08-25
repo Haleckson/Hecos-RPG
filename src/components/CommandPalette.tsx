@@ -216,7 +216,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
-                        {item.tags.slice(0, 2).map((t) => (
+                        {(item.tags || []).slice(0, 2).map((t) => (
                           <span
                             key={t}
                             className="hidden sm:inline-block text-[10px] px-1.5 py-0.5 rounded bg-black/60 border border-zinc-800 text-zinc-400"

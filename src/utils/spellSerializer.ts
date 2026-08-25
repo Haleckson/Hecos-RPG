@@ -6,17 +6,18 @@ import { PF2eSpellAttributes, SpellCategoryType } from '../types';
 export function getEmptySpellData(): PF2eSpellAttributes {
   return {
     rank: 1,
-    traditions: ['arcano'],
+    traditions: [],
     spellType: 'spell',
     subcategories: [],
-    castTime: '2 ações',
-    range: '9 metros',
+    castTime: '',
+    range: '',
     area: '',
-    targets: '1 criatura',
-    duration: 'instantânea',
+    targets: '',
+    trigger: '',
+    duration: '',
     savingThrow: '',
     rarity: 'Comum',
-    traits: ['Evocação', 'Concentração', 'Manipulação'],
+    traits: [],
     description: '',
     heightened: '',
     criticalSuccess: '',
@@ -41,6 +42,7 @@ export function getDefaultSpellData(spellName = 'Lampejo de Obsidiana'): PF2eSpe
     range: '18 metros',
     area: 'explosão de 3 metros',
     targets: 'criaturas na área',
+    trigger: '',
     duration: 'instantânea',
     savingThrow: 'Reflexos',
     rarity: 'Comum',
@@ -92,6 +94,7 @@ export function serializeSpellToHTML(title: string, data: PF2eSpellAttributes): 
         ${data.range ? `<div><strong>Alcance:</strong> ${data.range}</div>` : ''}
         ${data.area ? `<div><strong>Área:</strong> ${data.area}</div>` : ''}
         ${data.targets ? `<div><strong>Alvos:</strong> ${data.targets}</div>` : ''}
+        ${data.trigger ? `<div><strong>Gatilho:</strong> ${data.trigger}</div>` : ''}
         ${data.savingThrow ? `<div><strong>Salvamento:</strong> ${data.savingThrow}</div>` : ''}
         ${data.duration ? `<div><strong>Duração:</strong> ${data.duration}</div>` : ''}
     </section>

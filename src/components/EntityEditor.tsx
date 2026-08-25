@@ -114,9 +114,9 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
     .filter(
       (e) =>
         e.id !== entity.id &&
-        (e.title.toLowerCase().includes(mentionQuery.toLowerCase()) ||
-          e.slug.toLowerCase().includes(mentionQuery.toLowerCase()) ||
-          e.tags.some((t) => t.toLowerCase().includes(mentionQuery.toLowerCase())))
+        ((e.title || '').toLowerCase().includes(mentionQuery.toLowerCase()) ||
+          (e.slug || '').toLowerCase().includes(mentionQuery.toLowerCase()) ||
+          (e.tags || []).some((t) => (t || '').toLowerCase().includes(mentionQuery.toLowerCase())))
     )
     .slice(0, 8);
 

@@ -354,7 +354,7 @@ export const PerilView: React.FC<PerilViewProps> = ({
                         {atk.type === 'melee' ? 'Corpo a Corpo [1 ação]' : 'À Distância [1 ação]'} {atk.name}
                       </span>
                       <span className="font-mono text-cyan-300 font-bold">+{atk.bonus}</span>
-                      {atk.traits.length > 0 && (
+                      {atk.traits && atk.traits.length > 0 && (
                         <span className="text-zinc-400 text-[11px]">({atk.traits.join(', ')})</span>
                       )}
                     </div>
@@ -391,7 +391,7 @@ export const PerilView: React.FC<PerilViewProps> = ({
                     <div className="font-bold text-zinc-100 flex items-center gap-1.5">
                       <span className="text-amber-400 font-mono font-bold">[{act.cost}]</span>
                       {act.name}
-                      {act.traits.length > 0 && (
+                      {act.traits && act.traits.length > 0 && (
                         <span className="text-zinc-400 text-[11px] font-normal">({act.traits.join(', ')})</span>
                       )}
                     </div>

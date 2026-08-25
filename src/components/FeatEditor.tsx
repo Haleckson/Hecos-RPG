@@ -19,6 +19,7 @@ import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { ImageUploadInput } from './ImageUploadInput';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { TraitBadge } from './TraitBadge';
+import { TraitInputCombobox } from './TraitInputCombobox';
 import {
   Award,
   Sparkles,
@@ -90,7 +91,7 @@ export const FeatEditor: React.FC<FeatEditorProps> = ({
   const [subtitle, setSubtitle] = useState(entity.subtitle || '');
   const [coverImage, setCoverImage] = useState(entity.coverImage || '');
   const [tagsString, setTagsString] = useState(
-    entity.tags.length > 0 ? entity.tags.join(', ') : 'talento'
+    (entity.tags || []).length > 0 ? (entity.tags || []).join(', ') : 'talento'
   );
   const [isSecret, setIsSecret] = useState(entity.isSecret || false);
   const [visibility, setVisibility] = useState<ItemVisibility>(entity.visibility || (entity.isSecret ? 'gm' : 'public'));
@@ -675,78 +676,20 @@ export const FeatEditor: React.FC<FeatEditorProps> = ({
 
               {/* Traços PF2e */}
               <div className="space-y-2 pt-2 border-t border-zinc-800">
-                <label className="text-xs text-zinc-400 font-bold uppercase font-mono block">
-                  Traços PF2e (Traits)
+                <label className="text-xs text-zinc-400 font-bold uppercase font-mono flex items-center justify-between">
+                  <span>Traços PF2e (Traits)</span>
+                  <span className="text-[10px] text-zinc-500 font-normal lowercase">
+                    {(data.traits || []).length} traço(s)
+                  </span>
                 </label>
 
-                {/* Selected traits chips */}
-                <div className="flex flex-wrap gap-1.5 min-h-[32px] p-2 rounded-lg bg-zinc-950 border border-zinc-800">
-                  {data.traits && data.traits.length > 0 ? (
-                    data.traits.map((trait) => (
-                      <span
-                        key={trait}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold uppercase bg-[#1c2230] text-[#74b6c2] border border-[#74b6c2]/40"
-                      >
-                        <span>{trait}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeTrait(trait)}
-                          className="hover:text-rose-400 transition-colors"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-[11px] text-zinc-500 italic">Nenhum traço selecionado.</span>
-                  )}
-                </div>
-
-                {/* Common traits quick selection */}
-                <div className="flex flex-wrap gap-1 pt-1">
-                  {COMMON_PF2E_TRAITS.map((trait) => {
-                    const isSelected = data.traits?.includes(trait);
-                    return (
-                      <button
-                        key={trait}
-                        type="button"
-                        onClick={() => toggleTrait(trait)}
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase transition-colors ${
-                          isSelected
-                            ? 'bg-[#74b6c2] text-black'
-                            : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
-                        }`}
-                      >
-                        {isSelected ? '✓ ' : '+ '}
-                        {trait}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Custom trait adder */}
-                <div className="flex items-center gap-2 pt-1 max-w-sm">
-                  <input
-                    type="text"
-                    value={customTraitInput}
-                    onChange={(e) => setCustomTraitInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addCustomTrait();
-                      }
-                    }}
-                    placeholder="Adicionar traço personalizado..."
-                    className="flex-1 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-700 text-xs text-zinc-200 outline-none focus:border-cyan-400"
-                  />
-                  <button
-                    type="button"
-                    onClick={addCustomTrait}
-                    className="px-3 py-1.5 rounded-lg bg-cyan-950 hover:bg-cyan-900 border border-cyan-700 text-cyan-200 text-xs font-semibold"
-                  >
-                    Adicionar
-                  </button>
-                </div>
+                <TraitInputCombobox
+                  selectedTraits={data.traits || []}
+                  onChange={(newTraits) => setData((prev) => ({ ...prev, traits: newTraits }))}
+                  placeholder="Buscar ou criar traço (ex: Ataque, Floreio, Mental, Fogo)..."
+                  defaultCategory="Geral"
+                  quickSuggestions={COMMON_PF2E_TRAITS}
+                />
               </div>
             </section>
 

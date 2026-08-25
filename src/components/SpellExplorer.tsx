@@ -6,12 +6,14 @@ import {
 } from '../types';
 import { parseSpellFromContent } from '../utils/spellSerializer';
 import { HecosStorage } from '../services/storage';
-import { PF2eActionGlyph } from './PF2eActionGlyph';
+import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { Tooltip } from './Tooltip';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { SpellCreateModal } from './SpellCreateModal';
 import { TraitBadge } from './TraitBadge';
+import { RichContentRenderer } from './RichContentRenderer';
+import { FolderManagerModal } from './FolderManagerModal';
 import {
   Sparkles,
   Search,
@@ -42,7 +44,8 @@ import {
   Moon,
   Zap,
   Tag,
-  ArrowRight
+  ArrowRight,
+  Award,
 } from 'lucide-react';
 
 interface SpellExplorerProps {
@@ -76,44 +79,54 @@ export const MAIN_SPELL_CATEGORIES: {
     badgeBorder: 'border-cyan-600/40',
   },
   {
-    id: 'arcane',
-    name: 'Arcano',
-    englishName: 'Arcane',
-    description: 'Magias teóricas, racionais e manipuladoras da estrutura da realidade.',
-    icon: BookOpen,
-    color: '#74b6c2',
+    id: 'e_fisica',
+    name: 'E. Física',
+    englishName: 'Physical Energy',
+    description: 'Manipulação de energia térmica, cinética, gravidade, calor, eletricidade e forças físicas materiais.',
+    icon: Zap,
+    color: '#00f0ff',
     badgeBg: 'bg-cyan-950/40',
     badgeBorder: 'border-cyan-600/40',
   },
   {
-    id: 'divine',
-    name: 'Divino',
-    englishName: 'Divine',
-    description: 'Poderes de fé, cura, luz sagrada e julgamento dos deuses de Hecos.',
-    icon: Sun,
-    color: '#cca862',
-    badgeBg: 'bg-amber-950/40',
-    badgeBorder: 'border-amber-600/40',
-  },
-  {
-    id: 'occult',
-    name: 'Oculto',
-    englishName: 'Occult',
-    description: 'Mistérios da mente, aberrações do vazio, sombras e ilusões.',
+    id: 'e_meta',
+    name: 'E. Meta',
+    englishName: 'Metaphysical Energy',
+    description: 'Manipulação de tempo, espaço, alma, ilusões, dimensões e forças transcendentais.',
     icon: Moon,
-    color: '#b19ecc',
+    color: '#b877db',
     badgeBg: 'bg-purple-950/40',
     badgeBorder: 'border-purple-600/40',
   },
   {
-    id: 'primal',
-    name: 'Primal',
-    englishName: 'Primal',
-    description: 'Forças vivas dos elementos da natureza, metamorfose e feras.',
+    id: 'm_organica',
+    name: 'M. Orgânica',
+    englishName: 'Organic Matter',
+    description: 'Manipulação e transmutação de carne, sangue, biomassa, flora, cura e organismos vivos.',
     icon: Flame,
-    color: '#7eb897',
+    color: '#34d399',
     badgeBg: 'bg-emerald-950/40',
     badgeBorder: 'border-emerald-600/40',
+  },
+  {
+    id: 'm_inorganica',
+    name: 'M. Inorgânica',
+    englishName: 'Inorganic Matter',
+    description: 'Manipulação de metais, cristais, pedra, terra, minerais telúricos e matéria inanimada.',
+    icon: Shield,
+    color: '#fbbf24',
+    badgeBg: 'bg-amber-950/40',
+    badgeBorder: 'border-amber-600/40',
+  },
+  {
+    id: 'omni',
+    name: 'Omni',
+    englishName: 'Omni Tradition',
+    description: 'Tradição mágica suprema que unifica todas as vertentes da energia e matéria de Hecos.',
+    icon: Sparkles,
+    color: '#f43f5e',
+    badgeBg: 'bg-rose-950/40',
+    badgeBorder: 'border-rose-600/40',
   },
   {
     id: 'focus',
@@ -147,6 +160,60 @@ export const MAIN_SPELL_CATEGORIES: {
   },
 ];
 
+// Helper to normalize and match tradition strings flexibly
+function matchesTradition(traditionsList: string[], target: string): boolean {
+  if (!traditionsList || traditionsList.length === 0) return false;
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '');
+
+  const targetNorm = norm(target);
+
+  return traditionsList.some((t) => {
+    const tNorm = norm(t);
+    if (tNorm === targetNorm) return true;
+    if (
+      (targetNorm === 'efisica' || targetNorm === 'arcano' || targetNorm === 'arcane') &&
+      (tNorm.includes('fisica') || tNorm.includes('arcano') || tNorm.includes('arcane'))
+    )
+      return true;
+    if (
+      (targetNorm === 'emeta' || targetNorm === 'oculto' || targetNorm === 'occult') &&
+      (tNorm.includes('meta') || tNorm.includes('oculto') || tNorm.includes('occult'))
+    )
+      return true;
+    if (
+      (targetNorm === 'morganica' || targetNorm === 'primal') &&
+      (tNorm.includes('organica') || tNorm.includes('primal'))
+    )
+      return true;
+    if (
+      (targetNorm === 'minorganica' || targetNorm === 'divino' || targetNorm === 'divine') &&
+      (tNorm.includes('inorganica') || tNorm.includes('divino') || tNorm.includes('divine'))
+    )
+      return true;
+    if (targetNorm === 'omni' && tNorm.includes('omni')) return true;
+    return false;
+  });
+}
+
+// Helper to get action glyph for cards
+function getActionGlyphProp(castTime?: string): { type: ActionGlyphType; show: boolean } {
+  const ct = (castTime || '').toLowerCase();
+  if (ct.includes('1 a 3') || ct.includes('1 ou 2 ou 3')) return { type: '1-to-3-actions', show: true };
+  if (ct.includes('1 ou 2') || ct.includes('1 a 2')) return { type: '1-to-2-actions', show: true };
+  if (ct.includes('2 a 3') || ct.includes('2 ou 3')) return { type: '2-to-3-actions', show: true };
+  if (ct.startsWith('1') || ct.includes('1 ação') || ct.includes('1 acao') || ct === '1') return { type: '1-action', show: true };
+  if (ct.startsWith('2') || ct.includes('2 ações') || ct.includes('2 acoes') || ct === '2') return { type: '2-actions', show: true };
+  if (ct.startsWith('3') || ct.includes('3 ações') || ct.includes('3 acoes') || ct === '3') return { type: '3-actions', show: true };
+  if (ct.includes('reação') || ct.includes('reacao') || ct.includes('reaction')) return { type: 'reaction', show: true };
+  if (ct.includes('livre') || ct.includes('free')) return { type: 'free-action', show: true };
+  return { type: '1-action', show: false };
+}
+
 export function SpellExplorer({
   entities,
   onSelectEntity,
@@ -172,19 +239,16 @@ export function SpellExplorer({
 
   // 3. Filters
   const [filterRank, setFilterRank] = useState<string>('all'); // 'all', 'cantrip', '1'..'10'
-  const [filterTradition, setFilterTradition] = useState<string>('all'); // 'all', 'arcane', 'divine', etc.
-  const [filterRarity, setFilterRarity] = useState<string>('all'); // 'all', 'Comum', 'Incomum', 'Raro', 'Único'
-  const [filterCastTime, setFilterCastTime] = useState<string>('all'); // 'all', '1', '2', '3', 'reaction', 'free'
+  const [filterTradition, setFilterTradition] = useState<string>('all');
+  const [filterRarity, setFilterRarity] = useState<string>('all');
+  const [filterCastTime, setFilterCastTime] = useState<string>('all');
   const [filterTrait, setFilterTrait] = useState<string>('all');
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
 
   // 4. Modals & folder management
   const [isFolderManagerOpen, setIsFolderManagerOpen] = useState(false);
-  const [newFolderName, setNewFolderName] = useState('');
-  const [editingFolderOriginalName, setEditingFolderOriginalName] = useState<string | null>(null);
-  const [editingFolderNewName, setEditingFolderNewName] = useState('');
-  const [showInlineNewFolder, setShowInlineNewFolder] = useState(false);
-  const [inlineNewFolderName, setInlineNewFolderName] = useState('');
+  const [isFolderDropdownOpen, setIsFolderDropdownOpen] = useState(false);
+  const [folderDropdownSearch, setFolderDropdownSearch] = useState('');
 
   // 5. Creation & Delete Modals
   const [isSpellCreateModalOpen, setIsSpellCreateModalOpen] = useState(false);
@@ -203,7 +267,11 @@ export function SpellExplorer({
   const spellEntities = useMemo(() => {
     return entities
       .filter((e) => {
-        const isSpell = e.category === 'spell' || e.tags?.includes('spell') || e.tags?.includes('magia') || e.tags?.includes('feitiço');
+        const isSpell =
+          e.category === 'spell' ||
+          e.tags?.includes('spell') ||
+          e.tags?.includes('magia') ||
+          e.tags?.includes('feitiço');
         if (!isSpell) return false;
         return HecosStorage.canUserAccessItem(e, currentUser);
       })
@@ -232,6 +300,7 @@ export function SpellExplorer({
     const set = new Set<string>();
     spellEntities.forEach((sp) => {
       sp.spellData?.traits?.forEach((t) => set.add(t));
+      sp.spellData?.traditions?.forEach((t) => set.add(t));
       sp.tags?.forEach((t) => {
         if (!['spell', 'magia', 'feitiço'].includes(t.toLowerCase())) {
           set.add(t);
@@ -246,7 +315,7 @@ export function SpellExplorer({
     if (activeCategory === 'all') {
       const allSubs = new Set<string>();
       (Object.values(categoriesConfig) as string[][]).forEach((list) => {
-        list.forEach((s) => allSubs.add(s));
+        (list || []).forEach((s) => allSubs.add(s));
       });
       return Array.from(allSubs);
     }
@@ -257,26 +326,33 @@ export function SpellExplorer({
   const filteredSpells = useMemo(() => {
     return spellEntities.filter((sp) => {
       const data = sp.spellData!;
-      const traditions = data.traditions?.map((t) => t.toLowerCase()) || [];
+      const traditions = data.traditions || [];
 
       // 1. Category tab match
       if (activeCategory !== 'all') {
-        if (activeCategory === 'arcane' && !traditions.includes('arcano') && !traditions.includes('arcane')) return false;
-        if (activeCategory === 'divine' && !traditions.includes('divino') && !traditions.includes('divine')) return false;
-        if (activeCategory === 'occult' && !traditions.includes('oculto') && !traditions.includes('occult')) return false;
-        if (activeCategory === 'primal' && !traditions.includes('primal')) return false;
+        if (activeCategory === 'e_fisica' && !matchesTradition(traditions, 'E. Física')) return false;
+        if (activeCategory === 'e_meta' && !matchesTradition(traditions, 'E. Meta')) return false;
+        if (activeCategory === 'm_organica' && !matchesTradition(traditions, 'M. Orgânica')) return false;
+        if (activeCategory === 'm_inorganica' && !matchesTradition(traditions, 'M. Inorgânica')) return false;
+        if (activeCategory === 'omni' && !matchesTradition(traditions, 'Omni')) return false;
         if (activeCategory === 'focus' && data.spellType !== 'focus' && !data.traits?.includes('Foco')) return false;
         if (activeCategory === 'ritual' && data.spellType !== 'ritual' && !data.traits?.includes('Ritual')) return false;
+        if (activeCategory === 'extras' && data.spellType !== 'extras' && sp.category !== 'spell') return false;
       }
 
       // 2. Subcategory / Folder filter
       if (activeSubcategory) {
-        const hasSub =
-          data.subcategories?.includes(activeSubcategory) ||
-          sp.subcategories?.includes(activeSubcategory) ||
-          sp.subcategory === activeSubcategory ||
-          sp.tags?.includes(activeSubcategory);
-        if (!hasSub) return false;
+        if (activeSubcategory === '__none__') {
+          const subs = data.subcategories || sp.subcategories || (sp.subcategory ? [sp.subcategory] : []);
+          if (subs.length > 0) return false;
+        } else {
+          const hasSub =
+            data.subcategories?.includes(activeSubcategory) ||
+            sp.subcategories?.includes(activeSubcategory) ||
+            sp.subcategory === activeSubcategory ||
+            sp.tags?.includes(activeSubcategory);
+          if (!hasSub) return false;
+        }
       }
 
       // 3. Search query
@@ -298,7 +374,7 @@ export function SpellExplorer({
 
       // 5. Tradition Filter
       if (filterTradition !== 'all') {
-        if (!traditions.includes(filterTradition.toLowerCase())) return false;
+        if (!matchesTradition(traditions, filterTradition)) return false;
       }
 
       // 6. Rarity Filter
@@ -318,7 +394,10 @@ export function SpellExplorer({
 
       // 8. Trait Filter
       if (filterTrait !== 'all') {
-        const hasTrait = data.traits?.includes(filterTrait) || sp.tags?.includes(filterTrait);
+        const hasTrait =
+          data.traits?.includes(filterTrait) ||
+          data.traditions?.includes(filterTrait) ||
+          sp.tags?.includes(filterTrait);
         if (!hasTrait) return false;
       }
 
@@ -338,12 +417,16 @@ export function SpellExplorer({
 
   // Folder Counts
   const subcategoryCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
+    const counts: Record<string, number> = { __none__: 0 };
     spellEntities.forEach((sp) => {
-      const subs = sp.spellData?.subcategories || sp.subcategories || [];
-      subs.forEach((s) => {
-        counts[s] = (counts[s] || 0) + 1;
-      });
+      const subs = sp.spellData?.subcategories || sp.subcategories || (sp.subcategory ? [sp.subcategory] : []);
+      if (subs.length === 0) {
+        counts.__none__ = (counts.__none__ || 0) + 1;
+      } else {
+        subs.forEach((s) => {
+          counts[s] = (counts[s] || 0) + 1;
+        });
+      }
     });
     return counts;
   }, [spellEntities]);
@@ -355,11 +438,12 @@ export function SpellExplorer({
       if (cat.id === 'all') return;
       counts[cat.id] = spellEntities.filter((sp) => {
         const data = sp.spellData!;
-        const traditions = data.traditions?.map((t) => t.toLowerCase()) || [];
-        if (cat.id === 'arcane') return traditions.includes('arcano') || traditions.includes('arcane');
-        if (cat.id === 'divine') return traditions.includes('divino') || traditions.includes('divine');
-        if (cat.id === 'occult') return traditions.includes('oculto') || traditions.includes('occult');
-        if (cat.id === 'primal') return traditions.includes('primal');
+        const traditions = data.traditions || [];
+        if (cat.id === 'e_fisica') return matchesTradition(traditions, 'E. Física');
+        if (cat.id === 'e_meta') return matchesTradition(traditions, 'E. Meta');
+        if (cat.id === 'm_organica') return matchesTradition(traditions, 'M. Orgânica');
+        if (cat.id === 'm_inorganica') return matchesTradition(traditions, 'M. Inorgânica');
+        if (cat.id === 'omni') return matchesTradition(traditions, 'Omni');
         if (cat.id === 'focus') return data.spellType === 'focus' || data.traits?.includes('Foco');
         if (cat.id === 'ritual') return data.spellType === 'ritual' || data.traits?.includes('Ritual');
         if (cat.id === 'extras') return data.spellType === 'extras' || sp.category === 'spell';
@@ -371,6 +455,7 @@ export function SpellExplorer({
 
   // Active filters count
   const activeFiltersCount = [
+    activeSubcategory !== null,
     filterRank !== 'all',
     filterTradition !== 'all',
     filterRarity !== 'all',
@@ -380,52 +465,13 @@ export function SpellExplorer({
   ].filter(Boolean).length;
 
   const handleClearFilters = () => {
+    setActiveSubcategory(null);
     setFilterRank('all');
     setFilterTradition('all');
     setFilterRarity('all');
     setFilterCastTime('all');
     setFilterTrait('all');
     setSearchQuery('');
-  };
-
-  // Add folder
-  const handleAddFolder = () => {
-    if (!newFolderName.trim()) return;
-    const cat = activeCategory === 'all' ? 'arcane' : activeCategory;
-    HecosStorage.addSpellSubcategory(cat, newFolderName.trim());
-    setNewFolderName('');
-    refreshConfig();
-  };
-
-  // Add inline folder
-  const handleAddInlineSubcategory = () => {
-    if (!inlineNewFolderName.trim()) return;
-    const cat = activeCategory === 'all' ? 'arcane' : activeCategory;
-    HecosStorage.addSpellSubcategory(cat, inlineNewFolderName.trim());
-    setActiveSubcategory(inlineNewFolderName.trim());
-    setInlineNewFolderName('');
-    setShowInlineNewFolder(false);
-    refreshConfig();
-  };
-
-  // Rename folder
-  const handleRenameFolder = () => {
-    if (!editingFolderOriginalName || !editingFolderNewName.trim()) return;
-    const cat = activeCategory === 'all' ? 'arcane' : activeCategory;
-    HecosStorage.renameSpellSubcategory(cat, editingFolderOriginalName, editingFolderNewName.trim());
-    setEditingFolderOriginalName(null);
-    setEditingFolderNewName('');
-    refreshConfig();
-  };
-
-  // Delete folder
-  const handleDeleteFolder = (folderName: string) => {
-    if (confirm(`Tem certeza que deseja excluir a pasta "${folderName}"? As magias não serão excluídas.`)) {
-      const cat = activeCategory === 'all' ? 'arcane' : activeCategory;
-      HecosStorage.deleteSpellSubcategory(cat, folderName);
-      if (activeSubcategory === folderName) setActiveSubcategory(null);
-      refreshConfig();
-    }
   };
 
   // Save folder assignments on a specific spell
@@ -441,7 +487,7 @@ export function SpellExplorer({
       {/* 1. Header Banner & Actions */}
       <div className="bg-[#09080e] p-6 rounded-2xl border border-zinc-800/80 shadow-2xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-900/10 rounded-full blur-3xl pointer-events-none" />
-        
+
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
           <div>
             <div className="flex items-center gap-3">
@@ -456,7 +502,7 @@ export function SpellExplorer({
                   </span>
                 </h1>
                 <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
-                  Catálogo categorizado por tradições arcanas, divinas, ocultas, primais e pastas personalizadas.
+                  Catálogo estruturado pelas tradições de Hecos (E. Física, E. Meta, M. Orgânica, M. Inorgânica, Omni), Foco e Rituais.
                 </p>
               </div>
             </div>
@@ -468,8 +514,10 @@ export function SpellExplorer({
             <div className="flex items-center bg-zinc-900/80 border border-zinc-800 p-1 rounded-xl">
               <button
                 onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded-lg transition-colors ${
-                  viewMode === 'grid' ? 'bg-cyan-950 text-cyan-300 border border-cyan-700/50' : 'text-zinc-400 hover:text-zinc-200'
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                  viewMode === 'grid'
+                    ? 'bg-cyan-950 text-cyan-300 border border-cyan-700/50'
+                    : 'text-zinc-400 hover:text-zinc-200'
                 }`}
                 title="Visualização em Grade (Cards)"
               >
@@ -477,8 +525,10 @@ export function SpellExplorer({
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded-lg transition-colors ${
-                  viewMode === 'list' ? 'bg-cyan-950 text-cyan-300 border border-cyan-700/50' : 'text-zinc-400 hover:text-zinc-200'
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                  viewMode === 'list'
+                    ? 'bg-cyan-950 text-cyan-300 border border-cyan-700/50'
+                    : 'text-zinc-400 hover:text-zinc-200'
                 }`}
                 title="Visualização em Lista / Tabela"
               >
@@ -486,8 +536,10 @@ export function SpellExplorer({
               </button>
               <button
                 onClick={() => setViewMode('folders')}
-                className={`p-1.5 rounded-lg transition-colors ${
-                  viewMode === 'folders' ? 'bg-cyan-950 text-cyan-300 border border-cyan-700/50' : 'text-zinc-400 hover:text-zinc-200'
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                  viewMode === 'folders'
+                    ? 'bg-cyan-950 text-cyan-300 border border-cyan-700/50'
+                    : 'text-zinc-400 hover:text-zinc-200'
                 }`}
                 title="Visualização em Árvore de Pastas"
               >
@@ -568,165 +620,259 @@ export function SpellExplorer({
         </div>
       </div>
 
-      {/* 3. SUBCATEGORY HORIZONTAL STRIP (Single Line Scrollable Chips) */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between gap-2 px-1 text-xs">
-          <div className="flex items-center gap-1.5 text-zinc-400 font-medium">
-            <Folder className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">
-              Subpastas {activeCategory !== 'all' ? `de ${MAIN_SPELL_CATEGORIES.find((c) => c.id === activeCategory)?.name}` : ''}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {activeSubcategory && (
-              <button
-                type="button"
-                onClick={() => setActiveSubcategory(null)}
-                className="text-[11px] text-zinc-400 hover:text-zinc-200 hover:underline flex items-center gap-1"
-              >
-                <X className="w-3 h-3" />
-                <span>Todas as Pastas</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setShowInlineNewFolder(!showInlineNewFolder)}
-              className="text-[11px] text-cyan-400 hover:text-cyan-300 hover:underline flex items-center gap-1"
-            >
-              <FolderPlus className="w-3 h-3" />
-              <span>+ Nova Pasta</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Inline Subcategory Creator */}
-        {showInlineNewFolder && (
-          <div className="p-2.5 rounded-xl bg-zinc-950/90 border border-cyan-500/30 flex items-center gap-2">
+      {/* 3. Search & Multi-Filter Toolbar */}
+      <div className="bg-[#0d0b14] p-4 rounded-2xl border border-zinc-800/80 shadow-md space-y-3">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+          {/* Left: Search Input & Folder Dropdown */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1">
+            {/* Search Input */}
             <div className="relative flex-1">
+              <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                value={inlineNewFolderName}
-                onChange={(e) => setInlineNewFolderName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddInlineSubcategory();
-                  }
-                }}
-                placeholder="Nome da nova pasta (ex: Evocação, Necromancia, Truques, Círculo de Fogo)..."
-                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 placeholder-zinc-500 outline-none focus:border-cyan-400"
-                autoFocus
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar por nome, traço (Fogo, Mental), círculo, efeito..."
+                className="w-full bg-black/40 border border-zinc-800 focus:border-cyan-500 rounded-xl pl-10 pr-9 py-2 text-xs text-zinc-200 placeholder-zinc-500 outline-none transition-all"
               />
-              <FolderPlus className="w-3.5 h-3.5 text-cyan-400 absolute left-2.5 top-2" />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
-            <button
-              type="button"
-              onClick={handleAddInlineSubcategory}
-              disabled={!inlineNewFolderName.trim()}
-              className="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
-            >
-              <Check className="w-3.5 h-3.5" />
-              <span>Salvar</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setInlineNewFolderName('');
-                setShowInlineNewFolder(false);
-              }}
-              className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
 
-        {/* Horizontal Chips: Single clean row with horizontal scrolling */}
-        <div className="overflow-x-auto no-scrollbar py-0.5">
-          <div className="flex items-center gap-1.5 min-w-max">
-            <button
-              type="button"
-              onClick={() => setActiveSubcategory(null)}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                activeSubcategory === null
-                  ? 'bg-zinc-200 text-zinc-950 font-bold shadow-sm'
-                  : 'bg-zinc-900/80 hover:bg-zinc-850 text-zinc-400 hover:text-zinc-200 border border-zinc-800/80'
+            {/* Folder / Subcategory Dropdown Filter */}
+            <div className="relative min-w-[200px] sm:w-56">
+              <button
+                type="button"
+                onClick={() => setIsFolderDropdownOpen(!isFolderDropdownOpen)}
+                className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                  activeSubcategory !== null
+                    ? 'bg-purple-950/70 border-purple-500/80 text-purple-200 shadow-sm'
+                    : 'bg-zinc-900/90 border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100'
+                }`}
+              >
+                <div className="flex items-center gap-2 truncate">
+                  <Folder className={`w-3.5 h-3.5 shrink-0 ${activeSubcategory ? 'text-purple-400' : 'text-zinc-400'}`} />
+                  <span className="truncate">
+                    {activeSubcategory === null
+                      ? 'Todas as Pastas'
+                      : activeSubcategory === '__none__'
+                      ? 'Sem Pasta Definida'
+                      : activeSubcategory}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-zinc-400 border border-zinc-800">
+                    {activeSubcategory === null
+                      ? filteredSpells.length
+                      : activeSubcategory === '__none__'
+                      ? subcategoryCounts.__none__ || 0
+                      : subcategoryCounts[activeSubcategory] || 0}
+                  </span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${isFolderDropdownOpen ? 'rotate-180' : ''}`} />
+                </div>
+              </button>
+
+              {/* Folder Selector Dropdown Menu */}
+              {isFolderDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-30"
+                    onClick={() => setIsFolderDropdownOpen(false)}
+                  />
+                  <div className="absolute left-0 right-0 sm:right-auto sm:w-72 mt-1.5 z-40 bg-[#0d0a17] border border-zinc-700/80 rounded-2xl shadow-2xl overflow-hidden animate-fade-in flex flex-col max-h-80">
+                    {/* Search inside folder dropdown */}
+                    <div className="p-2 border-b border-zinc-800/80 bg-zinc-950/60 flex items-center gap-1.5">
+                      <Search className="w-3.5 h-3.5 text-zinc-500 ml-1 shrink-0" />
+                      <input
+                        type="text"
+                        value={folderDropdownSearch}
+                        onChange={(e) => setFolderDropdownSearch(e.target.value)}
+                        placeholder="Filtrar pastas..."
+                        className="flex-1 bg-transparent text-xs text-zinc-200 placeholder-zinc-500 outline-none"
+                        autoFocus
+                      />
+                      {folderDropdownSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setFolderDropdownSearch('')}
+                          className="p-1 text-zinc-500 hover:text-zinc-300"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Folders List */}
+                    <div className="p-1.5 overflow-y-auto space-y-1 flex-1">
+                      {/* Option: All Folders */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveSubcategory(null);
+                          setIsFolderDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left ${
+                          activeSubcategory === null
+                            ? 'bg-purple-950/80 text-purple-200 border border-purple-500/50'
+                            : 'text-zinc-300 hover:bg-zinc-900/90'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Folder className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Todas as Pastas</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-zinc-400">
+                          {activeCategory === 'all' ? spellEntities.length : categoryCounts[activeCategory] || 0}
+                        </span>
+                      </button>
+
+                      {/* Option: Without Folder */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveSubcategory('__none__');
+                          setIsFolderDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left ${
+                          activeSubcategory === '__none__'
+                            ? 'bg-purple-950/80 text-purple-200 border border-purple-500/50'
+                            : 'text-zinc-400 hover:bg-zinc-900/90'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Folder className="w-3.5 h-3.5 text-zinc-600" />
+                          <span className="italic">Sem Pasta Definida</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-zinc-500">
+                          {subcategoryCounts.__none__ || 0}
+                        </span>
+                      </button>
+
+                      <div className="my-1 border-t border-zinc-800/80" />
+
+                      {/* Custom subcategories */}
+                      {currentSubcategories
+                        .filter((s) =>
+                          s.toLowerCase().includes(folderDropdownSearch.toLowerCase().trim())
+                        )
+                        .map((subcat) => {
+                          const isSelected = activeSubcategory === subcat;
+                          const count = subcategoryCounts[subcat] || 0;
+
+                          return (
+                            <button
+                              key={subcat}
+                              type="button"
+                              onClick={() => {
+                                setActiveSubcategory(isSelected ? null : subcat);
+                                setIsFolderDropdownOpen(false);
+                              }}
+                              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left ${
+                                isSelected
+                                  ? 'bg-purple-950/80 text-purple-200 border border-purple-500/50'
+                                  : 'text-zinc-300 hover:bg-zinc-900/90'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 truncate">
+                                <Folder className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                                <span className="truncate">{subcat}</span>
+                              </div>
+                              <span className="text-[10px] font-mono text-zinc-400 shrink-0 ml-1">
+                                {count}
+                              </span>
+                            </button>
+                          );
+                        })}
+
+                      {currentSubcategories.filter((s) =>
+                        s.toLowerCase().includes(folderDropdownSearch.toLowerCase().trim())
+                      ).length === 0 && (
+                        <div className="p-3 text-center text-xs text-zinc-500 italic">
+                          Nenhuma pasta encontrada
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Manage Folders footer action */}
+                    {isActualGm && (
+                      <div className="p-2 border-t border-zinc-800/80 bg-zinc-950/90">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsFolderDropdownOpen(false);
+                            setIsFolderManagerOpen(true);
+                          }}
+                          className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-950/60 hover:bg-purple-900/70 border border-purple-600/40 text-purple-300 text-xs font-bold transition-all cursor-pointer"
+                        >
+                          <FolderPlus className="w-3.5 h-3.5" />
+                          <span>Gerenciar Pastas</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Right: Rank, Tradition and Filter Panel Controls */}
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            {/* Rank / Circle Quick Filter */}
+            <select
+              value={filterRank}
+              onChange={(e) => setFilterRank(e.target.value)}
+              className={`bg-zinc-900/90 border rounded-xl px-2.5 py-2 text-xs font-semibold outline-none transition-all cursor-pointer ${
+                filterRank !== 'all'
+                  ? 'border-cyan-500/80 text-cyan-200 bg-cyan-950/40'
+                  : 'border-zinc-800 text-zinc-300 hover:border-zinc-700'
               }`}
             >
-              <span>Todas</span>
-              <span className={`text-[10px] font-mono px-1 py-0.2 rounded ${activeSubcategory === null ? 'bg-zinc-400/40 text-black' : 'bg-zinc-800 text-zinc-400'}`}>
-                {filteredSpells.length}
-              </span>
-            </button>
+              <option value="all">Todos Círculos</option>
+              <option value="cantrip">Truque (0)</option>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((r) => (
+                <option key={r} value={String(r)}>
+                  {r}º Círculo
+                </option>
+              ))}
+            </select>
 
-            {currentSubcategories.map((subcat) => {
-              const count = subcategoryCounts[subcat] || 0;
-              const isSelected = activeSubcategory === subcat;
+            {/* Tradition Quick Filter */}
+            <select
+              value={filterTradition}
+              onChange={(e) => setFilterTradition(e.target.value)}
+              className={`bg-zinc-900/90 border rounded-xl px-2.5 py-2 text-xs font-semibold outline-none transition-all cursor-pointer ${
+                filterTradition !== 'all'
+                  ? 'border-cyan-500/80 text-cyan-200 bg-cyan-950/40'
+                  : 'border-zinc-800 text-zinc-300 hover:border-zinc-700'
+              }`}
+            >
+              <option value="all">Todas Tradições</option>
+              <option value="E. Física">E. Física</option>
+              <option value="E. Meta">E. Meta</option>
+              <option value="M. Orgânica">M. Orgânica</option>
+              <option value="M. Inorgânica">M. Inorgânica</option>
+              <option value="Omni">Omni</option>
+            </select>
 
-              return (
-                <button
-                  key={subcat}
-                  type="button"
-                  onClick={() => setActiveSubcategory(isSelected ? null : subcat)}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                    isSelected
-                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/60 font-bold shadow-sm'
-                      : 'bg-zinc-900/80 hover:bg-zinc-850 text-zinc-400 hover:text-zinc-200 border border-zinc-800/80'
-                  }`}
-                >
-                  <Folder className={`w-3 h-3 ${isSelected ? 'text-cyan-400' : 'text-zinc-500'}`} />
-                  <span>{subcat}</span>
-                  <span
-                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
-                      isSelected ? 'bg-cyan-500/30 text-cyan-200 font-bold' : 'bg-zinc-800 text-zinc-400'
-                    }`}
-                  >
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Search & Multi-Filter Toolbar */}
-      <div className="bg-[#0d0b14] p-4 rounded-2xl border border-zinc-800/80 shadow-md space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Search Input */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar por nome, traços (ex: Fogo, Ilusão), círculo, efeito ou descrição..."
-              className="w-full bg-black/40 border border-zinc-800 focus:border-cyan-500 rounded-xl pl-10 pr-9 py-2 text-xs text-zinc-200 placeholder-zinc-500 outline-none transition-all"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Filter Panel Toggle */}
-          <div className="flex items-center gap-2">
+            {/* More Filters Toggle */}
             <button
+              type="button"
               onClick={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                 isFilterPanelOpen || activeFiltersCount > 0
                   ? 'bg-purple-950/60 border-purple-500/50 text-purple-200'
                   : 'bg-zinc-900/80 border-zinc-800 text-zinc-400 hover:text-zinc-200'
               }`}
             >
               <SlidersHorizontal className="w-4 h-4 text-purple-400" />
-              <span>Filtros PF2e</span>
+              <span className="hidden sm:inline">Mais Filtros</span>
               {activeFiltersCount > 0 && (
                 <span className="w-5 h-5 rounded-full bg-purple-500 text-zinc-950 font-bold text-[10px] flex items-center justify-center">
                   {activeFiltersCount}
@@ -734,10 +880,12 @@ export function SpellExplorer({
               )}
             </button>
 
+            {/* Clear Filters Button */}
             {activeFiltersCount > 0 && (
               <button
+                type="button"
                 onClick={handleClearFilters}
-                className="px-2.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs transition-colors"
+                className="px-2.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs font-semibold transition-colors cursor-pointer"
                 title="Limpar todos os filtros ativos"
               >
                 Limpar
@@ -748,45 +896,10 @@ export function SpellExplorer({
 
         {/* Expandable Advanced Filters */}
         {isFilterPanelOpen && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-3 border-t border-zinc-800/80 text-xs">
-            {/* Rank Filter */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold text-zinc-400">Círculo / Rank:</label>
-              <select
-                value={filterRank}
-                onChange={(e) => setFilterRank(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-zinc-200 outline-none focus:border-cyan-500"
-              >
-                <option value="all">Todos os Círculos</option>
-                <option value="cantrip">Truque (Cantrip - 0)</option>
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((r) => (
-                  <option key={r} value={String(r)}>
-                    {r}º Círculo
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Tradition Filter */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold text-zinc-400">Tradição:</label>
-              <select
-                value={filterTradition}
-                onChange={(e) => setFilterTradition(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-zinc-200 outline-none focus:border-cyan-500"
-              >
-                <option value="all">Todas as Tradições</option>
-                <option value="arcano">Arcano</option>
-                <option value="divino">Divino</option>
-                <option value="oculto">Oculto</option>
-                <option value="primal">Primal</option>
-                <option value="outras">Outras</option>
-              </select>
-            </div>
-
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-zinc-800/80 text-xs animate-fade-in">
             {/* Cast Time Filter */}
             <div className="space-y-1">
-              <label className="text-[11px] font-bold text-zinc-400">Tempo de Conjuração:</label>
+              <label className="text-[11px] font-bold text-zinc-400">Tempo de Conjuração / Ações:</label>
               <select
                 value={filterCastTime}
                 onChange={(e) => setFilterCastTime(e.target.value)}
@@ -819,13 +932,13 @@ export function SpellExplorer({
 
             {/* Trait Filter */}
             <div className="space-y-1">
-              <label className="text-[11px] font-bold text-zinc-400">Escola / Traço:</label>
+              <label className="text-[11px] font-bold text-zinc-400">Descritor / Traço:</label>
               <select
                 value={filterTrait}
                 onChange={(e) => setFilterTrait(e.target.value)}
                 className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-zinc-200 outline-none focus:border-cyan-500"
               >
-                <option value="all">Todos os Traços</option>
+                <option value="all">Todos os Traços ({allTraits.length})</option>
                 {allTraits.map((t) => (
                   <option key={t} value={t}>
                     {t}
@@ -848,25 +961,31 @@ export function SpellExplorer({
           <div className="flex items-center justify-center gap-3 pt-2">
             <button
               onClick={handleClearFilters}
-              className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-semibold transition-colors"
+              className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-semibold transition-colors cursor-pointer"
             >
               Limpar Filtros
             </button>
             <button
-              onClick={() => onCreateSpell(activeCategory !== 'all' ? activeCategory : 'arcane', activeSubcategory || undefined)}
-              className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-zinc-950 text-xs font-bold transition-colors"
+              onClick={() =>
+                onCreateSpell(
+                  activeCategory !== 'all' ? activeCategory : 'e_fisica',
+                  activeSubcategory || undefined
+                )
+              }
+              className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-zinc-950 text-xs font-bold transition-colors cursor-pointer"
             >
               + Criar Feitiço
             </button>
           </div>
         </div>
       ) : viewMode === 'grid' ? (
-        /* GRID VIEW */
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        /* GRID VIEW (ADAPTIVE: MAX 3 COLS <1080P, UP TO 5 COLS >=1080P) */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 min-[1800px]:grid-cols-5 2xl:grid-cols-5 gap-3 sm:gap-4 items-stretch">
           {filteredSpells.map((sp) => {
             const data = sp.spellData!;
             const perm = HecosStorage.getEntityPermission(sp.id);
             const rankLabel = data.rank === 0 ? 'Truque' : `${data.rank}º Círculo`;
+            const actionGlyph = getActionGlyphProp(data.castTime);
 
             return (
               <div
@@ -874,34 +993,105 @@ export function SpellExplorer({
                 className="group/card bg-[#0e0c15] hover:bg-[#13101c] border border-zinc-800/80 hover:border-cyan-500/50 rounded-2xl p-5 transition-all shadow-md hover:shadow-[0_0_24px_rgba(6,182,212,0.15)] flex flex-col justify-between relative"
               >
                 <div>
-                  {/* Top Bar: Title, Rank, Actions Glyph */}
+                  {/* Top Bar: Title, Action Glyph, Cast Time, Visibility */}
                   <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <button
-                        type="button"
-                        onClick={() => onSelectEntity(sp.id)}
-                        className="text-left group/title focus:outline-none cursor-pointer"
-                        title={`Abrir feitiço ${sp.title}`}
+                    <div className="min-w-0 flex-1">
+                      <Tooltip
+                        side="right"
+                        delay={250}
+                        className="w-full"
+                        content={
+                          <div className="p-3.5 space-y-2.5 max-w-sm sm:max-w-md text-xs text-left bg-[#0e0c18] border border-cyan-500/50 rounded-2xl shadow-2xl">
+                            <div className="border-b border-zinc-800 pb-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <h4 className="text-sm font-extrabold text-cyan-200 font-serif">{sp.title}</h4>
+                                <span className="text-[10px] font-mono font-bold text-purple-300 uppercase px-1.5 py-0.2 rounded bg-purple-950 border border-purple-800">
+                                  {rankLabel}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 flex-wrap mt-1">
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 font-bold">
+                                  {data.rarity || 'Comum'}
+                                </span>
+                                {data.traditions?.map((tr) => (
+                                  <span key={`tt-trad-${tr}`} className="text-[10px] px-1.5 py-0.2 rounded bg-zinc-900 text-zinc-300">
+                                    {tr}
+                                  </span>
+                                ))}
+                                {data.traits?.map((tr) => (
+                                  <span key={`tt-trait-${tr}`} className="text-[10px] px-1.5 py-0.2 rounded bg-zinc-900 text-zinc-400">
+                                    {tr}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Tooltip Index Info */}
+                            <div className="grid grid-cols-2 gap-1 text-[10px] text-zinc-300 font-sans">
+                              {data.castTime && <div><strong className="text-cyan-400">Conjuração:</strong> {data.castTime}</div>}
+                              {data.range && <div><strong className="text-cyan-400">Alcance:</strong> {data.range}</div>}
+                              {data.area && <div><strong className="text-emerald-400">Área:</strong> {data.area}</div>}
+                              {data.targets && <div className="col-span-2"><strong className="text-purple-400">Alvos:</strong> {data.targets}</div>}
+                              {data.trigger && <div className="col-span-2"><strong className="text-amber-400">Gatilho:</strong> {data.trigger}</div>}
+                              {data.savingThrow && <div><strong className="text-rose-400">Defesa:</strong> {data.savingThrow}</div>}
+                              {data.duration && <div><strong className="text-teal-400">Duração:</strong> {data.duration}</div>}
+                            </div>
+
+                            {/* Full Description */}
+                            <div className="pt-2 border-t border-zinc-800/80 text-[11px] text-zinc-300 leading-relaxed max-h-48 overflow-y-auto pr-1">
+                              <RichContentRenderer content={data.description || sp.summary || 'Sem descrição.'} />
+                            </div>
+
+                            {/* Degrees of success in tooltip if present */}
+                            {(data.criticalSuccess || data.success || data.failure || data.criticalFailure) && (
+                              <div className="pt-2 border-t border-zinc-800 text-[10px] space-y-1">
+                                <div className="font-bold text-zinc-400 uppercase tracking-wider text-[9px]">Graus de Sucesso:</div>
+                                {data.criticalSuccess && <div><span className="text-emerald-400 font-bold">Sucesso Crítico:</span> {data.criticalSuccess}</div>}
+                                {data.success && <div><span className="text-cyan-400 font-bold">Sucesso:</span> {data.success}</div>}
+                                {data.failure && <div><span className="text-amber-400 font-bold">Falha:</span> {data.failure}</div>}
+                                {data.criticalFailure && <div><span className="text-rose-400 font-bold">Falha Crítica:</span> {data.criticalFailure}</div>}
+                              </div>
+                            )}
+
+                            {/* Heightened in tooltip */}
+                            {data.heightened && (
+                              <div className="pt-2 border-t border-zinc-800 text-[10px] text-purple-200">
+                                <strong className="text-purple-400 uppercase text-[9px]">Intensificado:</strong> {data.heightened}
+                              </div>
+                            )}
+                          </div>
+                        }
                       >
-                        <h3 className="text-base font-bold text-zinc-100 group-hover/title:text-cyan-300 transition-all flex items-center gap-2 group-hover/title:drop-shadow-[0_0_12px_rgba(6,182,212,0.85)]">
-                          <span className="group-hover/title:underline decoration-cyan-400/80 decoration-2 underline-offset-2">
-                            {sp.title}
-                          </span>
-                          {data.castTime && (
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700/80 text-cyan-300 font-mono">
-                              {data.castTime}
+                        <button
+                          type="button"
+                          onClick={() => onSelectEntity(sp.id)}
+                          className="text-left group/title focus:outline-none cursor-pointer block w-full"
+                          title={`Abrir feitiço ${sp.title}`}
+                        >
+                          <h3 className="text-base font-bold text-zinc-100 group-hover/title:text-cyan-300 transition-all flex items-center gap-2 group-hover/title:drop-shadow-[0_0_12px_rgba(6,182,212,0.85)]">
+                            <span className="group-hover/title:underline decoration-cyan-400/80 decoration-2 underline-offset-2 truncate">
+                              {sp.title}
                             </span>
-                          )}
-                          <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover/title:opacity-100 text-cyan-400 group-hover/title:translate-x-0.5 transition-all shrink-0" />
-                        </h3>
-                      </button>
-                      <div className="flex items-center gap-2 mt-1 text-[11px] text-zinc-400 font-mono">
-                        <span className="text-purple-300 font-bold">{rankLabel}</span>
-                        {data.traditions && data.traditions.length > 0 && (
-                          <>
-                            <span>•</span>
-                            <span className="text-cyan-400 capitalize">{data.traditions.join(', ')}</span>
-                          </>
+                            {actionGlyph.show && (
+                              <PF2eActionGlyph type={actionGlyph.type} size="sm" />
+                            )}
+                            {data.castTime && !actionGlyph.show && (
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700/80 text-cyan-300 font-mono shrink-0">
+                                {data.castTime}
+                              </span>
+                            )}
+                            <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover/title:opacity-100 text-cyan-400 group-hover/title:translate-x-0.5 transition-all shrink-0 ml-auto" />
+                          </h3>
+                        </button>
+                      </Tooltip>
+
+                      {/* Spell Type below Title in refined font */}
+                      <div className="mt-1 text-xs font-serif italic text-purple-300/90 tracking-wide flex items-center gap-1.5 flex-wrap">
+                        <span>{rankLabel}</span>
+                        {data.spellType && data.spellType !== 'spell' && (
+                          <span className="not-italic font-mono uppercase text-[9px] px-1.5 py-0.2 rounded bg-purple-950 text-purple-300 border border-purple-800/80 font-bold">
+                            {data.spellType === 'focus' ? 'Foco' : data.spellType === 'ritual' ? 'Ritual' : data.spellType}
+                          </span>
                         )}
                       </div>
                     </div>
@@ -920,59 +1110,98 @@ export function SpellExplorer({
                     )}
                   </div>
 
-                  {/* Traits & Rarity Badges */}
+                  {/* Traits & Traditions Area: Rarity First, then Traditions as TraitBadges, then other Traits */}
                   <div className="flex items-center gap-1.5 flex-wrap mt-3">
+                    {/* 1. Rarity at the beginning of traits */}
                     <TraitBadge
                       trait={data.rarity || 'Comum'}
                       onClick={() => {
-                        window.dispatchEvent(new CustomEvent('hecos:open-trait-drawer', { detail: { trait: data.rarity || 'Comum' } }));
+                        window.dispatchEvent(
+                          new CustomEvent('hecos:open-trait-drawer', {
+                            detail: { trait: data.rarity || 'Comum' },
+                          })
+                        );
                       }}
                     />
 
-                    {data.traits?.map((t, tIdx) => (
+                    {/* 2. Traditions as full interactive Traits */}
+                    {data.traditions?.map((trad, tradIdx) => (
                       <TraitBadge
-                        key={`${sp.id}-trait-${t}-${tIdx}`}
-                        trait={t}
+                        key={`${sp.id}-trad-${trad}-${tradIdx}`}
+                        trait={trad}
                         onClick={() => {
-                          window.dispatchEvent(new CustomEvent('hecos:open-trait-drawer', { detail: { trait: t } }));
+                          window.dispatchEvent(
+                            new CustomEvent('hecos:open-trait-drawer', { detail: { trait: trad } })
+                          );
                         }}
                       />
                     ))}
+
+                    {/* 3. General Traits */}
+                    {data.traits
+                      ?.filter((t) => !data.traditions?.includes(t))
+                      .map((t, tIdx) => (
+                        <TraitBadge
+                          key={`${sp.id}-trait-${t}-${tIdx}`}
+                          trait={t}
+                          onClick={() => {
+                            window.dispatchEvent(
+                              new CustomEvent('hecos:open-trait-drawer', { detail: { trait: t } })
+                            );
+                          }}
+                        />
+                      ))}
                   </div>
 
-                  {/* Range, Area, Targets, Saving Throw Info */}
-                  <div className="grid grid-cols-2 gap-x-2 gap-y-1 mt-3.5 pt-3 border-t border-zinc-800/60 text-[11px] text-zinc-400">
-                    {data.range && (
-                      <div>
-                        <strong className="text-zinc-300">Alcance:</strong> {data.range}
-                      </div>
-                    )}
-                    {data.area && (
-                      <div>
-                        <strong className="text-zinc-300">Área:</strong> {data.area}
-                      </div>
-                    )}
-                    {data.targets && (
-                      <div className="col-span-2 break-words">
-                        <strong className="text-zinc-300">Alvos:</strong> {data.targets}
-                      </div>
-                    )}
-                    {data.savingThrow && (
-                      <div>
-                        <strong className="text-zinc-300">Salvamento:</strong> {data.savingThrow}
-                      </div>
-                    )}
-                    {data.duration && (
-                      <div>
-                        <strong className="text-zinc-300">Duração:</strong> {data.duration}
-                      </div>
-                    )}
-                  </div>
+                  {/* Highlighted Index Information: Range, Area, Targets, Trigger, Defense, Duration */}
+                  {(data.range || data.area || data.targets || data.trigger || data.savingThrow || data.duration) && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-3.5 pt-3 border-t border-zinc-800/80 text-[11px]">
+                      {data.range && (
+                        <div className="p-1.5 rounded-lg bg-cyan-950/30 border border-cyan-900/50 flex items-baseline gap-1.5 overflow-hidden">
+                          <strong className="text-cyan-400 font-bold uppercase text-[10px] font-mono tracking-wider shrink-0">Alcance:</strong>
+                          <span className="text-zinc-200 break-words">{data.range}</span>
+                        </div>
+                      )}
+                      {data.area && (
+                        <div className="p-1.5 rounded-lg bg-emerald-950/30 border border-emerald-900/50 flex items-baseline gap-1.5 overflow-hidden">
+                          <strong className="text-emerald-400 font-bold uppercase text-[10px] font-mono tracking-wider shrink-0">Área:</strong>
+                          <span className="text-zinc-200 break-words">{data.area}</span>
+                        </div>
+                      )}
+                      {data.targets && (
+                        <div className="p-1.5 rounded-lg bg-purple-950/30 border border-purple-900/50 col-span-1 sm:col-span-2 flex items-baseline gap-1.5 overflow-hidden">
+                          <strong className="text-purple-400 font-bold uppercase text-[10px] font-mono tracking-wider shrink-0">Alvos:</strong>
+                          <span className="text-zinc-200 break-words">{data.targets}</span>
+                        </div>
+                      )}
+                      {data.trigger && (
+                        <div className="p-1.5 rounded-lg bg-amber-950/30 border border-amber-900/50 col-span-1 sm:col-span-2 flex items-baseline gap-1.5 overflow-hidden">
+                          <strong className="text-amber-400 font-bold uppercase text-[10px] font-mono tracking-wider shrink-0">Gatilho:</strong>
+                          <span className="text-zinc-200 break-words">{data.trigger}</span>
+                        </div>
+                      )}
+                      {data.savingThrow && (
+                        <div className="p-1.5 rounded-lg bg-rose-950/30 border border-rose-900/50 flex items-baseline gap-1.5 overflow-hidden">
+                          <strong className="text-rose-400 font-bold uppercase text-[10px] font-mono tracking-wider shrink-0">Defesa:</strong>
+                          <span className="text-zinc-200 break-words">{data.savingThrow}</span>
+                        </div>
+                      )}
+                      {data.duration && (
+                        <div className="p-1.5 rounded-lg bg-teal-950/30 border border-teal-900/50 flex items-baseline gap-1.5 overflow-hidden">
+                          <strong className="text-teal-400 font-bold uppercase text-[10px] font-mono tracking-wider shrink-0">Duração:</strong>
+                          <span className="text-zinc-200 break-words">{data.duration}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                  {/* Description na íntegra */}
-                  <p className="text-xs text-zinc-400 mt-3 leading-relaxed break-words whitespace-pre-wrap">
-                    {data.description || sp.summary || 'Sem descrição fornecida.'}
-                  </p>
+                  {/* Description rendered with RichContentRenderer so bold, colors, and formatting display cleanly */}
+                  <div className="text-xs text-zinc-300 mt-3 leading-relaxed break-words">
+                    <RichContentRenderer
+                      content={data.description || sp.summary || 'Sem descrição fornecida.'}
+                      onNavigate={onSelectEntity}
+                    />
+                  </div>
                 </div>
 
                 {/* Bottom Footer: Folder Tags & Edit/Delete Actions */}
@@ -1005,7 +1234,7 @@ export function SpellExplorer({
                           setManagingSpellFolders(sp);
                           setSelectedSpellSubcats(data.subcategories || []);
                         }}
-                        className="p-1 rounded text-zinc-500 hover:text-cyan-300 hover:bg-zinc-900 transition-colors"
+                        className="p-1 rounded text-zinc-500 hover:text-cyan-300 hover:bg-zinc-900 transition-colors cursor-pointer"
                         title="Organizar nas Pastas"
                       >
                         <FolderPlus className="w-3 h-3" />
@@ -1013,7 +1242,7 @@ export function SpellExplorer({
                     )}
                   </div>
 
-                      {/* Edit & Delete Buttons */}
+                  {/* Edit & Delete Buttons */}
                   {isActualGm && (
                     <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                       <Tooltip title="Editar Feitiço" description="Modificar detalhes, estatísticas e descrição">
@@ -1065,10 +1294,7 @@ export function SpellExplorer({
                   const rankLabel = data.rank === 0 ? 'Truque' : `${data.rank}º`;
 
                   return (
-                    <tr
-                      key={sp.id}
-                      className="hover:bg-zinc-900/50 transition-colors group"
-                    >
+                    <tr key={sp.id} className="hover:bg-zinc-900/50 transition-colors group">
                       <td className="py-3 px-4">
                         <button
                           type="button"
@@ -1082,7 +1308,13 @@ export function SpellExplorer({
                         </button>
                       </td>
                       <td className="py-3 px-3 font-mono text-purple-300 font-bold">{rankLabel}</td>
-                      <td className="py-3 px-3 text-cyan-400 capitalize">{data.traditions?.join(', ') || '—'}</td>
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {data.traditions?.map((trad) => (
+                            <TraitBadge key={`tbl-trad-${trad}`} trait={trad} />
+                          ))}
+                        </div>
+                      </td>
                       <td className="py-3 px-3 text-zinc-400">{data.castTime || '—'}</td>
                       <td className="py-3 px-3 text-zinc-400 truncate max-w-[150px]">
                         {data.range || data.area || '—'}
@@ -1091,7 +1323,11 @@ export function SpellExplorer({
                         <TraitBadge
                           trait={data.rarity || 'Comum'}
                           onClick={() => {
-                            window.dispatchEvent(new CustomEvent('hecos:open-trait-drawer', { detail: { trait: data.rarity || 'Comum' } }));
+                            window.dispatchEvent(
+                              new CustomEvent('hecos:open-trait-drawer', {
+                                detail: { trait: data.rarity || 'Comum' },
+                              })
+                            );
                           }}
                         />
                       </td>
@@ -1156,61 +1392,60 @@ export function SpellExplorer({
         </div>
       ) : (
         /* FOLDER TREE VIEW */
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {currentSubcategories.map((folderName) => {
             const spellsInFolder = spellEntities.filter((sp) =>
-              sp.spellData?.subcategories?.includes(folderName) || sp.subcategory === folderName
+              sp.spellData?.subcategories?.includes(folderName)
             );
 
             return (
-              <div key={folderName} className="bg-[#09080e] rounded-2xl border border-zinc-800/80 overflow-hidden shadow-lg">
-                <div className="p-4 bg-[#120f1c] flex items-center justify-between gap-3 border-b border-zinc-800/80">
+              <div
+                key={folderName}
+                className="bg-[#0b0914] border border-zinc-800/80 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all shadow-md flex flex-col justify-between"
+              >
+                <div className="p-4 bg-purple-950/20 border-b border-zinc-800/60 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Folder className="w-5 h-5 text-cyan-400" />
-                    <h3 className="text-sm font-bold text-zinc-200">{folderName}</h3>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 font-mono border border-cyan-800/50">
-                      {spellsInFolder.length}
-                    </span>
+                    <FolderOpen className="w-4 h-4 text-purple-400" />
+                    <h3 className="font-bold text-sm text-zinc-100">{folderName}</h3>
                   </div>
-
-                  {isActualGm && (
-                    <button
-                      onClick={() => onCreateSpell(activeCategory !== 'all' ? activeCategory : 'arcane', folderName)}
-                      className="text-xs px-3 py-1 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-700/60 text-cyan-300 flex items-center gap-1 font-semibold transition-colors cursor-pointer"
-                    >
-                      <Plus className="w-3 h-3" />
-                      <span>Adicionar Feitiço</span>
-                    </button>
-                  )}
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800/50">
+                    {spellsInFolder.length}
+                  </span>
                 </div>
 
-                <div className="p-4">
+                <div className="p-3 flex-1">
                   {spellsInFolder.length === 0 ? (
-                    <p className="text-xs text-zinc-500 italic py-2">Nenhum feitiço nesta pasta ainda.</p>
+                    <div className="text-center py-6 text-zinc-600 text-xs italic">
+                      Nenhum feitiço nesta pasta
+                    </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="space-y-1.5">
                       {spellsInFolder.map((sp) => (
                         <div
                           key={sp.id}
                           onClick={() => onSelectEntity(sp.id)}
-                          className="p-3 rounded-xl bg-zinc-900/60 hover:bg-zinc-900 border border-zinc-800/80 hover:border-cyan-500/50 flex items-center justify-between gap-2 cursor-pointer transition-all"
+                          className="flex items-center justify-between p-2 rounded-xl bg-zinc-900/40 hover:bg-cyan-950/30 border border-zinc-800/40 hover:border-cyan-500/40 cursor-pointer transition-all group"
                         >
                           <div>
-                            <div className="text-xs font-bold text-zinc-200 hover:text-cyan-300">{sp.title}</div>
+                            <div className="text-xs font-semibold text-zinc-200 group-hover:text-cyan-300">
+                              {sp.title}
+                            </div>
                             <div className="text-[10px] text-zinc-400 font-mono">
                               {sp.spellData?.rank === 0 ? 'Truque' : `${sp.spellData?.rank}º Círculo`} •{' '}
-                              {sp.spellData?.traditions?.join(', ')}
+                              {sp.spellData?.traditions?.join(', ') || 'Sem tradição'}
                             </div>
                           </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onEditEntity(sp.id);
-                            }}
-                            className="p-1 rounded text-zinc-500 hover:text-cyan-300"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </button>
+                          {isActualGm && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onEditEntity(sp.id);
+                              }}
+                              className="p-1 rounded text-zinc-500 hover:text-cyan-300"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1222,120 +1457,17 @@ export function SpellExplorer({
         </div>
       )}
 
-      {/* 6. Folder Management Modal */}
+      {/* 6. Folder Management Modal (Standardized 90% Screen Width Modal) */}
       {isFolderManagerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#0f0d18] border border-zinc-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl space-y-4 p-6">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-              <div className="flex items-center gap-2">
-                <Folder className="w-5 h-5 text-cyan-400" />
-                <h3 className="text-base font-bold text-zinc-100">Gerenciar Pastas de Feitiços</h3>
-              </div>
-              <button
-                onClick={() => setIsFolderManagerOpen(false)}
-                className="p-1 text-zinc-500 hover:text-zinc-300 rounded"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Create new folder in current category */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-zinc-300">Nova Pasta ({activeCategory.toUpperCase()}):</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={newFolderName}
-                  onChange={(e) => setNewFolderName(e.target.value)}
-                  placeholder="Nome da nova pasta..."
-                  className="flex-1 bg-black/50 border border-zinc-800 focus:border-cyan-500 rounded-xl px-3 py-2 text-xs text-zinc-200 outline-none"
-                />
-                <button
-                  onClick={handleAddFolder}
-                  className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-zinc-950 font-bold text-xs transition-colors flex items-center gap-1"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Criar</span>
-                </button>
-              </div>
-            </div>
-
-            {/* List existing folders with rename/delete */}
-            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-              <label className="text-xs font-bold text-zinc-400">Pastas Existentes:</label>
-              {currentSubcategories.map((folderName) => {
-                const count = subcategoryCounts[folderName] || 0;
-                const isEditing = editingFolderOriginalName === folderName;
-
-                return (
-                  <div
-                    key={folderName}
-                    className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800/80 text-xs"
-                  >
-                    {isEditing ? (
-                      <div className="flex items-center gap-2 flex-1">
-                        <input
-                          type="text"
-                          value={editingFolderNewName}
-                          onChange={(e) => setEditingFolderNewName(e.target.value)}
-                          className="flex-1 bg-black/60 border border-cyan-500 rounded-lg px-2 py-1 text-xs text-zinc-100 outline-none"
-                        />
-                        <button
-                          onClick={handleRenameFolder}
-                          className="p-1.5 bg-cyan-600 hover:bg-cyan-500 text-zinc-950 rounded-lg"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => setEditingFolderOriginalName(null)}
-                          className="p-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-lg"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <Folder className="w-3.5 h-3.5 text-cyan-400" />
-                          <span className="font-semibold text-zinc-200">{folderName}</span>
-                          <span className="text-[10px] text-zinc-500 font-mono">({count} feitiços)</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => {
-                              setEditingFolderOriginalName(folderName);
-                              setEditingFolderNewName(folderName);
-                            }}
-                            className="p-1 text-zinc-400 hover:text-cyan-300"
-                            title="Renomear Pasta"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteFolder(folderName)}
-                            className="p-1 text-zinc-500 hover:text-rose-400"
-                            title="Excluir Pasta"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="flex justify-end pt-3 border-t border-zinc-800">
-              <button
-                onClick={() => setIsFolderManagerOpen(false)}
-                className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold text-xs transition-colors"
-              >
-                Concluir
-              </button>
-            </div>
-          </div>
-        </div>
+        <FolderManagerModal
+          scope="spell"
+          categoriesConfig={categoriesConfig}
+          allEntities={spellEntities}
+          onClose={() => {
+            setIsFolderManagerOpen(false);
+            refreshConfig();
+          }}
+        />
       )}
 
       {/* 7. Assign Folders to Specific Spell Modal */}
@@ -1349,7 +1481,7 @@ export function SpellExplorer({
               </div>
               <button
                 onClick={() => setManagingSpellFolders(null)}
-                className="p-1 text-zinc-500 hover:text-zinc-300 rounded"
+                className="p-1 text-zinc-500 hover:text-zinc-300 rounded cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1395,13 +1527,13 @@ export function SpellExplorer({
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-800">
               <button
                 onClick={() => setManagingSpellFolders(null)}
-                className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 text-xs transition-colors"
+                className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 text-xs transition-colors cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleSaveSpellFolders}
-                className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-zinc-950 font-bold text-xs transition-colors"
+                className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-zinc-950 font-bold text-xs transition-colors cursor-pointer"
               >
                 Salvar Alterações
               </button>

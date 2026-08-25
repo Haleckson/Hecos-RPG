@@ -1,35 +1,39 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import {
   HecosEntity,
   PF2eSpellAttributes,
+  SpellTraditionType,
   SpellCategoryType,
   ItemVisibility,
 } from '../types';
-import { getEmptySpellData, serializeSpellToHTML } from '../utils/spellSerializer';
+import { serializeSpellToHTML, parseSpellFromContent } from '../utils/spellSerializer';
 import { HecosStorage } from '../services/storage';
-import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
+import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
+import { ColorPickerMenu } from './ColorPickerMenu';
+import { TraitInputCombobox } from './TraitInputCombobox';
 import { TraitBadge } from './TraitBadge';
 import {
-  Sparkles,
   X,
-  Check,
-  Plus,
-  Layers,
-  Flame,
-  Sun,
-  Moon,
+  Sparkles,
   Zap,
-  BookOpen,
-  Eye,
-  Folder,
+  Moon,
+  Flame,
   Shield,
-  Clock,
-  Target,
-  Sparkle,
-  SlidersHorizontal,
-  ChevronDown,
-  Info,
+  Folder,
+  Eye,
+  Plus,
+  Trash2,
+  Check,
+  Bold,
+  Italic,
+  Underline,
+  Palette,
+  Link as LinkIcon,
+  HelpCircle,
+  Award,
+  Tag as TagIcon,
+  Edit2,
 } from 'lucide-react';
 
 interface SpellCreateModalProps {
@@ -39,10 +43,69 @@ interface SpellCreateModalProps {
   presetTradition?: string;
   presetCategory?: SpellCategoryType;
   presetSubcategory?: string;
+  entityToEdit?: HecosEntity | null;
   onClose: () => void;
   onSave?: (newEntity: HecosEntity) => void;
   onSaveSpell?: (newEntity: HecosEntity) => void;
 }
+
+export const HECOS_SPELL_TRADITIONS = [
+  {
+    id: 'E. Física',
+    label: 'E. Física',
+    fullName: 'Energia Física',
+    icon: Zap,
+    color: 'text-cyan-300',
+    border: 'border-cyan-500/50',
+    bg: 'bg-cyan-950/80',
+    activeBg: 'bg-cyan-500 text-zinc-950 shadow-[0_0_15px_rgba(6,182,212,0.4)]',
+    desc: 'Manipulação de energia térmica, cinética, gravidade, eletricidade e forças físicas materiais.',
+  },
+  {
+    id: 'E. Meta',
+    label: 'E. Meta',
+    fullName: 'Energia Metafísica',
+    icon: Moon,
+    color: 'text-purple-300',
+    border: 'border-purple-500/50',
+    bg: 'bg-purple-950/80',
+    activeBg: 'bg-purple-500 text-zinc-950 shadow-[0_0_15px_rgba(168,85,247,0.4)]',
+    desc: 'Manipulação de tempo, espaço, alma, ilusões e forças transcendentais.',
+  },
+  {
+    id: 'M. Orgânica',
+    label: 'M. Orgânica',
+    fullName: 'Matéria Orgânica',
+    icon: Flame,
+    color: 'text-emerald-300',
+    border: 'border-emerald-500/50',
+    bg: 'bg-emerald-950/80',
+    activeBg: 'bg-emerald-500 text-zinc-950 shadow-[0_0_15px_rgba(16,185,129,0.4)]',
+    desc: 'Manipulação e transmutação de carne, sangue, biomassa, flora, cura e organismos vivos.',
+  },
+  {
+    id: 'M. Inorgânica',
+    label: 'M. Inorgânica',
+    fullName: 'Matéria Inorgânica',
+    icon: Shield,
+    color: 'text-amber-300',
+    border: 'border-amber-500/50',
+    bg: 'bg-amber-950/80',
+    activeBg: 'bg-amber-500 text-zinc-950 shadow-[0_0_15px_rgba(245,158,11,0.4)]',
+    desc: 'Manipulação de metais, cristais, pedra, terra, minerais telúricos e matéria inanimada.',
+  },
+  {
+    id: 'Omni',
+    label: 'Omni',
+    fullName: 'Omni',
+    icon: Sparkles,
+    color: 'text-rose-300',
+    border: 'border-rose-500/50',
+    bg: 'bg-rose-950/80',
+    activeBg: 'bg-rose-500 text-zinc-950 shadow-[0_0_15px_rgba(244,63,94,0.4)]',
+    desc: 'Tradição mágica universal que unifica todas as vertentes da energia e matéria de Hecos.',
+  },
+];
 
 const COMMON_SPELL_TRAITS = [
   'Concentração',
@@ -71,6 +134,24 @@ const COMMON_SPELL_TRAITS = [
   'Ataque',
 ];
 
+const getEmptySpellData = (): PF2eSpellAttributes => ({
+  rank: 1,
+  traditions: [],
+  traits: [],
+  castTime: '2 ações',
+  range: '',
+  area: '',
+  targets: '',
+  duration: '',
+  savingThrow: '',
+  description: '',
+  rarity: 'Comum',
+  spellType: 'spell',
+  subcategories: [],
+  hecosLore: '',
+  gmNotes: '',
+});
+
 export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
   isOpen,
   initialTradition,
@@ -78,6 +159,7 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
   presetTradition,
   presetCategory,
   presetSubcategory,
+  entityToEdit,
   onClose,
   onSave,
   onSaveSpell,
@@ -89,35 +171,93 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
   const [summary, setSummary] = useState('');
   const [activeTab, setActiveTab] = useState<'details' | 'mechanics' | 'preview'>('details');
 
-  // Spell data attributes
-  const [spellData, setSpellData] = useState<PF2eSpellAttributes>(() => {
-    const empty = getEmptySpellData();
-    if (finalInitialTrad) {
-      if (['arcano', 'divino', 'oculto', 'primal', 'outras'].includes(finalInitialTrad.toLowerCase())) {
-        empty.traditions = [finalInitialTrad.toLowerCase()];
-      }
-    }
-    if (presetCategory) {
-      empty.spellType = presetCategory;
-    }
-    if (finalInitialSub) {
-      empty.subcategories = [finalInitialSub];
-    }
-    return empty;
-  });
+  // Rich Text Active Field Ref & Color Picker State
+  const [activeRichField, setActiveRichField] = useState<string | null>(null);
+  const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
+  const descRef = useRef<HTMLTextAreaElement | null>(null);
+  const heightenedRef = useRef<HTMLTextAreaElement | null>(null);
+  const loreRef = useRef<HTMLTextAreaElement | null>(null);
+  const gmNotesRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Initialize or populate spellData
+  const [spellData, setSpellData] = useState<PF2eSpellAttributes>(() => getEmptySpellData());
 
   // Selected folders / subcategories
-  const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>(
-    finalInitialSub ? [finalInitialSub] : []
-  );
+  const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([]);
   const [newSubcategoryInput, setNewSubcategoryInput] = useState('');
+
+  // Narrative Tags (Distinct from mechanical rules traits)
+  const [tagsInput, setTagsInput] = useState('');
+  const [tagsList, setTagsList] = useState<string[]>([]);
+  const [editingTagIndex, setEditingTagIndex] = useState<number | null>(null);
+  const [editingTagValue, setEditingTagValue] = useState('');
 
   // Visibility state
   const [visibility, setVisibility] = useState<ItemVisibility>('all');
   const [allowedUserIds, setAllowedUserIds] = useState<string[]>([]);
 
-  // Traits management
-  const [traitInput, setTraitInput] = useState('');
+  // Sync state when entityToEdit or modal opens
+  useEffect(() => {
+    if (isOpen) {
+      if (entityToEdit) {
+        setTitle(entityToEdit.title || '');
+        setSummary(entityToEdit.summary || '');
+        setVisibility(entityToEdit.visibility || 'all');
+        setAllowedUserIds(entityToEdit.allowedUserIds || []);
+
+        const parsed = parseSpellFromContent(entityToEdit.content || '', entityToEdit.spellData);
+        setSpellData(parsed);
+
+        const subcats = Array.from(
+          new Set(
+            [
+              ...(parsed.subcategories || []),
+              ...(entityToEdit.subcategories || []),
+              entityToEdit.subcategory,
+            ].filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+          )
+        );
+        setSelectedSubcategories(subcats);
+
+        // Tags excluding rule traits and subcats (pure user tags)
+        const rawTags = entityToEdit.tags || parsed.tags || [];
+        const existingTags = rawTags.filter((t) => {
+          const lower = t.toLowerCase().trim();
+          return (
+            lower !== 'feitiço' &&
+            lower !== 'magia' &&
+            lower !== 'pf2e' &&
+            !subcats.includes(t) &&
+            !(parsed.traditions || []).some((trad) => trad.toLowerCase() === lower) &&
+            !(parsed.traits || []).some((tr) => tr.toLowerCase() === lower)
+          );
+        });
+        setTagsList(existingTags);
+      } else {
+        // New spell blank state
+        setTitle('');
+        setSummary('');
+        setVisibility('all');
+        setAllowedUserIds([]);
+        const empty = getEmptySpellData();
+        if (finalInitialTrad) {
+          empty.traditions = [finalInitialTrad];
+        }
+        if (presetCategory && presetCategory !== 'all') {
+          empty.spellType = presetCategory as any;
+        }
+        if (finalInitialSub) {
+          empty.subcategories = [finalInitialSub];
+        }
+        setSpellData(empty);
+        setSelectedSubcategories(finalInitialSub ? [finalInitialSub] : []);
+        setTagsList([]);
+      }
+      setEditingTagIndex(null);
+      setEditingTagValue('');
+      setActiveTab('details');
+    }
+  }, [isOpen, entityToEdit, finalInitialTrad, presetCategory, finalInitialSub]);
 
   // Available spell folders from storage
   const spellConfig = useMemo(() => HecosStorage.getAllSpellSubcategoriesConfig(), []);
@@ -131,34 +271,17 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleTraditionToggle = (tradition: string) => {
+  const handleTraditionToggle = (traditionName: string) => {
     setSpellData((prev) => {
       const current = prev.traditions || [];
-      const exists = current.includes(tradition);
+      const exists = current.includes(traditionName);
       return {
         ...prev,
-        traditions: exists ? current.filter((t) => t !== tradition) : [...current, tradition],
+        traditions: exists
+          ? current.filter((t) => t !== traditionName)
+          : [...current, traditionName],
       };
     });
-  };
-
-  const handleAddTrait = (traitToAdd: string) => {
-    const clean = traitToAdd.trim();
-    if (!clean) return;
-    if (!spellData.traits.includes(clean)) {
-      setSpellData((prev) => ({
-        ...prev,
-        traits: [...prev.traits, clean],
-      }));
-    }
-    setTraitInput('');
-  };
-
-  const handleRemoveTrait = (traitToRemove: string) => {
-    setSpellData((prev) => ({
-      ...prev,
-      traits: prev.traits.filter((t) => t !== traitToRemove),
-    }));
   };
 
   const handleAddSubcategory = () => {
@@ -173,56 +296,262 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
     setSelectedSubcategories(selectedSubcategories.filter((s) => s !== subcat));
   };
 
-  const handleSave = () => {
-    if (!title.trim()) {
-      alert('Por favor, informe o nome do feitiço.');
+  const handleAddNarrativeTag = (tagToAdd: string) => {
+    const clean = tagToAdd.trim().replace(/^#/, '');
+    if (!clean) return;
+    const lower = clean.toLowerCase();
+    if (!tagsList.some((t) => t.toLowerCase() === lower)) {
+      setTagsList([...tagsList, clean]);
+    }
+    setTagsInput('');
+  };
+
+  const handleStartEditTag = (index: number, currentTag: string) => {
+    setEditingTagIndex(index);
+    setEditingTagValue(currentTag);
+  };
+
+  const handleSaveEditedTag = () => {
+    if (editingTagIndex === null) return;
+    const clean = editingTagValue.trim().replace(/^#/, '');
+    if (!clean) {
+      setTagsList(tagsList.filter((_, i) => i !== editingTagIndex));
+    } else {
+      const updated = [...tagsList];
+      updated[editingTagIndex] = clean;
+      setTagsList(Array.from(new Set(updated)));
+    }
+    setEditingTagIndex(null);
+    setEditingTagValue('');
+  };
+
+  const handleCancelEditTag = () => {
+    setEditingTagIndex(null);
+    setEditingTagValue('');
+  };
+
+  const handleRemoveNarrativeTag = (tagToRemove: string) => {
+    setTagsList(tagsList.filter((t) => t.toLowerCase() !== tagToRemove.toLowerCase()));
+  };
+
+  // Rich Text Insertion Helper
+  const insertRichFormatting = (
+    field: 'description' | 'heightened' | 'hecosLore' | 'gmNotes',
+    ref: React.RefObject<HTMLTextAreaElement | null>,
+    prefix: string,
+    suffix: string = prefix
+  ) => {
+    const el = ref.current;
+    const currentVal = spellData[field] || '';
+    if (!el) {
+      setSpellData({ ...spellData, [field]: `${currentVal}${prefix}texto${suffix}` });
       return;
     }
+
+    const start = el.selectionStart || 0;
+    const end = el.selectionEnd || 0;
+    const selected = currentVal.substring(start, end);
+    const hasSelection = start !== end;
+
+    let newVal = '';
+    let newStart = start;
+    let newEnd = end;
+
+    if (hasSelection) {
+      if (
+        selected.startsWith(prefix) &&
+        selected.endsWith(suffix) &&
+        selected.length >= prefix.length + suffix.length
+      ) {
+        const unwrapped = selected.slice(prefix.length, selected.length - suffix.length);
+        newVal = currentVal.substring(0, start) + unwrapped + currentVal.substring(end);
+        newStart = start;
+        newEnd = start + unwrapped.length;
+      } else {
+        newVal = currentVal.substring(0, start) + prefix + selected + suffix + currentVal.substring(end);
+        newStart = start;
+        newEnd = start + prefix.length + selected.length + suffix.length;
+      }
+    } else {
+      const placeholder = 'texto';
+      newVal = currentVal.substring(0, start) + prefix + placeholder + suffix + currentVal.substring(end);
+      newStart = start + prefix.length;
+      newEnd = newStart + placeholder.length;
+    }
+
+    setSpellData({ ...spellData, [field]: newVal });
+
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(newStart, newEnd);
+    }, 10);
+  };
+
+  const handleSaveSpellRecord = () => {
+    if (!title.trim()) {
+      alert('Por favor, informe o Nome do Feitiço.');
+      return;
+    }
+
+    // Clean user tags without auto-injected system clutter
+    const distinctTags: string[] = Array.from(
+      new Set(tagsList.map((t) => t.trim().replace(/^#/, '')).filter(Boolean))
+    );
 
     const finalSpellData: PF2eSpellAttributes = {
       ...spellData,
       subcategories: selectedSubcategories,
+      tags: distinctTags,
     };
 
-    const newId = 'entity-spell-' + Date.now();
+    const targetId = entityToEdit ? entityToEdit.id : 'entity-spell-' + Date.now();
     const primarySub = selectedSubcategories[0] || '';
 
-    const newEntity: HecosEntity = {
-      id: newId,
-      slug:
-        title
-          .toLowerCase()
-          .replace(/[^\w\s-]/g, '')
-          .replace(/\s+/g, '-') +
-        '-' +
-        Date.now(),
+    const savedEntity: HecosEntity = {
+      id: targetId,
+      slug: entityToEdit
+        ? entityToEdit.slug
+        : title
+            .toLowerCase()
+            .replace(/[^\w\s-]/g, '')
+            .replace(/\s+/g, '-') +
+          '-' +
+          Date.now(),
       title: title.trim(),
       subtitle: spellData.rank === 0 ? 'Truque (Cantrip)' : `Magia de ${spellData.rank}º Círculo`,
       category: 'spell',
       subcategory: primarySub,
       subcategories: selectedSubcategories,
-      summary: summary.trim() || spellData.description.slice(0, 140),
+      summary: summary.trim() || (spellData.description ? spellData.description.slice(0, 140) : ''),
       content: serializeSpellToHTML(title.trim(), finalSpellData),
       spellData: finalSpellData,
-      tags: [
-        'feitiço',
-        'magia',
-        'pf2e',
-        ...spellData.traditions,
-        ...spellData.traits.map((t) => t.toLowerCase()),
-        ...selectedSubcategories,
-      ],
-      createdAt: new Date().toISOString(),
+      tags: distinctTags,
+      coverImage: entityToEdit?.coverImage,
+      createdAt: entityToEdit?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       isSecret: visibility === 'gm',
       visibility,
       allowedUserIds: visibility === 'specific' ? allowedUserIds : [],
     };
 
-    HecosStorage.saveEntity(newEntity);
-    if (onSave) onSave(newEntity);
-    if (onSaveSpell) onSaveSpell(newEntity);
+    HecosStorage.saveEntity(savedEntity);
+    if (onSave) onSave(savedEntity);
+    if (onSaveSpell) onSaveSpell(savedEntity);
     onClose();
+  };
+
+  // Mini toolbar for rich fields
+  const renderRichToolbar = (
+    field: 'description' | 'heightened' | 'hecosLore' | 'gmNotes',
+    ref: React.RefObject<HTMLTextAreaElement | null>
+  ) => {
+    return (
+      <div className="flex items-center gap-1 py-1 px-1.5 bg-[#14121b] border border-zinc-800 rounded-lg text-xs">
+        <button
+          type="button"
+          onClick={() => insertRichFormatting(field, ref, '**', '**')}
+          className="p-1 rounded hover:bg-zinc-800 text-zinc-300 hover:text-cyan-300 transition-colors"
+          title="Negrito (**texto**)"
+        >
+          <Bold className="w-3.5 h-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => insertRichFormatting(field, ref, '*', '*')}
+          className="p-1 rounded hover:bg-zinc-800 text-zinc-300 hover:text-cyan-300 transition-colors"
+          title="Itálico (*texto*)"
+        >
+          <Italic className="w-3.5 h-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => insertRichFormatting(field, ref, '<u>', '</u>')}
+          className="p-1 rounded hover:bg-zinc-800 text-zinc-300 hover:text-cyan-300 transition-colors"
+          title="Sublinhado"
+        >
+          <Underline className="w-3.5 h-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => insertRichFormatting(field, ref, '[[', ']]')}
+          className="p-1 rounded hover:bg-zinc-800 text-[#74b6c2] hover:text-cyan-300 transition-colors flex items-center gap-0.5"
+          title="Link para Artigo do Codex ([[Artigo]])"
+        >
+          <LinkIcon className="w-3.5 h-3.5" />
+        </button>
+
+        <span className="text-zinc-700 text-xs mx-0.5">|</span>
+
+        {/* Action Glyphs shortcuts */}
+        <button
+          type="button"
+          onClick={() => insertRichFormatting(field, ref, '[1-action]', '')}
+          className="px-1 py-0.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-cyan-300 text-[10px] font-mono"
+          title="Inserir Glifo 1 Ação"
+        >
+          [1A]
+        </button>
+        <button
+          type="button"
+          onClick={() => insertRichFormatting(field, ref, '[2-actions]', '')}
+          className="px-1 py-0.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-cyan-300 text-[10px] font-mono"
+          title="Inserir Glifo 2 Ações"
+        >
+          [2A]
+        </button>
+        <button
+          type="button"
+          onClick={() => insertRichFormatting(field, ref, '[3-actions]', '')}
+          className="px-1 py-0.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-cyan-300 text-[10px] font-mono"
+          title="Inserir Glifo 3 Ações"
+        >
+          [3A]
+        </button>
+        <button
+          type="button"
+          onClick={() => insertRichFormatting(field, ref, '[reaction]', '')}
+          className="px-1 py-0.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-cyan-300 text-[10px] font-mono"
+          title="Inserir Glifo Reação"
+        >
+          [Reação]
+        </button>
+
+        <span className="text-zinc-700 text-xs mx-0.5">|</span>
+
+        {/* Color / Highlight trigger */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveRichField(field);
+              setIsColorPickerOpen(!isColorPickerOpen);
+            }}
+            className="p-1 rounded hover:bg-zinc-800 text-amber-300 hover:text-amber-200 transition-colors flex items-center gap-1 cursor-pointer"
+            title="Adicionar Cores ou Destaques"
+          >
+            <Palette className="w-3.5 h-3.5" />
+            <span className="text-[10px] font-bold hidden sm:inline">Cores</span>
+          </button>
+
+          {isColorPickerOpen && activeRichField === field && (
+            <ColorPickerMenu
+              isOpen={isColorPickerOpen}
+              onClose={() => setIsColorPickerOpen(false)}
+              onApplyTextColor={(colorHex) => {
+                if (colorHex) {
+                  insertRichFormatting(field, ref, `<span style="color: ${colorHex}">`, '</span>');
+                }
+              }}
+              onApplyHighlight={(bgRgba) => {
+                if (bgRgba) {
+                  insertRichFormatting(field, ref, `<mark style="background-color: ${bgRgba}; color: inherit; padding: 2px 4px; border-radius: 4px;">`, '</mark>');
+                }
+              }}
+            />
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -237,14 +566,14 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base sm:text-lg font-black text-zinc-100">
-                  Criar Novo Feitiço & Grimório PF2e
+                  {entityToEdit ? 'Editar Feitiço & Grimório' : 'Criar Novo Feitiço & Grimório de Hecos'}
                 </h2>
                 <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-cyan-950 text-cyan-300 border border-cyan-800/60 uppercase">
-                  Pathfinder 2e
+                  Sistema Hecos • PF2e
                 </span>
               </div>
               <p className="text-xs text-zinc-400">
-                Preencha os campos estruturados de feitiço com dados de conjuração e graus de sucesso.
+                Preencha os dados do feitiço, tradições de Hecos, traços funcionais e regras estruturadas.
               </p>
             </div>
           </div>
@@ -254,7 +583,7 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
             <VisibilityBadgeMenu
               visibility={visibility}
               allowedUserIds={allowedUserIds}
-              onVisibilityChange={(newVis, newAllowed) => {
+              onChange={(newVis, newAllowed) => {
                 setVisibility(newVis);
                 setAllowedUserIds(newAllowed);
               }}
@@ -281,7 +610,7 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                 : 'border-transparent text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            1. Dados Gerais & Tradições
+            1. Dados Gerais, Tradições & Traços
           </button>
           <button
             type="button"
@@ -292,7 +621,7 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                 : 'border-transparent text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            2. Conjuração, Efeitos & Sucessos
+            2. Conjuração, Efeitos Ricos & Graus
           </button>
           <button
             type="button"
@@ -321,7 +650,7 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Ex: Raio de Gelo, Bola de Fogo, Escudo da Penumbra..."
+                    placeholder="Ex: Pulso Cinético, Tecelagem Dimensional, Biomorfismo..."
                     className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-zinc-900/90 border border-zinc-700/80 text-zinc-100 placeholder-zinc-500 outline-none focus:border-cyan-400 shadow-inner"
                   />
                 </div>
@@ -347,55 +676,50 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                 </div>
               </div>
 
-              {/* Row 2: Spell Type and Traditions */}
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                <div className="sm:col-span-4 space-y-1">
-                  <label className="text-xs font-bold text-zinc-300">Tipo de Feitiço</label>
-                  <select
-                    value={spellData.spellType || 'spell'}
-                    onChange={(e) =>
-                      setSpellData({ ...spellData, spellType: e.target.value as any })
-                    }
-                    className="w-full px-3 py-2 text-xs rounded-xl bg-zinc-900 border border-zinc-700 text-zinc-200 outline-none focus:border-cyan-400 font-semibold"
-                  >
-                    <option value="spell">Feitiço</option>
-                    <option value="focus">Focus</option>
-                    <option value="ritual">Ritual</option>
-                    <option value="other">Outro</option>
-                  </select>
+              {/* Row 2: Tradições de Hecos */}
+              <div className="space-y-1.5 p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Tradições Mágicas de Hecos (Traits Primários):</span>
+                  </label>
+                  <span className="text-[10px] text-zinc-500 font-mono">
+                    {(spellData.traditions || []).length} selecionada(s)
+                  </span>
                 </div>
 
-                <div className="sm:col-span-8 space-y-1">
-                  <label className="text-xs font-bold text-zinc-300">
-                    Tradições Mágicas (Selecione uma ou mais)
-                  </label>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {[
-                      { id: 'arcano', label: 'Arcano', icon: BookOpen, color: 'text-cyan-400' },
-                      { id: 'divino', label: 'Divino', icon: Sun, color: 'text-amber-400' },
-                      { id: 'oculto', label: 'Oculto', icon: Moon, color: 'text-purple-400' },
-                      { id: 'primal', label: 'Primal', icon: Flame, color: 'text-emerald-400' },
-                      { id: 'outras', label: 'Outras', icon: Sparkle, color: 'text-rose-400' },
-                    ].map((trad) => {
-                      const isSelected = (spellData.traditions || []).includes(trad.id);
-                      return (
-                        <button
-                          key={trad.id}
-                          type="button"
-                          onClick={() => handleTraditionToggle(trad.id)}
-                          className={`px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                            isSelected
-                              ? 'bg-cyan-950 text-cyan-200 border border-cyan-500 shadow-md ring-1 ring-cyan-500/50'
-                              : 'bg-zinc-900/80 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1">
+                  {HECOS_SPELL_TRADITIONS.map((trad) => {
+                    const isSelected = (spellData.traditions || []).includes(trad.id);
+                    return (
+                      <button
+                        key={trad.id}
+                        type="button"
+                        onClick={() => handleTraditionToggle(trad.id)}
+                        className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                          isSelected
+                            ? trad.activeBg
+                            : 'bg-zinc-900/80 border-zinc-800 hover:border-zinc-700 text-zinc-300'
+                        }`}
+                        title={trad.desc}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center gap-1.5">
+                            <trad.icon className="w-3.5 h-3.5 shrink-0" />
+                            <span className="font-extrabold">{trad.label}</span>
+                          </div>
+                          {isSelected && <Check className="w-3.5 h-3.5" />}
+                        </div>
+                        <span
+                          className={`text-[9px] line-clamp-1 opacity-80 ${
+                            isSelected ? 'text-zinc-900 font-semibold' : 'text-zinc-400'
                           }`}
                         >
-                          <trad.icon className={`w-3.5 h-3.5 ${trad.color}`} />
-                          <span>{trad.label}</span>
-                          {isSelected && <Check className="w-3 h-3 text-cyan-300" />}
-                        </button>
-                      );
-                    })}
-                  </div>
+                          {trad.fullName}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -407,7 +731,7 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                       Ações / Tempo de Conjuração
                     </label>
                     <span className="text-[11px] font-mono text-cyan-400">
-                      Selecionado: <strong className="text-white">{spellData.castTime || '2 ações'}</strong>
+                      Selecionado: <strong className="text-white">{spellData.castTime || '—'}</strong>
                     </span>
                   </div>
 
@@ -431,7 +755,7 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                             : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
                         }`}
                       >
-                        <PF2eActionGlyph action={act.glyph as ActionGlyphType} size="sm" />
+                        <PF2eActionGlyph type={act.glyph as ActionGlyphType} size="sm" />
                         <span className="text-[10px] font-bold mt-0.5 truncate">{act.label}</span>
                       </button>
                     ))}
@@ -454,7 +778,7 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                             : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
                         }`}
                       >
-                        <PF2eActionGlyph action={act.glyph as ActionGlyphType} size="sm" />
+                        <PF2eActionGlyph type={act.glyph as ActionGlyphType} size="sm" />
                         <span>{act.label}</span>
                       </button>
                     ))}
@@ -482,7 +806,7 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                     type="text"
                     value={spellData.castTime}
                     onChange={(e) => setSpellData({ ...spellData, castTime: e.target.value })}
-                    placeholder="Ou digite tempo personalizado (ex: 2 rodadas, 1 semana, ativação sob gatilho)..."
+                    placeholder="Ou digite tempo personalizado..."
                     className="w-full px-3 py-1.5 text-xs rounded-lg bg-zinc-900/90 border border-zinc-800 text-zinc-200 placeholder-zinc-500 outline-none focus:border-cyan-400"
                   />
                 </div>
@@ -514,77 +838,148 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                 </div>
               </div>
 
-              {/* Row 4: Traits Management */}
+              {/* Row 4: Unified Traits Management with TraitInputCombobox */}
               <div className="space-y-1.5 p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-800">
                 <label className="text-xs font-bold text-zinc-300 flex items-center justify-between">
-                  <span>Descritores & Traços (Traits):</span>
+                  <span className="flex items-center gap-1.5">
+                    <Award className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Traços de Regras PF2e (Traits Funcionais):</span>
+                  </span>
                   <span className="text-[10px] text-zinc-500 font-mono">
-                    {spellData.traits.length} selecionados
+                    {(spellData.traits || []).length} traço(s) mecânico(s)
                   </span>
                 </label>
 
-                {/* Selected traits chips */}
-                <div className="flex items-center gap-1.5 flex-wrap min-h-[32px]">
-                  {spellData.traits.map((trait) => (
-                    <span
-                      key={trait}
-                      className="px-2.5 py-1 rounded-lg bg-cyan-950 border border-cyan-800 text-cyan-200 text-xs font-bold flex items-center gap-1 shadow-sm"
-                    >
-                      <span>{trait}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTrait(trait)}
-                        className="hover:text-rose-400 text-cyan-400"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
+                <TraitInputCombobox
+                  selectedTraits={spellData.traits || []}
+                  onChange={(newTraits) => setSpellData({ ...spellData, traits: newTraits })}
+                  placeholder="Buscar traço de regras ou criar novo (ex: Fogo, Mente, Abjuração)..."
+                  defaultCategory="Feitiços e Magia"
+                  quickSuggestions={COMMON_SPELL_TRAITS}
+                />
+              </div>
+
+              {/* Row 5: Narrative Tags (Diferenciação clara entre Tags e Traits) */}
+              <div className="space-y-1.5 p-3.5 rounded-xl bg-[#110d1e] border border-purple-900/40">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                    <TagIcon className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Tags Narrativas & Tópicos de Lore:</span>
+                  </label>
+                  <span className="text-[10px] text-zinc-500 font-mono">
+                    {tagsList.length} tag(s) temática(s)
+                  </span>
+                </div>
+                <p className="text-[11px] text-zinc-400">
+                  Palavras-chave de indexação narrativa (ex: <em>#astral, #ruinas, #arcano-perdido, #faccao</em>). Diferentes dos traços de regras mecânicas.
+                </p>
+
+                {/* Selected tags chips with full CRUD (Add, Edit, Delete) */}
+                <div className="flex flex-wrap gap-1.5 min-h-[36px] p-2.5 rounded-xl bg-black/40 border border-zinc-900 items-center">
+                  {tagsList.length === 0 ? (
+                    <span className="text-xs text-zinc-500 italic px-1">
+                      Nenhuma tag narrativa atribuída. (Tags nunca são preenchidas automaticamente).
                     </span>
-                  ))}
+                  ) : (
+                    tagsList.map((tag, idx) => {
+                      const isEditing = editingTagIndex === idx;
+                      if (isEditing) {
+                        return (
+                          <div
+                            key={`editing-tag-${idx}`}
+                            className="inline-flex items-center gap-1.5 p-1 rounded-lg bg-purple-950 border border-purple-400 shadow-md"
+                          >
+                            <input
+                              type="text"
+                              autoFocus
+                              value={editingTagValue}
+                              onChange={(e) => setEditingTagValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleSaveEditedTag();
+                                } else if (e.key === 'Escape') {
+                                  e.preventDefault();
+                                  handleCancelEditTag();
+                                }
+                              }}
+                              className="px-2 py-0.5 text-xs bg-black/60 border border-purple-600 rounded text-purple-100 outline-none w-28"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleSaveEditedTag}
+                              className="p-1 rounded hover:bg-purple-800 text-purple-200"
+                              title="Salvar alteração da tag"
+                            >
+                              <Check className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleCancelEditTag}
+                              className="p-1 rounded hover:bg-zinc-800 text-zinc-400"
+                              title="Cancelar edição"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <span
+                          key={`tag-${tag}-${idx}`}
+                          className="group inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-950/80 text-purple-200 border border-purple-800/60 shadow-sm transition-all hover:border-purple-600"
+                        >
+                          <span>#{tag}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditTag(idx, tag)}
+                            className="hover:text-amber-300 text-purple-400 cursor-pointer ml-1 p-0.5 rounded transition-colors"
+                            title="Editar esta tag"
+                          >
+                            <Edit2 className="w-2.5 h-2.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveNarrativeTag(tag)}
+                            className="hover:text-rose-300 text-purple-400 cursor-pointer p-0.5 rounded transition-colors"
+                            title="Excluir esta tag"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      );
+                    })
+                  )}
                 </div>
 
-                {/* Add trait custom or preset */}
                 <div className="flex items-center gap-2 pt-1">
                   <input
                     type="text"
-                    value={traitInput}
-                    onChange={(e) => setTraitInput(e.target.value)}
+                    value={tagsInput}
+                    onChange={(e) => setTagsInput(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
-                        handleAddTrait(traitInput);
+                        handleAddNarrativeTag(tagsInput);
                       }
                     }}
-                    placeholder="Adicionar traço (ex: Fogo, Mente, Teleporte)..."
-                    className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 placeholder-zinc-500 outline-none focus:border-cyan-400"
+                    placeholder="Adicionar tag narrativa (ex: #necromancia-antiga, #culto)..."
+                    className="flex-1 px-3 py-1.5 text-xs rounded-xl bg-zinc-900 border border-zinc-700/80 text-zinc-200 placeholder-zinc-500 outline-none focus:border-purple-400"
                   />
                   <button
                     type="button"
-                    onClick={() => handleAddTrait(traitInput)}
-                    disabled={!traitInput.trim()}
-                    className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-zinc-950 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+                    onClick={() => handleAddNarrativeTag(tagsInput)}
+                    disabled={!tagsInput.trim()}
+                    className="px-3.5 py-1.5 rounded-xl bg-purple-900/80 hover:bg-purple-800 border border-purple-700/60 text-purple-200 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>Adicionar</span>
+                    <span>Tag</span>
                   </button>
-                </div>
-
-                {/* Quick Presets */}
-                <div className="flex items-center gap-1 flex-wrap pt-1">
-                  <span className="text-[10px] text-zinc-500 mr-1">Sugestões:</span>
-                  {COMMON_SPELL_TRAITS.slice(0, 10).map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => handleAddTrait(preset)}
-                      className="px-2 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-cyan-300 text-[10px] border border-zinc-800 transition-colors"
-                    >
-                      +{preset}
-                    </button>
-                  ))}
                 </div>
               </div>
 
-              {/* Row 5: Subcategories / Folders */}
+              {/* Row 6: Subcategories / Folders */}
               <div className="space-y-1.5 p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-800">
                 <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
                   <Folder className="w-3.5 h-3.5 text-cyan-400" />
@@ -601,7 +996,7 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                       <button
                         type="button"
                         onClick={() => handleRemoveSubcategory(subcat)}
-                        className="hover:text-rose-400 text-purple-400"
+                        className="hover:text-rose-400 text-purple-400 cursor-pointer"
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -642,7 +1037,7 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                     type="button"
                     onClick={handleAddSubcategory}
                     disabled={!newSubcategoryInput.trim()}
-                    className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                   >
                     + Adicionar
                   </button>
@@ -689,6 +1084,20 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                 </div>
 
                 <div className="space-y-1">
+                  <label className="text-xs font-bold text-amber-300 flex items-center gap-1">
+                    <Zap className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Gatilho (Trigger)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={spellData.trigger || ''}
+                    onChange={(e) => setSpellData({ ...spellData, trigger: e.target.value })}
+                    placeholder="Ex: Uma criatura se move adjacente a você, você sofre dano..."
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-zinc-900 border border-amber-900/60 text-amber-200 placeholder-zinc-500 outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                <div className="space-y-1">
                   <label className="text-xs font-bold text-zinc-300">Salvamento / Defesa</label>
                   <select
                     value={spellData.savingThrow || ''}
@@ -715,7 +1124,7 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                     type="text"
                     value={spellData.duration || ''}
                     onChange={(e) => setSpellData({ ...spellData, duration: e.target.value })}
-                    placeholder="Ex: instantânea, sustentada até 1 min, 1 hora..."
+                    placeholder="Ex: instantânea, sustentada até 1 min..."
                     className="w-full px-3 py-2 text-xs rounded-xl bg-zinc-900 border border-zinc-700 text-zinc-200 placeholder-zinc-500 outline-none focus:border-cyan-400"
                   />
                 </div>
@@ -732,107 +1141,108 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                 </div>
               </div>
 
-              {/* Description */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-zinc-300">
-                  Descrição & Efeitos da Magia <span className="text-rose-400">*</span>
-                </label>
+              {/* Rich Description */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-zinc-300">
+                    Descrição & Efeitos da Magia <span className="text-rose-400">*</span>
+                  </label>
+                  {renderRichToolbar('description', descRef)}
+                </div>
                 <textarea
-                  rows={5}
+                  ref={descRef}
                   value={spellData.description}
                   onChange={(e) => setSpellData({ ...spellData, description: e.target.value })}
-                  placeholder="Descreva detalhadamente a conjuração, danos, condições aplicadas e regras..."
-                  className="w-full p-3 text-xs rounded-xl bg-zinc-900/90 border border-zinc-700/80 text-zinc-200 placeholder-zinc-500 outline-none focus:border-cyan-400 leading-relaxed"
+                  placeholder="Descreva o efeito mágico detalhado..."
+                  rows={6}
+                  className="w-full px-3.5 py-2.5 text-xs font-mono rounded-xl bg-zinc-900/90 border border-zinc-700/80 text-zinc-100 placeholder-zinc-500 outline-none focus:border-cyan-400 leading-relaxed shadow-inner"
                 />
               </div>
 
-              {/* Degree of Success (Expandable) */}
-              <div className="p-3.5 rounded-xl bg-zinc-950/70 border border-zinc-800 space-y-3">
-                <h4 className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
-                  <Target className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Graus de Sucesso (Salvamento):</span>
-                </h4>
-
+              {/* Degrees of Success */}
+              <div className="p-3.5 rounded-xl bg-[#090b14] border border-cyan-900/40 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-cyan-300">
+                    Graus de Sucesso (Opcional - PF2e)
+                  </label>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-emerald-400">
-                      Sucesso Crítico:
-                    </label>
+                    <label className="text-[11px] font-bold text-emerald-400">Sucesso Crítico:</label>
                     <input
                       type="text"
                       value={spellData.criticalSuccess || ''}
-                      onChange={(e) =>
-                        setSpellData({ ...spellData, criticalSuccess: e.target.value })
-                      }
-                      placeholder="Ex: O alvo não sofre efeito ou dano."
-                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700/80 text-zinc-200 placeholder-zinc-600 outline-none focus:border-emerald-500"
+                      onChange={(e) => setSpellData({ ...spellData, criticalSuccess: e.target.value })}
+                      placeholder="Efeito no sucesso crítico..."
+                      className="w-full px-3 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 outline-none focus:border-emerald-400"
                     />
                   </div>
-
                   <div className="space-y-1">
                     <label className="text-[11px] font-bold text-cyan-400">Sucesso:</label>
                     <input
                       type="text"
                       value={spellData.success || ''}
                       onChange={(e) => setSpellData({ ...spellData, success: e.target.value })}
-                      placeholder="Ex: O alvo sofre metade do dano."
-                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700/80 text-zinc-200 placeholder-zinc-600 outline-none focus:border-cyan-500"
+                      placeholder="Efeito no sucesso regular..."
+                      className="w-full px-3 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 outline-none focus:border-cyan-400"
                     />
                   </div>
-
                   <div className="space-y-1">
                     <label className="text-[11px] font-bold text-amber-400">Falha:</label>
                     <input
                       type="text"
                       value={spellData.failure || ''}
                       onChange={(e) => setSpellData({ ...spellData, failure: e.target.value })}
-                      placeholder="Ex: O alvo sofre o dano total."
-                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700/80 text-zinc-200 placeholder-zinc-600 outline-none focus:border-amber-500"
+                      placeholder="Efeito na falha..."
+                      className="w-full px-3 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 outline-none focus:border-amber-400"
                     />
                   </div>
-
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-rose-400">
-                      Falha Crítica:
-                    </label>
+                    <label className="text-[11px] font-bold text-rose-400">Falha Crítica:</label>
                     <input
                       type="text"
                       value={spellData.criticalFailure || ''}
-                      onChange={(e) =>
-                        setSpellData({ ...spellData, criticalFailure: e.target.value })
-                      }
-                      placeholder="Ex: O alvo sofre dano dobrado e condição Frightened 2."
-                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700/80 text-zinc-200 placeholder-zinc-600 outline-none focus:border-rose-500"
+                      onChange={(e) => setSpellData({ ...spellData, criticalFailure: e.target.value })}
+                      placeholder="Efeito na falha crítica..."
+                      className="w-full px-3 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 outline-none focus:border-rose-400"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Heightened & Lore */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-zinc-300">
-                    Intensificado (Heightened)
-                  </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-zinc-300">
+                      Intensificado (Heightened)
+                    </label>
+                    {renderRichToolbar('heightened', heightenedRef)}
+                  </div>
                   <textarea
-                    rows={2}
+                    ref={heightenedRef}
                     value={spellData.heightened || ''}
                     onChange={(e) => setSpellData({ ...spellData, heightened: e.target.value })}
-                    placeholder="Ex: (+1) O dano aumenta em 1d6.\n(4º) Você pode escolher até 2 alvos."
-                    className="w-full p-2.5 text-xs rounded-xl bg-zinc-900 border border-zinc-700 text-zinc-200 placeholder-zinc-500 outline-none focus:border-cyan-400 leading-relaxed"
+                    placeholder="Ex: (+1) O dano aumenta em 1d6..."
+                    rows={3}
+                    className="w-full px-3 py-2 text-xs font-mono rounded-xl bg-zinc-900 border border-zinc-700 text-zinc-200 outline-none focus:border-cyan-400"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-zinc-300">
-                    História / Lore de Hecos
-                  </label>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-zinc-300">
+                      Origem & Lore de Hecos
+                    </label>
+                    {renderRichToolbar('hecosLore', loreRef)}
+                  </div>
                   <textarea
-                    rows={2}
+                    ref={loreRef}
                     value={spellData.hecosLore || ''}
                     onChange={(e) => setSpellData({ ...spellData, hecosLore: e.target.value })}
-                    placeholder="Notas históricas de quem desenvolveu este feitiço no cenário..."
-                    className="w-full p-2.5 text-xs rounded-xl bg-zinc-900 border border-zinc-700 text-zinc-200 placeholder-zinc-500 outline-none focus:border-cyan-400 leading-relaxed"
+                    placeholder="Histórico deste feitiço em Hecos..."
+                    rows={3}
+                    className="w-full px-3 py-2 text-xs font-mono rounded-xl bg-zinc-900 border border-zinc-700 text-zinc-200 outline-none focus:border-cyan-400"
                   />
                 </div>
               </div>
@@ -840,150 +1250,88 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
           )}
 
           {activeTab === 'preview' && (
-            <div className="p-4 rounded-2xl bg-[#090710] border border-cyan-500/30 space-y-4 shadow-xl">
-              <div className="border-b border-zinc-800 pb-3 flex items-center justify-between">
+            <div className="p-5 rounded-2xl bg-[#09080e] border border-cyan-500/30 space-y-4">
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
                 <div>
-                  <h3 className="text-lg font-black text-cyan-300 flex items-center gap-2">
-                    <span>{title || '[Nome do Feitiço]'}</span>
+                  <h3 className="text-lg font-black text-cyan-300">
+                    {title.trim() || 'Nome do Feitiço'}
                   </h3>
-                  <div className="text-xs text-purple-300 font-mono">
-                    {spellData.rank === 0 ? 'Truque (Cantrip)' : `Magia ${spellData.rank}º Círculo`}
-                  </div>
+                  <p className="text-xs text-zinc-400">
+                    {spellData.rank === 0 ? 'Truque (Cantrip)' : `Magia de ${spellData.rank}º Círculo`}
+                  </p>
                 </div>
-
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <TraitBadge trait={spellData.rarity || 'Comum'} />
-                  {(spellData.traditions || []).map((t) => (
-                    <span
-                      key={t}
-                      className="px-2 py-0.5 rounded text-[11px] font-bold uppercase bg-cyan-950 text-cyan-300 border border-cyan-800"
-                    >
-                      {t}
-                    </span>
-                  ))}
-                  {(spellData.traits || []).map((tr) => (
-                    <span
-                      key={tr}
-                      className="px-2 py-0.5 rounded text-[11px] font-bold uppercase bg-zinc-900 text-zinc-400 border border-zinc-800"
-                    >
-                      {tr}
-                    </span>
-                  ))}
+                <div className="px-3 py-1 rounded-xl bg-cyan-950 text-cyan-300 border border-cyan-700 font-mono text-xs font-bold">
+                  {spellData.castTime || '2 ações'}
                 </div>
               </div>
 
-              {/* Cast Meta */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-zinc-300">
-                {spellData.castTime && (
-                  <div>
-                    <strong className="text-zinc-400">Conjuração:</strong> {spellData.castTime}
-                  </div>
-                )}
+              {/* Traits & Traditions Chips */}
+              <div className="flex flex-wrap gap-1.5">
+                <TraitBadge trait={spellData.rarity || 'Comum'} />
+                {spellData.traditions.map((trad) => (
+                  <TraitBadge key={trad} trait={trad} />
+                ))}
+                {spellData.traits.map((tr) => (
+                  <TraitBadge key={tr} trait={tr} />
+                ))}
+              </div>
+
+              {/* Properties */}
+              <div className="text-xs space-y-1 text-zinc-300">
                 {spellData.range && (
-                  <div>
+                  <p>
                     <strong className="text-zinc-400">Alcance:</strong> {spellData.range}
-                  </div>
+                  </p>
                 )}
                 {spellData.area && (
-                  <div>
+                  <p>
                     <strong className="text-zinc-400">Área:</strong> {spellData.area}
-                  </div>
+                  </p>
                 )}
                 {spellData.targets && (
-                  <div>
+                  <p>
                     <strong className="text-zinc-400">Alvos:</strong> {spellData.targets}
-                  </div>
+                  </p>
                 )}
                 {spellData.savingThrow && (
-                  <div>
+                  <p>
                     <strong className="text-zinc-400">Salvamento:</strong> {spellData.savingThrow}
-                  </div>
+                  </p>
                 )}
                 {spellData.duration && (
-                  <div>
+                  <p>
                     <strong className="text-zinc-400">Duração:</strong> {spellData.duration}
-                  </div>
+                  </p>
                 )}
               </div>
 
-              {/* Description */}
-              <div className="text-xs leading-relaxed text-zinc-200 border-t border-zinc-800/80 pt-3 whitespace-pre-line">
+              {/* Description preview */}
+              <div className="pt-3 border-t border-zinc-800/80 text-xs text-zinc-200 whitespace-pre-wrap font-sans leading-relaxed">
                 {spellData.description || (
-                  <span className="text-zinc-600 italic">Nenhuma descrição informada ainda.</span>
+                  <span className="italic text-zinc-600">Nenhuma descrição informada.</span>
                 )}
               </div>
-
-              {/* Degree of Success if provided */}
-              {(spellData.criticalSuccess ||
-                spellData.success ||
-                spellData.failure ||
-                spellData.criticalFailure) && (
-                <div className="text-xs space-y-1 pt-2 border-t border-zinc-800/60">
-                  {spellData.criticalSuccess && (
-                    <div>
-                      <strong className="text-emerald-400">Sucesso Crítico:</strong>{' '}
-                      {spellData.criticalSuccess}
-                    </div>
-                  )}
-                  {spellData.success && (
-                    <div>
-                      <strong className="text-cyan-400">Sucesso:</strong> {spellData.success}
-                    </div>
-                  )}
-                  {spellData.failure && (
-                    <div>
-                      <strong className="text-amber-400">Falha:</strong> {spellData.failure}
-                    </div>
-                  )}
-                  {spellData.criticalFailure && (
-                    <div>
-                      <strong className="text-rose-400">Falha Crítica:</strong>{' '}
-                      {spellData.criticalFailure}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Heightened */}
-              {spellData.heightened && (
-                <div className="text-xs pt-2 border-t border-zinc-800/60">
-                  <strong className="text-amber-300">Intensificado:</strong> {spellData.heightened}
-                </div>
-              )}
             </div>
           )}
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 bg-[#090710] border-t border-zinc-800/80 flex items-center justify-between">
+        <div className="p-4 bg-[#0b0816] border-t border-zinc-800/80 flex items-center justify-between">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-300 text-xs font-bold transition-all cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-bold transition-all cursor-pointer"
           >
             Cancelar
           </button>
 
           <div className="flex items-center gap-2">
-            {activeTab !== 'preview' && (
-              <button
-                type="button"
-                onClick={() =>
-                  setActiveTab(activeTab === 'details' ? 'mechanics' : 'preview')
-                }
-                className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold transition-all cursor-pointer"
-              >
-                Próximo Passo →
-              </button>
-            )}
-
             <button
               type="button"
-              onClick={handleSave}
-              className="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-zinc-950 text-xs font-black shadow-lg shadow-cyan-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+              onClick={handleSaveSpellRecord}
+              className="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-zinc-950 text-xs font-black shadow-lg transition-all cursor-pointer"
             >
-              <Check className="w-4 h-4 stroke-[3]" />
-              <span>Salvar Feitiço no Grimório</span>
+              {entityToEdit ? 'Salvar Alterações' : 'Criar Feitiço'}
             </button>
           </div>
         </div>

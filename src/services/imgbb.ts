@@ -99,3 +99,65 @@ export async function uploadToImgBB(imageFileOrBase64: File | string, name?: str
     error: lastError || 'Não foi possível fazer upload para o ImgBB após tentar todas as chaves. Tente novamente ou use uma URL externa.'
   };
 }
+
+export interface MultiUploadProgress {
+  completed: number;
+  total: number;
+  currentFileName?: string;
+  results: { file: File | string; name?: string; result: ImgBBUploadResult }[];
+}
+
+/**
+ * Uploads multiple image files or base64 strings to ImgBB sequentially or in controlled parallel
+ */
+export async function uploadMultipleToImgBB(
+  items: { file: File | string; name?: string }[],
+  onProgress?: (progress: MultiUploadProgress) => void
+): Promise<{ file: File | string; name?: string; result: ImgBBUploadResult }[]> {
+  const results: { file: File | string; name?: string; result: ImgBBUploadResult }[] = [];
+  const total = items.length;
+
+  for (let i = 0; i < total; i++) {
+    const item = items[i];
+    const fileName = typeof item.file === 'string' ? item.name || `image-${i + 1}` : item.file.name;
+
+    if (onProgress) {
+      onProgress({
+        completed: i,
+        total,
+        currentFileName: fileName,
+        results: [...results],
+      });
+    }
+
+    try {
+      const res = await uploadToImgBB(item.file, item.name || (typeof item.file !== 'string' ? item.file.name.replace(/\.[^/.]+$/, '') : undefined));
+      results.push({
+        file: item.file,
+        name: item.name,
+        result: res,
+      });
+    } catch (err: any) {
+      results.push({
+        file: item.file,
+        name: item.name,
+        result: {
+          success: false,
+          error: err?.message || 'Falha ao enviar imagem',
+        },
+      });
+    }
+
+    if (onProgress) {
+      onProgress({
+        completed: i + 1,
+        total,
+        currentFileName: fileName,
+        results: [...results],
+      });
+    }
+  }
+
+  return results;
+}
+

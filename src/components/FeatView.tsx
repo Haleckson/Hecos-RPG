@@ -97,16 +97,39 @@ export const FeatView: React.FC<FeatViewProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const subcats = Array.from(
+    new Set(
+      [
+        ...(featData.subcategories || []),
+        ...(entity.subcategories || []),
+        entity.subcategory,
+      ].filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+    )
+  );
+
   return (
     <div className="space-y-6">
       {/* CARD PRINCIPAL DO TALENTO PF2E */}
       <div className="rounded-2xl bg-[#0e0b17] border border-zinc-800 shadow-xl overflow-hidden">
         {/* CABEÇALHO DO STATBLOCK */}
         <div className="p-6 bg-gradient-to-r from-[#171124] via-[#120d1c] to-[#1a1220] border-b border-zinc-800/80 space-y-4">
-          {/* Top Bar: Rarity Trait, Category & Copy Action */}
+          {/* Top Bar: Pastas/Subcategorias, Category & Copy Action */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              <TraitBadge trait={featData.rarity || 'Comum'} />
+              {/* Indicador de Pastas logo antes da Categoria */}
+              {subcats.map((subcat) => (
+                <button
+                  key={subcat}
+                  type="button"
+                  onClick={() => onTagClick(subcat)}
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-amber-950/60 hover:bg-amber-900/70 text-amber-300 border border-amber-600/40 transition-colors shadow-sm cursor-pointer"
+                  title={`Filtrar pela pasta ${subcat}`}
+                >
+                  <Folder className="w-3 h-3 text-amber-400" />
+                  <span>{subcat}</span>
+                </button>
+              ))}
+
               <span className="px-2.5 py-0.5 text-[11px] font-bold uppercase rounded-md bg-purple-950/60 text-purple-300 border border-purple-800/50">
                 {getFeatTypeLabel(featData.featType)}
               </span>
@@ -165,38 +188,18 @@ export const FeatView: React.FC<FeatViewProps> = ({
             </p>
           )}
 
-          {/* Subcategorias / Pastas */}
-          {((featData.subcategories && featData.subcategories.length > 0) || (entity.subcategories && entity.subcategories.length > 0) || entity.subcategory) && (
-            <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-zinc-800/60">
-              <span className="text-[11px] font-mono font-bold text-zinc-500 uppercase flex items-center gap-1 mr-1">
-                <Folder className="w-3 h-3 text-amber-400" />
-                Pastas:
-              </span>
-              {(featData.subcategories || entity.subcategories || (entity.subcategory ? [entity.subcategory] : [])).map((subcat) => (
-                <button
-                  key={subcat}
-                  type="button"
-                  onClick={() => onTagClick(subcat)}
-                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-amber-950/60 hover:bg-amber-900/70 text-amber-300 border border-amber-600/40 transition-colors shadow-sm"
-                >
-                  <Folder className="w-3 h-3 text-amber-400" />
-                  <span>{subcat}</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Traços PF2e */}
-          {featData.traits && featData.traits.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-zinc-800/60">
-              {featData.traits.map((trait) => (
+          {/* Traços PF2e (iniciando pela Raridade) */}
+          <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-zinc-800/60">
+            <TraitBadge trait={featData.rarity || 'Comum'} />
+            {featData.traits
+              ?.filter((t) => t.toLowerCase() !== (featData.rarity || 'Comum').toLowerCase())
+              .map((trait) => (
                 <TraitBadge
                   key={trait}
                   trait={trait}
                 />
               ))}
-            </div>
-          )}
+          </div>
         </div>
 
         {/* METADADOS DE ATIVAÇÃO, PRÉ-REQUISITOS E REQUISITOS */}

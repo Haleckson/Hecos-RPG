@@ -8,6 +8,7 @@ import { AncestryView } from './AncestryView';
 import { FeatView } from './FeatView';
 import { PerilView } from './PerilView';
 import { ClassView } from './ClassView';
+import { SpellView } from './SpellView';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { AdjustableImage } from './AdjustableImage';
 import {
@@ -106,6 +107,18 @@ export const EntityView: React.FC<EntityViewProps> = ({
       <ClassView
         entity={entity}
         onEdit={onEdit}
+        onNavigate={onNavigate}
+        onTagClick={onTagClick}
+      />
+    );
+  }
+
+  if (entity.category === 'spell' || entity.spellData) {
+    return (
+      <SpellView
+        entity={entity}
+        onEdit={onEdit}
+        onDelete={onDelete}
         onNavigate={onNavigate}
         onTagClick={onTagClick}
       />

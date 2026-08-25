@@ -30,10 +30,27 @@ export interface PF2eAction {
   description: string;
 }
 
-export type SpellTradition = 'arcano' | 'divino' | 'oculto' | 'primal' | 'outras';
+export type SpellTradition =
+  | 'E. Física'
+  | 'E. Meta'
+  | 'M. Orgânica'
+  | 'M. Inorgânica'
+  | 'Omni'
+  | 'arcano'
+  | 'divino'
+  | 'oculto'
+  | 'primal'
+  | 'outras';
+
+export type SpellTraditionType = SpellTradition;
 
 export type SpellCategoryType =
   | 'all'
+  | 'e_fisica'
+  | 'e_meta'
+  | 'm_organica'
+  | 'm_inorganica'
+  | 'omni'
   | 'arcane'
   | 'divine'
   | 'occult'
@@ -47,10 +64,12 @@ export interface PF2eSpellAttributes {
   traditions: string[];
   spellType?: 'spell' | 'focus' | 'ritual' | 'other' | 'cantrip';
   subcategories?: string[];
+  tags?: string[];
   castTime: string;
   range?: string;
   area?: string;
   targets?: string;
+  trigger?: string;
   duration?: string;
   savingThrow?: string;
   rarity?: 'Comum' | 'Incomum' | 'Raro' | 'Único';
@@ -515,6 +534,7 @@ export interface ClassAttributes {
   hpPerLevel?: number; // e.g. 6, 8, 10, 12
   keyAttribute?: string; // Força, Destreza, etc.
   rarity?: 'Comum' | 'Incomum' | 'Raro' | 'Único';
+  traits?: string[];
   
   // Proficiencies
   perceptionProficiency?: ClassProficiencyRank;

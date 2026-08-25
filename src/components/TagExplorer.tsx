@@ -1,7 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { HecosStorage } from '../services/storage';
 import { TagInfo, HecosEntity } from '../types';
-import { Tag as TagIcon, ArrowRight, Shield, Award, Sparkles, Filter, Plus, Edit2, Trash2 } from 'lucide-react';
+import {
+  Tag as TagIcon,
+  ArrowRight,
+  Shield,
+  Award,
+  Sparkles,
+  Filter,
+  Plus,
+  Edit2,
+  Trash2,
+  Search,
+  ArrowUpDown,
+  SortAsc,
+  SortDesc,
+} from 'lucide-react';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { TraitBadge } from './TraitBadge';
 import { TraitModal } from './TraitModal';
@@ -60,6 +74,10 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
   const [selectedTag, setSelectedTag] = useState<string | null>(initialSelectedTag || null);
   const [selectedTrait, setSelectedTrait] = useState<string | null>(null);
 
+  // Filtering & Sorting State
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState<'count-desc' | 'count-asc' | 'alpha-asc' | 'alpha-desc'>('count-desc');
+
   // Modals state
   const [traitModalOpen, setTraitModalOpen] = useState(false);
   const [editingTraitName, setEditingTraitName] = useState<string | null>(null);
@@ -76,35 +94,115 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
     HecosStorage.canUserAccessItem(e, currentUser)
   );
 
-  // Compute dynamic tags based on accessible entities
-  const tagCounts: Record<string, number> = {};
-  // Compute dynamic traits from entity.traits, statblock traits, spell traits, feat traits
-  const traitCounts: Record<string, number> = {};
+  // Compute dynamic tags with case-insensitive unification
+  const tags: TagInfo[] = useMemo(() => {
+    const map = new Map<string, { displayName: string; count: number }>();
 
-  accessibleEntities.forEach((ent) => {
-    (ent.tags || []).forEach((t) => {
-      const clean = typeof t === 'string' ? t.trim() : '';
+    accessibleEntities.forEach((ent) => {
+      (ent.tags || []).forEach((t) => {
+        const clean = typeof t === 'string' ? t.trim() : '';
+        if (clean) {
+          const lower = clean.toLowerCase();
+          const existing = map.get(lower);
+          if (existing) {
+            existing.count += 1;
+            // Prefer capitalized or longer casing if existing was all lowercase
+            if (clean[0] === clean[0].toUpperCase() && existing.displayName[0] === existing.displayName[0].toLowerCase()) {
+              existing.displayName = clean;
+            }
+          } else {
+            map.set(lower, { displayName: clean, count: 1 });
+          }
+        }
+      });
+    });
+
+    let list = Array.from(map.values()).map((v) => ({ name: v.displayName, count: v.count }));
+
+    // Filter by search query
+    if (searchTerm.trim()) {
+      const q = searchTerm.trim().toLowerCase();
+      list = list.filter((t) => t.name.toLowerCase().includes(q));
+    }
+
+    // Sort list
+    list.sort((a, b) => {
+      switch (sortBy) {
+        case 'count-asc':
+          return a.count - b.count || a.name.localeCompare(b.name, 'pt-BR');
+        case 'alpha-asc':
+          return a.name.localeCompare(b.name, 'pt-BR');
+        case 'alpha-desc':
+          return b.name.localeCompare(a.name, 'pt-BR');
+        case 'count-desc':
+        default:
+          return b.count - a.count || a.name.localeCompare(b.name, 'pt-BR');
+      }
+    });
+
+    return list;
+  }, [accessibleEntities, searchTerm, sortBy]);
+
+  // Compute dynamic traits with case-insensitive deduplication & storage union
+  const traits: TagInfo[] = useMemo(() => {
+    const map = new Map<string, { displayName: string; count: number }>();
+
+    // 1. Add all registered custom traits from HecosStorage
+    const custom = HecosStorage.getCustomTraits();
+    Object.keys(custom).forEach((k) => {
+      const clean = k.trim();
       if (clean) {
-        tagCounts[clean] = (tagCounts[clean] || 0) + 1;
+        const lower = clean.toLowerCase();
+        const display = clean.charAt(0).toUpperCase() + clean.slice(1);
+        map.set(lower, { displayName: display, count: 0 });
       }
     });
 
-    // Traits collection
-    const entTraits = extractEntityTraits(ent);
-    entTraits.forEach((tr) => {
-      if (tr) {
-        traitCounts[tr] = (traitCounts[tr] || 0) + 1;
+    // 2. Count occurrences from all entities
+    accessibleEntities.forEach((ent) => {
+      const entTraits = extractEntityTraits(ent);
+      entTraits.forEach((tr) => {
+        const clean = typeof tr === 'string' ? tr.trim() : '';
+        if (clean) {
+          const lower = clean.toLowerCase();
+          const existing = map.get(lower);
+          if (existing) {
+            existing.count += 1;
+            if (clean[0] === clean[0].toUpperCase() && existing.displayName[0] === existing.displayName[0].toLowerCase()) {
+              existing.displayName = clean;
+            }
+          } else {
+            map.set(lower, { displayName: clean, count: 1 });
+          }
+        }
+      });
+    });
+
+    let list = Array.from(map.values()).map((v) => ({ name: v.displayName, count: v.count }));
+
+    // Filter by search query
+    if (searchTerm.trim()) {
+      const q = searchTerm.trim().toLowerCase();
+      list = list.filter((t) => t.name.toLowerCase().includes(q));
+    }
+
+    // Sort list
+    list.sort((a, b) => {
+      switch (sortBy) {
+        case 'count-asc':
+          return a.count - b.count || a.name.localeCompare(b.name, 'pt-BR');
+        case 'alpha-asc':
+          return a.name.localeCompare(b.name, 'pt-BR');
+        case 'alpha-desc':
+          return b.name.localeCompare(a.name, 'pt-BR');
+        case 'count-desc':
+        default:
+          return b.count - a.count || a.name.localeCompare(b.name, 'pt-BR');
       }
     });
-  });
 
-  const tags: TagInfo[] = Object.entries(tagCounts)
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count);
-
-  const traits: TagInfo[] = Object.entries(traitCounts)
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count);
+    return list;
+  }, [accessibleEntities, searchTerm, sortBy]);
 
   const matchingEntities =
     activeTab === 'tags'
@@ -126,6 +224,7 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
 
   return (
     <div key={refreshKey} className="bg-[#09080d] text-zinc-100 rounded-2xl border border-zinc-800/80 shadow-2xl p-6 sm:p-8 space-y-6">
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 pb-4">
         <div>
           <div className="flex items-center gap-3">
@@ -153,7 +252,10 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
           <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#120e1e] border border-zinc-800">
             <button
               type="button"
-              onClick={() => setActiveTab('tags')}
+              onClick={() => {
+                setActiveTab('tags');
+                setSelectedTrait(null);
+              }}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'tags'
                   ? 'bg-cyan-500 text-zinc-950 shadow-[0_0_12px_rgba(6,182,212,0.4)]'
@@ -165,7 +267,10 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('traits')}
+              onClick={() => {
+                setActiveTab('traits');
+                setSelectedTag(null);
+              }}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'traits'
                   ? 'bg-amber-500 text-zinc-950 shadow-[0_0_12px_rgba(245,158,11,0.4)]'
@@ -194,16 +299,55 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
         </div>
       </div>
 
+      {/* Filter and Sort Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-[#0f0c1b] border border-zinc-800/70">
+        <div className="relative flex-1 min-w-[200px] max-w-md">
+          <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder={`Filtrar ${activeTab === 'tags' ? 'tags' : 'traços'} por nome...`}
+            className="w-full pl-9 pr-4 py-1.5 text-xs rounded-lg bg-zinc-900/90 border border-zinc-700/70 text-zinc-200 placeholder-zinc-500 outline-none focus:border-cyan-400"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-zinc-500 hover:text-zinc-300"
+            >
+              ×
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-zinc-400 flex items-center gap-1">
+            <ArrowUpDown className="w-3 h-3 text-zinc-500" />
+            <span>Ordenar por:</span>
+          </span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="px-2.5 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 outline-none focus:border-cyan-400 cursor-pointer"
+          >
+            <option value="count-desc">Mais usados primeiro</option>
+            <option value="count-asc">Menos usados primeiro</option>
+            <option value="alpha-asc">Ordem Alfabética (A-Z)</option>
+            <option value="alpha-desc">Ordem Alfabética (Z-A)</option>
+          </select>
+        </div>
+      </div>
+
       {/* Cloud Content */}
       {activeTab === 'tags' ? (
         tags.length === 0 ? (
           <div className="p-8 text-center bg-[#110e19] rounded-xl border border-zinc-800 text-zinc-400 text-xs">
-            Nenhuma tag encontrada nos artigos autorizados para o seu perfil.
+            {searchTerm ? `Nenhuma tag encontrada para "${searchTerm}".` : 'Nenhuma tag encontrada nos artigos autorizados para o seu perfil.'}
           </div>
         ) : (
           <div className="flex flex-wrap gap-2">
             {tags.map((tag) => {
-              const isSelected = selectedTag === tag.name;
+              const isSelected = selectedTag?.toLowerCase() === tag.name.toLowerCase();
               return (
                 <div
                   key={tag.name}
@@ -250,12 +394,12 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
         )
       ) : traits.length === 0 ? (
         <div className="p-8 text-center bg-[#110e19] rounded-xl border border-zinc-800 text-zinc-400 text-xs">
-          Nenhum traço de mecânica PF2e registrado nos artigos ainda.
+          {searchTerm ? `Nenhum traço encontrado para "${searchTerm}".` : 'Nenhum traço de mecânica PF2e registrado nos artigos ainda.'}
         </div>
       ) : (
         <div className="flex flex-wrap gap-2">
           {traits.map((tr) => {
-            const isSelected = selectedTrait === tr.name;
+            const isSelected = selectedTrait?.toLowerCase() === tr.name.toLowerCase();
             return (
               <div
                 key={tr.name}

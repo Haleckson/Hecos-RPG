@@ -10,6 +10,8 @@ import { AdjustableImage } from './AdjustableImage';
 import { EntityIcon } from './EntityIcon';
 import { TraitBadge } from './TraitBadge';
 import { ImageUploadInput } from './ImageUploadInput';
+import { MultiImageAlbumUploader } from './MultiImageAlbumUploader';
+import { FeatCard } from './FeatCard';
 import {
   Swords,
   Dna,
@@ -75,6 +77,7 @@ export const AncestryView: React.FC<AncestryViewProps> = ({
   // Album (Lore) state
   const [isAlbumOpen, setIsAlbumOpen] = useState(false);
   const [isAddingImage, setIsAddingImage] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [newImageUrl, setNewImageUrl] = useState('');
   const [newImageCaption, setNewImageCaption] = useState('');
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
@@ -171,6 +174,31 @@ export const AncestryView: React.FC<AncestryViewProps> = ({
     setTimeout(() => setGmSaveSuccess(false), 2500);
   };
 
+  const handleAddMultipleImagesToAlbum = (newImages: { url: string; caption?: string }[]) => {
+    if (!newImages || newImages.length === 0) return;
+    const formatted: AncestryAlbumImage[] = newImages.map((img, idx) => ({
+      id: `img-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
+      url: img.url,
+      caption: img.caption || undefined,
+      createdAt: Date.now(),
+    }));
+    const currentAlbum = Array.isArray(data.album) ? data.album : [];
+    const updatedAlbum = [...currentAlbum, ...formatted];
+    const updatedData: AncestryAttributes = {
+      ...data,
+      album: updatedAlbum,
+    };
+    const updatedEntity: HecosEntity = {
+      ...entity,
+      ancestryData: updatedData,
+      content: serializeAncestryToHTML(entity.title, updatedData),
+      updatedAt: new Date().toISOString(),
+    };
+    HecosStorage.saveEntity(updatedEntity);
+    setIsBulkUploadOpen(false);
+    setIsAddingImage(false);
+  };
+
   const handleAddImageToAlbum = () => {
     if (!newImageUrl.trim()) return;
     const newImg: AncestryAlbumImage = {
@@ -256,8 +284,13 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1 flex items-start gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-[#1b1430] border border-cyan-500/40 flex items-center justify-center text-cyan-300 shrink-0 shadow-lg mt-0.5 group-hover:scale-105 transition-all">
-              <EntityIcon icon={entity.icon} category="ancestry" className="w-7 h-7" />
+            <div className="w-16 h-16 rounded-2xl bg-[#1b1430] border border-cyan-500/40 flex items-center justify-center text-cyan-300 shrink-0 shadow-lg mt-0.5 group-hover:scale-105 transition-all overflow-hidden">
+              <EntityIcon
+                icon={entity.icon}
+                category="ancestry"
+                className="w-8 h-8"
+                imageClassName="w-full h-full object-cover rounded-2xl"
+              />
             </div>
 
             <div className="min-w-0 flex-1">
@@ -734,85 +767,36 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                           <span className="text-[10px] text-zinc-400">{feats.length} talento(s)</span>
                         </h4>
                       )}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {feats.map((feat, idx) => (
-                          <div
-                            key={feat.id || idx}
-                            className="p-4 rounded-xl bg-[#131120] border border-[#272438] hover:border-[#74b6c2]/40 transition-all space-y-2 min-w-0 break-words"
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#272438] pb-2">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="font-bold text-zinc-100 text-sm flex items-center gap-1.5">
-                                  <span className="text-[#b19ecc]">◆</span>
-                                  {feat.featEntityId && onNavigate ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => onNavigate(feat.featEntityId!)}
-                                      className="hover:text-[#74b6c2] hover:underline transition-colors text-left font-bold cursor-pointer inline-flex items-center gap-1"
-                                      title="Abrir página completa do talento"
-                                    >
-                                      <span>{feat.name}</span>
-                                      <ExternalLink className="w-3 h-3 text-[#74b6c2] opacity-70" />
-                                    </button>
-                                  ) : (
-                                    <span>{feat.name}</span>
-                                  )}
-                                </span>
-                                {(() => {
-                                  const eff = HecosStorage.getEffectiveItemPermission(feat);
-                                  if (isActualGm && eff.visibility && eff.visibility !== 'all') {
-                                    return (
-                                      <span
-                                        className={`text-[9px] font-bold px-1.5 py-0.2 rounded border font-mono ${
-                                          eff.visibility === 'gm'
-                                            ? 'bg-rose-950/80 text-rose-300 border-rose-600/50'
-                                            : 'bg-purple-950/80 text-purple-300 border-purple-600/50'
-                                        }`}
-                                      >
-                                        {eff.visibility === 'gm' ? 'Apenas GM' : 'Compartilhado'}
-                                      </span>
-                                    );
-                                  }
-                                  return null;
-                                })()}
-                              </div>
-                              {feat.actions && (
-                                <PF2eActionGlyph
-                                  action={
-                                    feat.actions === 'passive'
-                                      ? 'passive'
-                                      : feat.actions === 'free'
-                                      ? 'free'
-                                      : feat.actions === 'reaction'
-                                      ? 'reaction'
-                                      : (parseInt(feat.actions, 10) as 1 | 2 | 3) || 'passive'
-                                  }
-                                />
-                              )}
-                            </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 min-[1800px]:grid-cols-5 2xl:grid-cols-5 gap-3 sm:gap-3.5 items-stretch">
+                        {feats.map((feat, idx) => {
+                          const linkedEntity = feat.featEntityId
+                            ? HecosStorage.getEntities().find((e) => e.id === feat.featEntityId)
+                            : undefined;
 
-                            {feat.traits && feat.traits.length > 0 && (
-                              <div className="flex flex-wrap gap-1">
-                                {feat.traits.map((t, ti) => (
-                                  <TraitBadge
-                                    key={ti}
-                                    trait={typeof t === 'string' ? t.trim() : String(t)}
-                                  />
-                                ))}
-                              </div>
-                            )}
-
-                            {feat.prerequisites && (
-                              <p className="text-xs text-[#cfb284] font-mono">
-                                <strong>Pré-requisitos:</strong> {feat.prerequisites}
-                              </p>
-                            )}
-
-                            <div className="text-xs sm:text-sm text-zinc-300 leading-relaxed min-w-0 break-words">
-                              <RichContentRenderer content={feat.description} onNavigate={onNavigate} />
-                            </div>
-                          </div>
-                        ))}
+                          return (
+                            <FeatCard
+                              key={feat.id || idx}
+                              entity={linkedEntity}
+                              id={feat.featEntityId || feat.id}
+                              title={feat.name}
+                              level={feat.rank}
+                              featType="ancestry"
+                              subcategories={[entity.title]}
+                              traits={
+                                feat.traits && feat.traits.length > 0
+                                  ? feat.traits
+                                  : ['Ancestralidade', entity.title]
+                              }
+                              actionCost={feat.actions}
+                              prerequisites={feat.prerequisites}
+                              description={feat.description}
+                              visibility={feat.visibility}
+                              allowedUserIds={feat.allowedUserIds}
+                              onSelectEntity={onNavigate}
+                              isGmMode={isActualGm}
+                            />
+                          );
+                        })}
                       </div>
                     </div>
                   );
@@ -855,17 +839,32 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
               <div className="flex items-center gap-2">
                 {isActualGm && isAlbumOpen && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsAddingImage(!isAddingImage);
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-900/70 hover:bg-purple-800 border border-purple-500/60 text-purple-200 text-xs font-bold transition-colors cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Adicionar Imagem</span>
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsBulkUploadOpen(!isBulkUploadOpen);
+                        if (!isBulkUploadOpen) setIsAddingImage(false);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-900/80 hover:bg-purple-800 border border-purple-500/60 text-purple-200 text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      <Images className="w-3.5 h-3.5" />
+                      <span>{isBulkUploadOpen ? 'Fechar Lote' : 'Upload Múltiplo'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsAddingImage(!isAddingImage);
+                        if (!isAddingImage) setIsBulkUploadOpen(false);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-800/80 hover:bg-purple-700 border border-purple-500/60 text-purple-100 text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Adicionar Uma</span>
+                    </button>
+                  </>
                 )}
                 <div className="p-1 rounded-lg text-purple-400 hover:text-purple-200">
                   {isAlbumOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
@@ -876,6 +875,19 @@ IDIOMAS: ${data.languages || 'Humani'}`;
             {/* Conteúdo do Álbum (quando expandido) */}
             {isAlbumOpen && (
               <div className="p-4 sm:p-5 border-t border-[#272438] space-y-4 bg-[#0a0912]">
+                {/* Batch multi-image upload component */}
+                {isBulkUploadOpen && isActualGm && (
+                  <div className="mb-4 animate-in fade-in">
+                    <MultiImageAlbumUploader
+                      title="Upload em Lote de Imagens para o Álbum"
+                      description="Selecione múltiplos arquivos de uma vez ou arraste várias imagens para salvar direto no artigo."
+                      onImagesUploaded={handleAddMultipleImagesToAlbum}
+                      onCancel={() => setIsBulkUploadOpen(false)}
+                      themeColor="purple"
+                    />
+                  </div>
+                )}
+
                 {/* Form para adicionar nova imagem ao Álbum (Apenas GM) */}
                 {isAddingImage && isActualGm && (
                   <div className="p-4 rounded-xl bg-[#141022] border border-purple-500/50 space-y-3 animate-in fade-in">

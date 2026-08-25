@@ -10,6 +10,7 @@ import { HecosStorage } from '../services/storage';
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { TraitBadge } from './TraitBadge';
+import { TraitInputCombobox } from './TraitInputCombobox';
 import {
   Package,
   X,
@@ -601,69 +602,17 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                 <label className="text-xs font-bold text-zinc-300 flex items-center justify-between">
                   <span>Descritores & Traços do Item (Traits):</span>
                   <span className="text-[10px] text-zinc-500 font-mono">
-                    {itemData.traits.length} selecionados
+                    {(itemData.traits || []).length} selecionados
                   </span>
                 </label>
 
-                {/* Selected traits chips */}
-                <div className="flex items-center gap-1.5 flex-wrap min-h-[32px]">
-                  {itemData.traits.map((trait) => (
-                    <span
-                      key={trait}
-                      className="px-2.5 py-1 rounded-lg bg-amber-950 border border-amber-800 text-amber-200 text-xs font-bold flex items-center gap-1 shadow-sm"
-                    >
-                      <span>{trait}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTrait(trait)}
-                        className="hover:text-rose-400 text-amber-400"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-
-                {/* Add trait custom or preset */}
-                <div className="flex items-center gap-2 pt-1">
-                  <input
-                    type="text"
-                    value={traitInput}
-                    onChange={(e) => setTraitInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddTrait(traitInput);
-                      }
-                    }}
-                    placeholder="Adicionar traço (ex: Ágil, Mágico, Vidro Estelar, Investido)..."
-                    className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 placeholder-zinc-500 outline-none focus:border-amber-400"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleAddTrait(traitInput)}
-                    disabled={!traitInput.trim()}
-                    className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Adicionar</span>
-                  </button>
-                </div>
-
-                {/* Quick Presets */}
-                <div className="flex items-center gap-1 flex-wrap pt-1">
-                  <span className="text-[10px] text-zinc-500 mr-1">Sugestões:</span>
-                  {COMMON_ITEM_TRAITS.slice(0, 12).map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => handleAddTrait(preset)}
-                      className="px-2 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-amber-300 text-[10px] border border-zinc-800 transition-colors"
-                    >
-                      +{preset}
-                    </button>
-                  ))}
-                </div>
+                <TraitInputCombobox
+                  selectedTraits={itemData.traits || []}
+                  onChange={(newTraits) => setItemData({ ...itemData, traits: newTraits })}
+                  placeholder="Buscar traço de item ou criar novo (ex: Mágico, Investido, Ágil, Vidro Estelar)..."
+                  defaultCategory="Itens e Equipamento"
+                  quickSuggestions={COMMON_ITEM_TRAITS}
+                />
               </div>
 
               {/* Row 5: Subcategories / Folders */}

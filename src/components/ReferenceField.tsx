@@ -37,10 +37,10 @@ export const ReferenceField: React.FC<ReferenceFieldProps> = ({
   const filteredEntities = allEntities
     .filter(
       (e) =>
-        e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        e.slug.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        e.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        e.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()))
+        (e.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (e.slug || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (e.category || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (e.tags || []).some((t) => (t || '').toLowerCase().includes(searchQuery.toLowerCase()))
     )
     .slice(0, 7);
 

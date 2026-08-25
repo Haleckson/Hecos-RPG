@@ -7,6 +7,7 @@ import { ImageUploadInput } from './ImageUploadInput';
 import { IconPicker } from './IconPicker';
 import { FeatPickerModal } from './FeatPickerModal';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
+import { MultiImageAlbumUploader } from './MultiImageAlbumUploader';
 import { HecosStorage } from '../services/storage';
 import { parseFeatFromContent } from '../utils/featSerializer';
 import {
@@ -62,7 +63,7 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
   const [subtitle, setSubtitle] = useState(entity.subtitle === 'Conceito ou linhagem...' ? '' : entity.subtitle || '');
   const [coverImage, setCoverImage] = useState(entity.coverImage || '');
   const [icon, setIcon] = useState(entity.icon || '');
-  const [tagsString, setTagsString] = useState(entity.tags.join(', '));
+  const [tagsString, setTagsString] = useState((entity.tags || []).join(', '));
   const [isSecret, setIsSecret] = useState(entity.isSecret || false);
   const [visibility, setVisibility] = useState<ItemVisibility>(entity.visibility || (entity.isSecret ? 'gm' : 'public'));
   const [allowedUserIds, setAllowedUserIds] = useState<string[]>(entity.allowedUserIds || []);
@@ -76,6 +77,7 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
   const [activeFeatRank, setActiveFeatRank] = useState<1 | 5 | 9 | 13 | 17>(1);
   const [isFeatPickerOpen, setIsFeatPickerOpen] = useState(false);
   const [isAlbumEditorOpen, setIsAlbumEditorOpen] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
 
   // Field change helpers
   const updateHeader = (field: keyof AncestryAttributes, val: string) => {
@@ -94,6 +96,21 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
       ...prev,
       album: [...(prev.album || []), newImg],
     }));
+  };
+
+  const addMultipleAlbumImages = (newImages: { url: string; caption?: string }[]) => {
+    if (!newImages || newImages.length === 0) return;
+    const formatted: AncestryAlbumImage[] = newImages.map((img, idx) => ({
+      id: `img-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
+      url: img.url,
+      caption: img.caption || '',
+      createdAt: Date.now(),
+    }));
+    setData((prev) => ({
+      ...prev,
+      album: [...(prev.album || []), ...formatted],
+    }));
+    setIsBulkUploadOpen(false);
   };
 
   const updateAlbumImage = (index: number, field: keyof AncestryAlbumImage, val: any) => {
@@ -1216,17 +1233,30 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
 
                 <div className="flex items-center gap-2">
                   {isAlbumEditorOpen && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        addAlbumImage();
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-800 hover:bg-purple-700 text-purple-100 text-xs font-bold transition-all shadow cursor-pointer border border-purple-500/60"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Adicionar Imagem</span>
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsBulkUploadOpen(!isBulkUploadOpen);
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-900/80 hover:bg-purple-800 text-purple-200 text-xs font-bold transition-all shadow cursor-pointer border border-purple-500/60"
+                      >
+                        <Images className="w-3.5 h-3.5" />
+                        <span>{isBulkUploadOpen ? 'Fechar Upload Múltiplo' : 'Upload Múltiplo'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addAlbumImage();
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-800 hover:bg-purple-700 text-purple-100 text-xs font-bold transition-all shadow cursor-pointer border border-purple-500/60"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Adicionar Uma</span>
+                      </button>
+                    </>
                   )}
                   <div className="p-1 rounded-lg text-purple-400 hover:text-purple-200">
                     {isAlbumEditorOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
@@ -1236,6 +1266,19 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
 
               {isAlbumEditorOpen && (
                 <div className="p-4 sm:p-5 border-t border-purple-900/40 space-y-4 bg-[#0c0a15]">
+                  {/* Multi-image Uploader Area */}
+                  {isBulkUploadOpen && (
+                    <div className="mb-4">
+                      <MultiImageAlbumUploader
+                        title="Upload em Lote de Imagens para o Álbum"
+                        description="Selecione múltiplos arquivos simultâneos, arraste de uma pasta ou cole com Ctrl+V."
+                        onImagesUploaded={addMultipleAlbumImages}
+                        onCancel={() => setIsBulkUploadOpen(false)}
+                        themeColor="purple"
+                      />
+                    </div>
+                  )}
+
                   {(data.album || []).length > 0 ? (
                     <div className="space-y-3">
                       {(data.album || []).map((img, idx) => (

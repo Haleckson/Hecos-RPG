@@ -33,6 +33,8 @@ import { PerilCreateModal } from './components/PerilCreateModal';
 import { ClassCreateModal } from './components/ClassCreateModal';
 import { TraitDrawer } from './components/TraitDrawer';
 import { FeatCategoryType, SpellCategoryType, ItemCategoryType } from './types';
+import { HomePage } from './components/HomePage';
+import { setupGlobalTextFormattingShortcuts } from './utils/keyboardShortcuts';
 import { getEmptyAncestryData, serializeAncestryToHTML } from './utils/ancestrySerializer';
 import { getEmptyFeatData, serializeFeatToHTML } from './utils/featSerializer';
 import { getEmptySpellData, serializeSpellToHTML } from './utils/spellSerializer';
@@ -54,6 +56,7 @@ import {
   FolderKanban,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Menu,
   X,
   RefreshCw,
@@ -177,6 +180,7 @@ export function App() {
 
   // Dedicated creation modals for robust PF2e entities
   const [isSpellCreateModalOpen, setIsSpellCreateModalOpen] = useState(false);
+  const [editingSpellEntity, setEditingSpellEntity] = useState<HecosEntity | null>(null);
   const [spellModalPresetCategory, setSpellModalPresetCategory] = useState<SpellCategoryType | undefined>(undefined);
   const [spellModalPresetSubcategory, setSpellModalPresetSubcategory] = useState<string | undefined>(undefined);
 
@@ -240,13 +244,36 @@ export function App() {
     // 5. Trigger initial merge sync
     HecosStorage.syncWithFirebase();
 
+    // 6. Global keyboard formatting shortcuts (Ctrl+B, Ctrl+I, Ctrl+U, Ctrl+K)
+    const cleanupShortcuts = setupGlobalTextFormattingShortcuts();
+
     return () => {
       unsubEntities();
       unsubFirebase();
       unsubUser();
       unsubFolderPerms();
+      cleanupShortcuts();
     };
   }, []);
+
+  const handleGoBack = () => {
+    if (editingEntity) {
+      setEditingEntity(null);
+      setActiveView('view');
+    } else if (selectedEntityId) {
+      setSelectedEntityId(null);
+      setActiveView('entities');
+    } else if (activeSubcategory) {
+      setActiveSubcategory(null);
+    } else if (selectedCategoryKey !== 'codex') {
+      setSelectedCategoryKey('codex');
+      setActiveSubcategory(null);
+      setSelectedEntityId(null);
+      setActiveView('entities');
+    } else if (activeView !== 'entities') {
+      setActiveView('entities');
+    }
+  };
 
   // Keyboard shortcut for Command Palette (Ctrl+K or Cmd+K)
   useEffect(() => {
@@ -497,14 +524,14 @@ export function App() {
     if (searchFilter.trim()) {
       const q = searchFilter.toLowerCase();
       const match =
-        e.title.toLowerCase().includes(q) ||
+        (e.title || '').toLowerCase().includes(q) ||
         (e.subtitle && e.subtitle.toLowerCase().includes(q)) ||
-        e.tags.some((t) => t.toLowerCase().includes(q));
+        (e.tags || []).some((t) => (t || '').toLowerCase().includes(q));
       if (!match) return false;
     }
 
     if (selectedTagFilter) {
-      if (!e.tags.includes(selectedTagFilter)) return false;
+      if (!(e.tags || []).includes(selectedTagFilter)) return false;
     }
 
     return true;
@@ -916,7 +943,7 @@ export function App() {
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         {/* Top App Header Bar */}
         <header className="px-6 py-3.5 bg-[#09080e]/90 backdrop-blur-md border-b border-zinc-800/80 flex items-center justify-between gap-4 z-30">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <button
               onClick={() => setIsSidebarOpen(true)}
               className="lg:hidden p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300"
@@ -937,6 +964,19 @@ export function App() {
               </button>
             )}
 
+            {/* Back Navigation Button */}
+            {(selectedCategoryKey !== 'codex' || activeSubcategory !== null || selectedEntityId !== null || editingEntity !== null || activeView !== 'entities') && (
+              <button
+                type="button"
+                onClick={handleGoBack}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-300 hover:text-cyan-300 text-xs font-bold transition-all shadow-sm cursor-pointer hover:border-cyan-500/50"
+                title="Voltar ao nível anterior"
+              >
+                <ChevronLeft className="w-4 h-4 text-cyan-400" />
+                <span className="hidden sm:inline">Voltar</span>
+              </button>
+            )}
+
             {/* Interactive Breadcrumb path */}
             <div className="flex items-center gap-1.5 text-xs flex-wrap">
               <button
@@ -947,43 +987,55 @@ export function App() {
                   setSelectedEntityId(null);
                   setEditingEntity(null);
                   setActiveView('entities');
+                  setSearchFilter('');
+                  setSelectedTagFilter(null);
                 }}
-                className="text-zinc-400 hover:text-cyan-300 uppercase tracking-wider font-bold transition-all hover:underline cursor-pointer px-1 py-0.5 rounded hover:bg-zinc-800/60"
+                className={`uppercase tracking-wider font-bold transition-all hover:underline cursor-pointer px-1 py-0.5 rounded hover:bg-zinc-800/60 ${
+                  selectedCategoryKey === 'codex' && !activeSubcategory && !selectedEntityId && !editingEntity && activeView === 'entities'
+                    ? 'text-cyan-300'
+                    : 'text-zinc-400 hover:text-cyan-300'
+                }`}
                 title="Página Inicial do Codex Hecos"
               >
                 Hecos
               </button>
 
-              <span className="text-zinc-700 select-none">/</span>
-
+              {/* Category Level (only if not at root Codex) */}
               {(() => {
                 const effectiveCatKey = currentEntity ? currentEntity.category : selectedCategoryKey;
+                if (effectiveCatKey === 'codex' && !currentEntity) return null;
                 const catMeta = getCategoryMeta(effectiveCatKey);
                 return (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedCategoryKey(effectiveCatKey);
-                      setActiveSubcategory(null);
-                      setSelectedEntityId(null);
-                      setEditingEntity(null);
-                      setActiveView('entities');
-                    }}
-                    className={`font-bold transition-all hover:underline cursor-pointer px-1 py-0.5 rounded hover:bg-zinc-800/60 ${
-                      !activeSubcategory && !selectedEntityId
-                        ? 'text-cyan-300'
-                        : 'text-zinc-300 hover:text-cyan-300'
-                    }`}
-                    title={`Navegar para a categoria ${catMeta.name}`}
-                  >
-                    {catMeta.name}
-                  </button>
+                  <>
+                    <span className="text-zinc-700 select-none">/</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCategoryKey(effectiveCatKey);
+                        setActiveSubcategory(null);
+                        setSelectedEntityId(null);
+                        setEditingEntity(null);
+                        setActiveView('entities');
+                      }}
+                      className={`font-bold transition-all hover:underline cursor-pointer px-1 py-0.5 rounded hover:bg-zinc-800/60 ${
+                        !activeSubcategory && !selectedEntityId && !editingEntity
+                          ? 'text-cyan-300'
+                          : 'text-zinc-300 hover:text-cyan-300'
+                      }`}
+                      title={`Navegar para a categoria ${catMeta.name}`}
+                    >
+                      {catMeta.name}
+                    </button>
+                  </>
                 );
               })()}
 
+              {/* Subcategory Level (prevent duplicating category name) */}
               {(() => {
+                const effectiveCatKey = currentEntity ? currentEntity.category : selectedCategoryKey;
+                const catMeta = getCategoryMeta(effectiveCatKey);
                 const sub = activeSubcategory || currentEntity?.subcategory;
-                if (!sub) return null;
+                if (!sub || sub.toLowerCase() === catMeta.name.toLowerCase()) return null;
                 return (
                   <>
                     <span className="text-zinc-700 select-none">/</span>
@@ -996,7 +1048,7 @@ export function App() {
                         setActiveView('entities');
                       }}
                       className={`font-medium transition-all hover:underline cursor-pointer px-1 py-0.5 rounded hover:bg-zinc-800/60 ${
-                        !selectedEntityId
+                        !selectedEntityId && !editingEntity
                           ? 'text-amber-300 font-bold'
                           : 'text-zinc-400 hover:text-amber-300'
                       }`}
@@ -1008,6 +1060,7 @@ export function App() {
                 );
               })()}
 
+              {/* Entity Level */}
               {selectedEntityId && currentEntity && (
                 <>
                   <span className="text-zinc-700 select-none">/</span>
@@ -1017,11 +1070,21 @@ export function App() {
                       setEditingEntity(null);
                       setActiveView('view');
                     }}
-                    className="text-zinc-100 font-bold truncate max-w-[150px] sm:max-w-[280px] hover:text-cyan-300 transition-colors cursor-pointer px-1 py-0.5 rounded hover:bg-zinc-800/60"
+                    className={`font-bold truncate max-w-[150px] sm:max-w-[280px] hover:text-cyan-300 transition-colors cursor-pointer px-1 py-0.5 rounded hover:bg-zinc-800/60 ${
+                      !editingEntity ? 'text-cyan-200' : 'text-zinc-400'
+                    }`}
                     title={`Visualizar ${currentEntity.title}`}
                   >
                     {currentEntity.title}
                   </button>
+                </>
+              )}
+
+              {/* Special Views or Editing Level */}
+              {editingEntity && (
+                <>
+                  <span className="text-zinc-700 select-none">/</span>
+                  <span className="text-amber-400 font-bold px-1 py-0.5">Editar</span>
                 </>
               )}
             </div>
@@ -1168,8 +1231,13 @@ export function App() {
             <EntityView
               entity={currentEntity}
               onEdit={() => {
-                setEditingEntity(currentEntity);
-                setActiveView('edit');
+                if (currentEntity.category === 'spell' || currentEntity.spellData) {
+                  setEditingSpellEntity(currentEntity);
+                  setIsSpellCreateModalOpen(true);
+                } else {
+                  setEditingEntity(currentEntity);
+                  setActiveView('edit');
+                }
               }}
               onDelete={() => handleDeleteEntity(currentEntity.id)}
               onNavigate={handleNavigateEntity}
@@ -1222,8 +1290,8 @@ export function App() {
                 onEditEntity={(id) => {
                   const ent = entities.find((e) => e.id === id || e.slug === id);
                   if (ent) {
-                    setEditingEntity(ent);
-                    setActiveView('edit');
+                    setEditingSpellEntity(ent);
+                    setIsSpellCreateModalOpen(true);
                   }
                 }}
                 onCreateSpell={handleCreateSpellDirectly}
@@ -1262,6 +1330,20 @@ export function App() {
                 }}
                 onCreateQuest={() => handleCreateNewEntity('quest')}
                 isGmMode={isGmMode}
+              />
+            ) : selectedCategoryKey === 'codex' && !activeSubcategory && !searchFilter.trim() && !selectedTagFilter ? (
+              <HomePage
+                entities={entities}
+                onSelectEntity={handleNavigateEntity}
+                onNavigateCategory={(catKey) => {
+                  setSelectedCategoryKey(catKey);
+                  setActiveSubcategory(null);
+                  setSelectedEntityId(null);
+                  setEditingEntity(null);
+                  setActiveView('entities');
+                }}
+                onCreateArticle={() => setIsNewArticleModalOpen(true)}
+                isGm={isActualGm}
               />
             ) : (
               <div className="space-y-6">
@@ -1398,7 +1480,7 @@ export function App() {
                                 </td>
                                 <td className="py-2.5 px-3">
                                   <div className="flex items-center gap-1 flex-wrap">
-                                    {item.tags.slice(0, 3).map((t, tIdx) => (
+                                    {(item.tags || []).slice(0, 3).map((t, tIdx) => (
                                       <span
                                         key={`${item.id}-tbltag-${t}-${tIdx}`}
                                         className="text-[10px] px-1.5 py-0.2 rounded bg-black/40 text-zinc-400 border border-zinc-800"
@@ -1443,9 +1525,9 @@ export function App() {
                     </div>
                   </div>
                 ) : (
-                  /* STANDARD CARDS GRID VIEW - 5 cols on >=1080p, 3 cols on smaller screens */
+                  /* STANDARD CARDS GRID VIEW - Up to 5 cols on >=1080p, max 3 cols on <1080p */
                   <div
-                    className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 min-[1367px]:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5 gap-3 sm:gap-3.5 items-stretch"
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 min-[1800px]:grid-cols-5 2xl:grid-cols-5 gap-3 sm:gap-3.5 items-stretch"
                   >
                     {sortedCategoryEntities.map((item) => {
                       if (item.category === 'ancestry') {
@@ -1533,13 +1615,18 @@ export function App() {
       {/* Robust PF2e Spell Creation Modal */}
       <SpellCreateModal
         isOpen={isSpellCreateModalOpen}
-        onClose={() => setIsSpellCreateModalOpen(false)}
+        onClose={() => {
+          setIsSpellCreateModalOpen(false);
+          setEditingSpellEntity(null);
+        }}
+        entityToEdit={editingSpellEntity || undefined}
         presetCategory={spellModalPresetCategory}
         presetSubcategory={spellModalPresetSubcategory}
         onSave={(newSpellEntity) => {
           refreshEntities();
           handleNavigateEntity(newSpellEntity.id);
           setIsSpellCreateModalOpen(false);
+          setEditingSpellEntity(null);
         }}
       />
 

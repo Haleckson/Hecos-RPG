@@ -96,7 +96,7 @@ export const ClassView: React.FC<ClassViewProps> = ({
 
           {/* Tags */}
           <div className="flex items-center gap-1.5 flex-wrap pt-1">
-            {entity.tags.map((tag, idx) => (
+            {(entity.tags || []).map((tag, idx) => (
               <span
                 key={idx}
                 onClick={() => onTagClick(tag)}

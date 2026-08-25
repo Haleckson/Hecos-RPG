@@ -100,8 +100,13 @@ export const AncestryCard: React.FC<AncestryCardProps> = ({
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-[#1b1236] via-[#100b21] to-[#0a0714] flex items-center justify-center p-4">
-            <div className="w-12 h-12 rounded-2xl bg-cyan-950/30 border border-cyan-800/30 flex items-center justify-center text-cyan-400/50 group-hover:text-cyan-300 group-hover:scale-105 transition-all">
-              <EntityIcon icon={currentEntity.icon} category="ancestry" className="w-6 h-6" />
+            <div className="w-14 h-14 rounded-2xl bg-cyan-950/30 border border-cyan-800/30 flex items-center justify-center text-cyan-400/50 group-hover:text-cyan-300 group-hover:scale-105 transition-all overflow-hidden">
+              <EntityIcon
+                icon={currentEntity.icon}
+                category="ancestry"
+                className="w-7 h-7"
+                imageClassName="w-full h-full object-cover"
+              />
             </div>
           </div>
         )}
@@ -165,8 +170,13 @@ export const AncestryCard: React.FC<AncestryCardProps> = ({
         <div className="space-y-3">
           {/* ÍCONE, NOME (ÚNICA ÁREA CLICÁVEL DO CARD) E SUBTÍTULO */}
           <div className="flex items-start gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-[#1b1430] border border-cyan-500/40 flex items-center justify-center text-cyan-300 shrink-0 shadow-md mt-0.5 group-hover:border-cyan-400 group-hover:scale-105 transition-all">
-              <EntityIcon icon={currentEntity.icon} category="ancestry" className="w-4.5 h-4.5" />
+            <div className="w-9 h-9 rounded-xl bg-[#1b1430] border border-cyan-500/40 flex items-center justify-center text-cyan-300 shrink-0 shadow-md mt-0.5 group-hover:border-cyan-400 group-hover:scale-105 transition-all overflow-hidden">
+              <EntityIcon
+                icon={currentEntity.icon}
+                category="ancestry"
+                className="w-4.5 h-4.5"
+                imageClassName="w-full h-full object-cover rounded-xl"
+              />
             </div>
 
             <div className="min-w-0 flex-1">

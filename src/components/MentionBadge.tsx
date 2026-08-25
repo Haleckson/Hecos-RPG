@@ -69,17 +69,24 @@ export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNa
 
   return (
     <span className="relative inline-block my-0.5">
-      <button
-        type="button"
+      <span
+        role="button"
+        tabIndex={0}
         onClick={() => onNavigate(entity.id)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onNavigate(entity.id);
+          }
+        }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={() => setIsHovered(false)}
-        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border font-medium text-xs sm:text-sm transition-all duration-150 cursor-pointer ${themeClasses}`}
+        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border font-medium text-xs sm:text-sm transition-all duration-150 cursor-pointer select-none ${themeClasses}`}
       >
         <span className="opacity-80">{getEntityIcon(entity.category)}</span>
         <span>{displayText || entity.title}</span>
         <ExternalLink className="w-3 h-3 opacity-60 ml-0.5" />
-      </button>
+      </span>
 
       {/* Hover Preview Card Popup */}
       <AnimatePresence>
@@ -140,7 +147,7 @@ export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNa
               <div className="flex items-center gap-2 p-1.5 my-2 rounded bg-black/60 border border-cyan-900/40 text-xs">
                 <span className="text-cyan-400 font-bold">Rank {entity.spellData.rank}</span>
                 <span className="text-zinc-400">• {entity.spellData.castTime}</span>
-                <span className="text-zinc-500 text-[10px] ml-auto">{entity.spellData.traditions.join(', ')}</span>
+                <span className="text-zinc-500 text-[10px] ml-auto">{(entity.spellData.traditions || []).join(', ')}</span>
               </div>
             )}
 
@@ -150,9 +157,9 @@ export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNa
             </p>
 
             {/* Tags */}
-            {entity.tags.length > 0 && (
+            {(entity.tags || []).length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-zinc-800/80">
-                {entity.tags.slice(0, 4).map(t => (
+                {(entity.tags || []).slice(0, 4).map(t => (
                   <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">
                     #{t}
                   </span>

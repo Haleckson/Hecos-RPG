@@ -576,6 +576,205 @@ export class HecosStorage {
     syncEntityToFirebase(updatedEntity).catch((err) => console.warn(err));
   }
 
+  /**
+   * Remove a specific trait from an entity across its various sub-structures
+   */
+  static removeTraitFromEntity(entityId: string, traitToRemove: string): HecosEntity | null {
+    const entity = this.getEntityById(entityId);
+    if (!entity) return null;
+
+    const lower = traitToRemove.toLowerCase().trim();
+    let hasChanged = false;
+
+    const updated: HecosEntity = { ...entity };
+
+    // 1. General entity traits
+    if (updated.traits && updated.traits.length > 0) {
+      const filtered = updated.traits.filter((t) => t.toLowerCase().trim() !== lower);
+      if (filtered.length !== updated.traits.length) {
+        updated.traits = filtered;
+        hasChanged = true;
+      }
+    }
+
+    // 2. Spell traits & traditions
+    if (updated.spellData) {
+      const spellCopy = { ...updated.spellData };
+      if (spellCopy.traits && spellCopy.traits.length > 0) {
+        const filteredTraits = spellCopy.traits.filter((t) => t.toLowerCase().trim() !== lower);
+        if (filteredTraits.length !== spellCopy.traits.length) {
+          spellCopy.traits = filteredTraits;
+          hasChanged = true;
+        }
+      }
+      if (spellCopy.traditions && spellCopy.traditions.length > 0) {
+        const filteredTrads = spellCopy.traditions.filter((t) => t.toLowerCase().trim() !== lower);
+        if (filteredTrads.length !== spellCopy.traditions.length) {
+          spellCopy.traditions = filteredTrads;
+          hasChanged = true;
+        }
+      }
+      updated.spellData = spellCopy;
+    }
+
+    // 3. Statblock traits
+    if (updated.statblock && updated.statblock.traits) {
+      const filteredStatTraits = updated.statblock.traits.filter((t) => t.toLowerCase().trim() !== lower);
+      if (filteredStatTraits.length !== updated.statblock.traits.length) {
+        updated.statblock = { ...updated.statblock, traits: filteredStatTraits };
+        hasChanged = true;
+      }
+    }
+
+    // 4. Feat traits
+    if (updated.featData && updated.featData.traits) {
+      const filteredFeatTraits = updated.featData.traits.filter((t) => t.toLowerCase().trim() !== lower);
+      if (filteredFeatTraits.length !== updated.featData.traits.length) {
+        updated.featData = { ...updated.featData, traits: filteredFeatTraits };
+        hasChanged = true;
+      }
+    }
+
+    // 5. Item traits
+    if (updated.itemData && updated.itemData.traits) {
+      const filteredItemTraits = updated.itemData.traits.filter((t) => t.toLowerCase().trim() !== lower);
+      if (filteredItemTraits.length !== updated.itemData.traits.length) {
+        updated.itemData = { ...updated.itemData, traits: filteredItemTraits };
+        hasChanged = true;
+      }
+    }
+
+    // 6. Peril / Hazard traits
+    if (updated.perilData && updated.perilData.traits) {
+      const filteredPerilTraits = updated.perilData.traits.filter((t) => t.toLowerCase().trim() !== lower);
+      if (filteredPerilTraits.length !== updated.perilData.traits.length) {
+        updated.perilData = { ...updated.perilData, traits: filteredPerilTraits };
+        hasChanged = true;
+      }
+    }
+
+    // 7. Class traits
+    if (updated.classData && updated.classData.traits) {
+      const filteredClassTraits = updated.classData.traits.filter((t) => t.toLowerCase().trim() !== lower);
+      if (filteredClassTraits.length !== updated.classData.traits.length) {
+        updated.classData = { ...updated.classData, traits: filteredClassTraits };
+        hasChanged = true;
+      }
+    }
+
+    if (hasChanged) {
+      this.saveEntity(updated);
+      return updated;
+    }
+    return entity;
+  }
+
+  /**
+   * Add a tag to an entity
+   */
+  static addTagToEntity(entityId: string, newTag: string): HecosEntity | null {
+    const entity = this.getEntityById(entityId);
+    if (!entity) return null;
+
+    const clean = newTag.trim().replace(/^#/, '');
+    if (!clean) return entity;
+
+    const currentTags = entity.tags || [];
+    const lower = clean.toLowerCase();
+    if (currentTags.some((t) => t.toLowerCase() === lower)) {
+      return entity;
+    }
+
+    const updatedTags = [...currentTags, clean];
+    const updated: HecosEntity = {
+      ...entity,
+      tags: updatedTags,
+      spellData: entity.spellData ? { ...entity.spellData, tags: updatedTags } : entity.spellData,
+    };
+
+    this.saveEntity(updated);
+    return updated;
+  }
+
+  /**
+   * Remove a tag from an entity
+   */
+  static removeTagFromEntity(entityId: string, tagToRemove: string): HecosEntity | null {
+    const entity = this.getEntityById(entityId);
+    if (!entity) return null;
+
+    const lower = tagToRemove.toLowerCase().trim().replace(/^#/, '');
+    const currentTags = entity.tags || [];
+    const filtered = currentTags.filter((t) => t.toLowerCase().replace(/^#/, '').trim() !== lower);
+
+    const updated: HecosEntity = {
+      ...entity,
+      tags: filtered,
+      spellData: entity.spellData
+        ? {
+            ...entity.spellData,
+            tags: (entity.spellData.tags || []).filter(
+              (t) => t.toLowerCase().replace(/^#/, '').trim() !== lower
+            ),
+          }
+        : entity.spellData,
+    };
+
+    this.saveEntity(updated);
+    return updated;
+  }
+
+  /**
+   * Update/Rename a tag in an entity
+   */
+  static updateTagInEntity(entityId: string, oldTag: string, newTag: string): HecosEntity | null {
+    const entity = this.getEntityById(entityId);
+    if (!entity) return null;
+
+    const oldClean = oldTag.toLowerCase().trim().replace(/^#/, '');
+    const newClean = newTag.trim().replace(/^#/, '');
+    if (!newClean) return this.removeTagFromEntity(entityId, oldTag);
+
+    const currentTags = entity.tags || [];
+    const updatedTags = currentTags.map((t) =>
+      t.toLowerCase().trim().replace(/^#/, '') === oldClean ? newClean : t
+    );
+
+    const updated: HecosEntity = {
+      ...entity,
+      tags: Array.from(new Set(updatedTags)),
+      spellData: entity.spellData
+        ? {
+            ...entity.spellData,
+            tags: Array.from(
+              new Set(
+                (entity.spellData.tags || []).map((t) =>
+                  t.toLowerCase().trim().replace(/^#/, '') === oldClean ? newClean : t
+                )
+              )
+            ),
+          }
+        : entity.spellData,
+    };
+
+    this.saveEntity(updated);
+    return updated;
+  }
+
+  /**
+   * Get recently modified/created entities sorted by updatedAt/createdAt
+   */
+  static getRecentEntities(limit: number = 10): HecosEntity[] {
+    const all = this.getEntities();
+    return [...all]
+      .sort((a, b) => {
+        const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+        const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+        return timeB - timeA;
+      })
+      .slice(0, limit);
+  }
+
   static deleteEntity(id: string, permanent: boolean = false): void {
     if (!permanent) {
       this.moveToTrash(id);
@@ -1881,8 +2080,8 @@ export class HecosStorage {
     const entities = this.getEntities();
     const counts = new Map<string, number>();
     entities.forEach(entity => {
-      entity.tags.forEach(tag => {
-        const t = tag.trim();
+      (entity.tags || []).forEach(tag => {
+        const t = (tag || '').trim();
         if (t) {
           counts.set(t, (counts.get(t) || 0) + 1);
         }

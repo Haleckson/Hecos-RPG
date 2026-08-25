@@ -11,6 +11,7 @@ import {
 } from '../types';
 import { HecosStorage } from '../services/storage';
 import { ImageUploadInput } from './ImageUploadInput';
+import { TraitInputCombobox } from './TraitInputCombobox';
 import {
   Skull,
   AlertTriangle,
@@ -648,16 +649,15 @@ ${gmNotes.trim() ? `\n:::gm\n**Notas do Mestre (Segredos & Revelações):**\n${g
                 <div className="sm:col-span-2">
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-[11px] font-semibold text-zinc-400">
-                      Traços (separados por vírgula)
+                      Traços & Tipos PF2e (Traits)
                     </label>
                     {renderFieldEye('typeAndTraits', 'Traços')}
                   </div>
-                  <input
-                    type="text"
-                    value={traitsInput}
-                    onChange={(e) => setTraitsInput(e.target.value)}
-                    placeholder="Ex: Humanoide, Morto-vivo, Aberração, Mecânico..."
-                    className="w-full px-2.5 py-1.5 text-xs bg-black/60 border border-zinc-800 rounded-lg text-zinc-200"
+                  <TraitInputCombobox
+                    selectedTraits={traitsInput.split(',').map((t) => t.trim()).filter(Boolean)}
+                    onChange={(newTraits) => setTraitsInput(newTraits.join(', '))}
+                    placeholder="Buscar ou criar traço (ex: Humanoide, Morto-vivo, Aberração, Mecânico, Veneno)..."
+                    defaultCategory="Criaturas e Perigos"
                   />
                 </div>
               </div>

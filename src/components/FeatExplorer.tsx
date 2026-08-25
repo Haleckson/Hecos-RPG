@@ -12,6 +12,8 @@ import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { TraitBadge } from './TraitBadge';
 import { renderContentWithMentions } from './MentionBadge';
+import { FeatCard } from './FeatCard';
+import { FolderManagerModal } from './FolderManagerModal';
 import {
   Award,
   Search,
@@ -574,171 +576,7 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
         </div>
       </div>
 
-      {/* 3. SUBCATEGORY HORIZONTAL STRIP (Single Line Scrollable Chips) */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between gap-2 px-1 text-xs">
-          <div className="flex items-center gap-1.5 text-zinc-400 font-medium">
-            <Folder className="w-3.5 h-3.5 text-amber-400" />
-            <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">
-              Subpastas {selectedMainCategory !== 'all' ? `de ${MAIN_FEAT_CATEGORIES.find((c) => c.id === selectedMainCategory)?.name}` : ''}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {selectedSubcategory !== 'all' && selectedSubcategory !== '__none__' && (
-              <button
-                type="button"
-                onClick={() => openBulkAddModal(selectedSubcategory)}
-                className="text-[11px] text-purple-300 hover:text-purple-200 hover:underline flex items-center gap-1"
-              >
-                <Plus className="w-3 h-3" />
-                <span>+ Adicionar Talentos à Pasta</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setShowInlineNewSubcategory(!showInlineNewSubcategory)}
-              className="text-[11px] text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-1"
-            >
-              <FolderPlus className="w-3 h-3" />
-              <span>+ Nova Pasta</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Inline Subcategory Creator */}
-        {showInlineNewSubcategory && (
-          <div className="p-2.5 rounded-xl bg-zinc-950/90 border border-amber-500/30 flex items-center gap-2">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                value={inlineNewSubcategoryName}
-                onChange={(e) => setInlineNewSubcategoryName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddInlineSubcategory();
-                  }
-                }}
-                placeholder="Nome da nova pasta (ex: Fighter, Umbralis, Atletismo)..."
-                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 placeholder-zinc-500 outline-none focus:border-amber-400"
-                autoFocus
-              />
-              <FolderPlus className="w-3.5 h-3.5 text-amber-400 absolute left-2.5 top-2" />
-            </div>
-            <button
-              type="button"
-              onClick={handleAddInlineSubcategory}
-              disabled={!inlineNewSubcategoryName.trim()}
-              className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
-            >
-              <Check className="w-3.5 h-3.5" />
-              <span>Salvar</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setInlineNewSubcategoryName('');
-                setShowInlineNewSubcategory(false);
-              }}
-              className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-
-        {/* Horizontal Chips: Single clean row with horizontal scrolling */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 px-0.5">
-          {/* Todas */}
-          <button
-            type="button"
-            onClick={() => setSelectedSubcategory('all')}
-            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
-              selectedSubcategory === 'all'
-                ? 'bg-amber-500 text-black shadow-sm'
-                : 'bg-[#0f0c18] hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800/80'
-            }`}
-          >
-            <span>Todas as Pastas</span>
-            <span
-              className={`text-[10px] font-mono px-1 rounded ${
-                selectedSubcategory === 'all' ? 'bg-black text-amber-300' : 'bg-zinc-800 text-zinc-400'
-              }`}
-            >
-              {filteredFeats.length}
-            </span>
-          </button>
-
-          {/* Subcategorias disponíveis */}
-          {currentAvailableSubcategories.map((subcat) => {
-            const isSelected = selectedSubcategory === subcat;
-            const count = subcategoryCounts[subcat] || 0;
-            const isSecret = HecosStorage.isFolderSecret(subcat);
-
-            return (
-              <div
-                key={subcat}
-                className={`px-2 py-1 rounded-lg text-xs font-medium transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none ${
-                  isSelected
-                    ? 'bg-amber-950/90 text-amber-200 border border-amber-500 shadow-sm ring-1 ring-amber-500/30'
-                    : isSecret
-                    ? 'bg-zinc-950 text-zinc-400 hover:text-zinc-200 border border-dashed border-zinc-700 hover:border-zinc-500'
-                    : 'bg-[#0f0c18] hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800/80 hover:border-zinc-700'
-                }`}
-                onClick={() => setSelectedSubcategory(subcat)}
-              >
-                <Folder className={`w-3 h-3 ${isSelected ? 'text-amber-400' : isSecret ? 'text-zinc-500' : 'text-zinc-500'}`} />
-                <span>{subcat}</span>
-                <span
-                  className={`text-[10px] font-mono px-1 rounded ${
-                    isSelected ? 'bg-amber-500 text-black font-bold' : 'bg-zinc-800 text-zinc-500'
-                  }`}
-                >
-                  {count}
-                </span>
-
-                {/* GM Mode: 3-Level Granular Folder Visibility Menu */}
-                {effectiveGmMode && (
-                  <div className="ml-0.5" onClick={(e) => e.stopPropagation()}>
-                    <VisibilityBadgeMenu
-                      visibility={HecosStorage.getFolderPermission(subcat).visibility}
-                      allowedUserIds={HecosStorage.getFolderPermission(subcat).allowedUserIds}
-                      isSecret={isSecret}
-                      onChange={(newVis, newAllowed) => {
-                        HecosStorage.setFolderPermission(subcat, newVis, newAllowed);
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          {/* Sem Pasta */}
-          <button
-            type="button"
-            onClick={() => setSelectedSubcategory('__none__')}
-            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all shrink-0 flex items-center gap-1 cursor-pointer ${
-              selectedSubcategory === '__none__'
-                ? 'bg-rose-950/90 text-rose-200 border border-rose-500 shadow-sm'
-                : 'bg-[#0f0c18] hover:bg-zinc-900 text-zinc-500 hover:text-zinc-300 border border-dashed border-zinc-800'
-            }`}
-          >
-            <span>Sem Pasta</span>
-            <span
-              className={`text-[10px] font-mono px-1 rounded ${
-                selectedSubcategory === '__none__' ? 'bg-rose-500 text-black font-bold' : 'bg-zinc-800 text-zinc-500'
-              }`}
-            >
-              {subcategoryCounts.__none__ || 0}
-            </span>
-          </button>
-        </div>
-      </div>
-
-      {/* 4. SEARCH, FILTERS AND VIEW MODES TOOLBAR */}
+      {/* 3. SEARCH, FILTERS AND VIEW MODES TOOLBAR */}
       <div className="p-3.5 rounded-xl bg-[#0e0b17] border border-zinc-800/90 space-y-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2.5">
           {/* Search Input */}
@@ -866,6 +704,22 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
                       );
                     })}
                 </div>
+
+                {effectiveGmMode && (
+                  <div className="pt-1.5 border-t border-zinc-800/80">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsFolderDropdownOpen(false);
+                        setIsManageSubcategoriesModalOpen(true);
+                      }}
+                      className="w-full py-1.5 px-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                      <span>Gerenciar Pastas</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1030,236 +884,20 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
           </div>
         </div>
       ) : viewMode === 'grid' ? (
-        /* --- MODE 1: GRID CARDS --- */
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 min-[1080px]:grid-cols-5 gap-3">
-          {filteredFeats.map((ent) => {
-            const feat = parseFeatFromContent(ent.title, ent.content || '', ent.featData);
-            const subcats = getEntitySubcategories(ent, feat);
-            const action = getActionGlyphProp(feat.actionCost);
-
-            return (
-              <div
-                key={ent.id}
-                className="rounded-xl bg-[#0e0b17] hover:bg-[#130f20] border border-zinc-800/90 hover:border-amber-500/40 p-3.5 transition-all flex flex-col justify-between group shadow-md space-y-3"
-              >
-                <div className="space-y-2.5">
-                  {/* Top Bar: Rarity Trait, Category & GM Actions */}
-                  <div className="flex items-center justify-between gap-1.5">
-                    <div className="flex flex-wrap items-center gap-1">
-                      <TraitBadge trait={feat.rarity || 'Comum'} />
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-950/60 text-purple-300 border border-purple-800/40">
-                        {getFeatTypeLabel(feat.featType)}
-                      </span>
-                    </div>
-
-                    {isActualGm && (
-                      <div className="flex items-center gap-0.5 opacity-80 group-hover:opacity-100 transition-opacity shrink-0">
-                        {/* 3-Level Granular Visibility Menu */}
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <VisibilityBadgeMenu
-                            visibility={ent.visibility}
-                            allowedUserIds={ent.allowedUserIds}
-                            isSecret={ent.isSecret}
-                            onChange={(newVis, newAllowed) => {
-                              HecosStorage.setEntityVisibility(ent.id, newVis, newAllowed);
-                            }}
-                          />
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => openAssignModal(ent)}
-                          className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-amber-300 transition-colors"
-                          title="Organizar Pastas / Subcategorias deste talento"
-                        >
-                          <Folder className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onEditEntity(ent.id)}
-                          className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-cyan-300 transition-colors"
-                          title="Editar Talento"
-                        >
-                          <Edit className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onDeleteEntity(ent.id)}
-                          className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-rose-400 transition-colors"
-                          title="Excluir Talento"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Title & Action Glyph on Left, Feat Level on Opposite Right */}
-                  <div className="flex items-start justify-between gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onSelectEntity(ent.id)}
-                      className="text-left flex-1 min-w-0 group/title focus:outline-none cursor-pointer"
-                      title={`Abrir talento ${ent.title}`}
-                    >
-                      <h3 className="text-sm font-bold text-amber-200 group-hover/title:text-amber-300 group-hover/title:drop-shadow-[0_0_10px_rgba(245,158,11,0.85)] flex flex-wrap items-center gap-1.5 leading-snug transition-all">
-                        <span className="group-hover/title:underline decoration-amber-400/80 decoration-2 underline-offset-2 break-words">
-                          {ent.title}
-                        </span>
-                        {action.show && <PF2eActionGlyph type={action.type} size="sm" />}
-                        {feat.actionCost === 'passive' && (
-                          <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-zinc-900 text-zinc-400 border border-zinc-800 shrink-0">
-                            Passivo
-                          </span>
-                        )}
-                        {feat.actionCost === 'activity' && (
-                          <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-purple-950/70 text-purple-300 border border-purple-800/60 flex items-center gap-0.5 shrink-0">
-                            <Clock className="w-2.5 h-2.5" />
-                            <span>Ativ.</span>
-                          </span>
-                        )}
-                      </h3>
-                      {ent.subtitle && (
-                        <p className="text-[11px] text-zinc-400 mt-0.5 italic break-words">{ent.subtitle}</p>
-                      )}
-                    </button>
-
-                    <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0 ml-1">
-                      Nível {feat.level}
-                    </span>
-                  </div>
-
-                  {/* Subcategories (Folders) badges */}
-                  {subcats.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {subcats.map((subcat) => (
-                        <button
-                          key={subcat}
-                          type="button"
-                          onClick={() => setSelectedSubcategory(subcat)}
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-950/60 hover:bg-amber-900 text-amber-300 border border-amber-600/40 transition-colors"
-                        >
-                          <Folder className="w-2.5 h-2.5 text-amber-400" />
-                          <span>{subcat}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Traits badges */}
-                  {feat.traits && feat.traits.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {feat.traits.map((trait) => (
-                        <TraitBadge
-                          key={trait}
-                          trait={trait}
-                          onClick={() => {
-                            window.dispatchEvent(new CustomEvent('hecos:open-trait-drawer', { detail: { trait } }));
-                          }}
-                        />
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Prerequisites */}
-                  {feat.prerequisites && (
-                    <div className="text-[11px] text-zinc-400 break-words">
-                      <strong className="text-zinc-500 font-bold uppercase text-[9px] mr-1">Pré-req:</strong>
-                      <span>{renderContentWithMentions(feat.prerequisites, onSelectEntity)}</span>
-                    </div>
-                  )}
-
-                  {/* Requirements */}
-                  {feat.requirements && (
-                    <div className="text-[11px] text-zinc-400 break-words">
-                      <strong className="text-zinc-500 font-bold uppercase text-[9px] mr-1">Requisitos:</strong>
-                      <span>{renderContentWithMentions(feat.requirements, onSelectEntity)}</span>
-                    </div>
-                  )}
-
-                  {/* Trigger */}
-                  {feat.trigger && (
-                    <div className="text-[11px] text-rose-300 break-words">
-                      <strong className="text-rose-400 font-bold uppercase text-[9px] mr-1">Gatilho:</strong>
-                      <span>{renderContentWithMentions(feat.trigger, onSelectEntity)}</span>
-                    </div>
-                  )}
-
-                  {/* Frequency */}
-                  {feat.frequency && (
-                    <div className="text-[11px] text-zinc-300 break-words">
-                      <strong className="text-zinc-500 font-bold uppercase text-[9px] mr-1">Frequência:</strong>
-                      <span>{feat.frequency}</span>
-                    </div>
-                  )}
-
-                  {/* Description na íntegra (full text) */}
-                  <div className="text-xs text-zinc-300/90 leading-relaxed break-words">
-                    {renderContentWithMentions(feat.description || ent.summary || ent.content?.replace(/<[^>]+>/g, '') || '', onSelectEntity)}
-                  </div>
-
-                  {/* Degrees of Success if present */}
-                  {(feat.criticalSuccess || feat.success || feat.failure || feat.criticalFailure) && (
-                    <div className="text-[11px] space-y-1 pt-1.5 border-t border-zinc-800/60 text-zinc-300">
-                      {feat.criticalSuccess && (
-                        <div>
-                          <strong className="text-emerald-400 font-bold">Sucesso Crítico: </strong>
-                          <span>{renderContentWithMentions(feat.criticalSuccess, onSelectEntity)}</span>
-                        </div>
-                      )}
-                      {feat.success && (
-                        <div>
-                          <strong className="text-cyan-400 font-bold">Sucesso: </strong>
-                          <span>{renderContentWithMentions(feat.success, onSelectEntity)}</span>
-                        </div>
-                      )}
-                      {feat.failure && (
-                        <div>
-                          <strong className="text-amber-400 font-bold">Falha: </strong>
-                          <span>{renderContentWithMentions(feat.failure, onSelectEntity)}</span>
-                        </div>
-                      )}
-                      {feat.criticalFailure && (
-                        <div>
-                          <strong className="text-rose-400 font-bold">Falha Crítica: </strong>
-                          <span>{renderContentWithMentions(feat.criticalFailure, onSelectEntity)}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Special if present */}
-                  {feat.special && (
-                    <div className="text-[11px] pt-1 text-zinc-400 break-words">
-                      <strong className="text-zinc-300 font-bold">Especial: </strong>
-                      <span>{renderContentWithMentions(feat.special, onSelectEntity)}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Footer: View Button */}
-                <div className="pt-2.5 border-t border-zinc-800/80 flex items-center justify-between mt-auto">
-                  <button
-                    type="button"
-                    onClick={() => openAssignModal(ent)}
-                    className="text-[10px] text-zinc-400 hover:text-amber-300 font-medium flex items-center gap-1 transition-colors"
-                  >
-                    <FolderPlus className="w-3 h-3 text-amber-400" />
-                    <span>Pastas</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => onSelectEntity(ent.id)}
-                    className="text-xs font-bold text-amber-300 hover:text-amber-200 flex items-center gap-1 group-hover:underline"
-                  >
-                    <span>Ver Detalhes</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+        /* --- MODE 1: GRID CARDS (ADAPTIVE: MAX 3 COLS <1080P, UP TO 5 COLS >=1080P) --- */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 min-[1800px]:grid-cols-5 2xl:grid-cols-5 gap-3 sm:gap-3.5 items-stretch">
+          {filteredFeats.map((ent) => (
+            <FeatCard
+              key={ent.id}
+              entity={ent}
+              onSelectEntity={onSelectEntity}
+              onEditEntity={onEditEntity}
+              onDeleteEntity={onDeleteEntity}
+              onOpenFolderAssign={openAssignModal}
+              onSelectSubcategory={(subcat) => setSelectedSubcategory(subcat)}
+              isGmMode={effectiveGmMode}
+            />
+          ))}
         </div>
       ) : viewMode === 'table' ? (
         /* --- MODE 2: TABLE LIST --- */
@@ -1536,8 +1174,10 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
 
       {/* --- MODAL 1: GERENCIAR ESTRUTURA DE PASTAS E SUBCATEGORIAS --- */}
       {isManageSubcategoriesModalOpen && (
-        <ManageSubcategoriesModal
+        <FolderManagerModal
+          scope="feat"
           categoriesConfig={categoriesConfig}
+          allEntities={allFeatEntities}
           onClose={() => setIsManageSubcategoriesModalOpen(false)}
         />
       )}
@@ -1565,241 +1205,6 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
           }}
         />
       )}
-    </div>
-  );
-};
-
-/**
- * MODAL: Gerenciar Pastas & Subcategorias
- */
-const ManageSubcategoriesModal: React.FC<{
-  categoriesConfig: Record<string, string[]>;
-  onClose: () => void;
-}> = ({ categoriesConfig, onClose }) => {
-  const [selectedCatKey, setSelectedCatKey] = useState<string>('class');
-  const [newSubcatName, setNewSubcatName] = useState('');
-  const [editingSubcatName, setEditingSubcatName] = useState<{ oldName: string; newName: string } | null>(null);
-
-  const subcats = categoriesConfig[selectedCatKey] || [];
-
-  const handleAdd = () => {
-    const trimmed = newSubcatName.trim();
-    if (!trimmed) return;
-    HecosStorage.addFeatSubcategory(selectedCatKey, trimmed);
-    setNewSubcatName('');
-  };
-
-  const handleRename = () => {
-    if (!editingSubcatName || !editingSubcatName.newName.trim()) return;
-    HecosStorage.renameFeatSubcategory(selectedCatKey, editingSubcatName.oldName, editingSubcatName.newName.trim());
-    setEditingSubcatName(null);
-  };
-
-  const handleDelete = (subcat: string) => {
-    if (window.confirm(`Tem certeza que deseja excluir a subcategoria "${subcat}"? Os talentos não serão apagados.`)) {
-      HecosStorage.deleteFeatSubcategory(selectedCatKey, subcat);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-      <div className="bg-[#0e0b17] border border-zinc-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-        {/* Header */}
-        <div className="p-5 bg-[#151023] border-b border-zinc-800 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <FolderPlus className="w-5 h-5 text-amber-400" />
-            <h3 className="text-base font-black text-zinc-100">Gerenciar Pastas & Subcategorias</h3>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-6 space-y-6 flex-1 overflow-y-auto">
-          {/* Main Category Selector Tabs */}
-          <div className="space-y-2">
-            <label className="text-xs font-mono font-bold text-zinc-400 uppercase">
-              Selecione a Categoria Principal:
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {MAIN_FEAT_CATEGORIES.filter((c) => c.id !== 'all').map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedCatKey(cat.id);
-                    setEditingSubcatName(null);
-                  }}
-                  className={`p-2.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-2 ${
-                    selectedCatKey === cat.id
-                      ? 'bg-amber-950/80 border-amber-500 text-amber-200 shadow-sm'
-                      : 'bg-zinc-900/80 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                  }`}
-                >
-                  <cat.icon className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{cat.name} ({cat.englishName})</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Add New Subcategory Input */}
-          <div className="p-4 rounded-xl bg-zinc-950/80 border border-amber-500/20 space-y-2">
-            <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
-              <Plus className="w-3.5 h-3.5 text-amber-400" />
-              <span>Criar Nova Subcategoria em "{MAIN_FEAT_CATEGORIES.find((c) => c.id === selectedCatKey)?.name}":</span>
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={newSubcatName}
-                onChange={(e) => setNewSubcatName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAdd();
-                  }
-                }}
-                placeholder="Ex: Fighter, Wizard, Ladino, Umbralis, Acrobacia..."
-                className="flex-1 px-3 py-2 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 placeholder-zinc-500 outline-none focus:border-amber-400"
-              />
-              <button
-                type="button"
-                onClick={handleAdd}
-                disabled={!newSubcatName.trim()}
-                className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Adicionar</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Subcategories List */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs font-mono font-bold text-zinc-400 uppercase">
-              <span>Subcategorias Existentes ({subcats.length}):</span>
-            </div>
-
-            <div className="divide-y divide-zinc-800/80 border border-zinc-800 rounded-xl overflow-hidden bg-zinc-950/40">
-              {subcats.length === 0 ? (
-                <div className="p-4 text-center text-xs text-zinc-500 italic">
-                  Nenhuma subcategoria cadastrada nesta categoria.
-                </div>
-              ) : (
-                subcats.map((subcat) => (
-                  <div
-                    key={subcat}
-                    className="p-3 flex items-center justify-between gap-3 hover:bg-zinc-900/40 transition-colors"
-                  >
-                    {editingSubcatName?.oldName === subcat ? (
-                      <div className="flex items-center gap-2 flex-1">
-                        <input
-                          type="text"
-                          value={editingSubcatName.newName}
-                          onChange={(e) =>
-                            setEditingSubcatName({ ...editingSubcatName, newName: e.target.value })
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleRename();
-                            }
-                          }}
-                          className="flex-1 px-2.5 py-1 text-xs rounded-lg bg-zinc-900 border border-amber-400 text-zinc-100 outline-none"
-                          autoFocus
-                        />
-                        <button
-                          type="button"
-                          onClick={handleRename}
-                          className="p-1 rounded bg-emerald-950 text-emerald-300 border border-emerald-700"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditingSubcatName(null)}
-                          className="p-1 rounded bg-zinc-800 text-zinc-400"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <Folder className="w-3.5 h-3.5 text-amber-400" />
-                          <span className="text-xs font-semibold text-zinc-200">{subcat}</span>
-                        </div>
-
-                        <div className="flex items-center gap-1.5">
-                          {/* Folder Secret / Visibility Toggle */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              HecosStorage.toggleFolderSecret(subcat);
-                              // Force re-render of modal
-                              setEditingSubcatName(null);
-                            }}
-                            className={`p-1.5 rounded-lg border transition-all ${
-                              HecosStorage.isFolderSecret(subcat)
-                                ? 'bg-zinc-900 text-zinc-500 hover:text-amber-300 border-zinc-700 hover:border-amber-500/50'
-                                : 'bg-amber-950/40 text-amber-400 hover:text-amber-300 border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.2)]'
-                            }`}
-                            title={
-                              HecosStorage.isFolderSecret(subcat)
-                                ? 'Pasta Secreta: Apenas o GM pode ver (Clique para tornar Pública)'
-                                : 'Pasta Pública: Todos podem ver (Clique para tornar Secreta do GM)'
-                            }
-                          >
-                            {HecosStorage.isFolderSecret(subcat) ? (
-                              <EyeOff className="w-3.5 h-3.5" />
-                            ) : (
-                              <Eye className="w-3.5 h-3.5 fill-amber-400/20" />
-                            )}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setEditingSubcatName({ oldName: subcat, newName: subcat })}
-                            className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-cyan-300"
-                            title="Renomear Subcategoria"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(subcat)}
-                            className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-rose-400"
-                            title="Excluir Subcategoria"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="p-4 bg-[#110d1d] border-t border-zinc-800 flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs font-bold transition-all"
-          >
-            Concluir
-          </button>
-        </div>
-      </div>
     </div>
   );
 };

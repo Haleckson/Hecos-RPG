@@ -6,6 +6,7 @@ interface EntityIconProps {
   icon?: string;
   category?: string;
   className?: string;
+  imageClassName?: string;
   fallbackIcon?: LucideIcon;
   size?: number;
 }
@@ -40,6 +41,7 @@ export const EntityIcon: React.FC<EntityIconProps> = ({
   icon,
   category,
   className = 'w-5 h-5',
+  imageClassName,
   fallbackIcon: Fallback,
   size,
 }) => {
@@ -50,7 +52,7 @@ export const EntityIcon: React.FC<EntityIconProps> = ({
         src={icon}
         alt="Ícone"
         referrerPolicy="no-referrer"
-        className={`object-cover rounded-lg ${className}`}
+        className={`object-cover ${imageClassName || className}`}
         style={size ? { width: size, height: size } : undefined}
       />
     );
