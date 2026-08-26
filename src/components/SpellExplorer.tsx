@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   HecosEntity,
   PF2eSpellAttributes,
@@ -12,7 +12,7 @@ import { Tooltip } from './Tooltip';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { SpellCreateModal } from './SpellCreateModal';
 import { TraitBadge } from './TraitBadge';
-import { RichContentRenderer } from './RichContentRenderer';
+import { RichContentRenderer, renderContentWithMentions } from './RichContentRenderer';
 import { FolderManagerModal } from './FolderManagerModal';
 import {
   Sparkles,
@@ -46,7 +46,22 @@ import {
   Tag,
   ArrowRight,
   Award,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Lock,
+  Unlock,
 } from 'lucide-react';
+
+export type SpellSortOption =
+  | 'rank-asc'
+  | 'rank-desc'
+  | 'name-asc'
+  | 'name-desc'
+  | 'actions'
+  | 'rarity'
+  | 'tradition'
+  | 'recent';
 
 interface SpellExplorerProps {
   entities: HecosEntity[];
@@ -214,6 +229,90 @@ function getActionGlyphProp(castTime?: string): { type: ActionGlyphType; show: b
   return { type: '1-action', show: false };
 }
 
+// Crisp, pixel-perfect, zero-scroll Spell Popover Content
+function SpellTooltipCard({
+  spell,
+  onSelectEntity,
+}: {
+  spell: HecosEntity;
+  onSelectEntity: (id: string) => void;
+}) {
+  const data = spell.spellData;
+  if (!data) return null;
+  const rankLabel = data.rank === 0 ? 'Truque' : `${data.rank}º Círculo`;
+
+  return (
+    <div
+      style={{
+        transform: 'translate3d(0, 0, 0)',
+        backfaceVisibility: 'hidden',
+        willChange: 'transform, opacity',
+      }}
+      className="w-96 sm:w-[440px] max-w-[calc(100vw-32px)] p-4 space-y-3 text-xs text-left bg-[#0d0a17] border border-cyan-500/60 rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.95)] ring-1 ring-white/10 antialiased select-text"
+    >
+      {/* Header */}
+      <div className="border-b border-zinc-800/80 pb-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <h4 className="text-sm font-extrabold text-cyan-200 font-serif tracking-wide">{spell.title}</h4>
+          <span className="text-xs font-mono font-bold text-purple-300 uppercase px-2 py-0.5 rounded bg-purple-950/90 border border-purple-800">
+            {rankLabel}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap mt-2">
+          <span className="text-xs px-2 py-0.5 rounded bg-cyan-950/90 text-cyan-300 font-mono font-semibold border border-cyan-800/60">
+            {data.rarity || 'Comum'}
+          </span>
+          {data.traditions?.map((tr) => (
+            <span key={`tt-trad-${tr}`} className="text-xs px-2 py-0.5 rounded bg-zinc-900/90 text-zinc-200 border border-zinc-800 font-mono font-medium">
+              {tr}
+            </span>
+          ))}
+          {data.traits?.map((tr) => (
+            <span key={`tt-trait-${tr}`} className="text-xs px-2 py-0.5 rounded bg-zinc-900/90 text-zinc-300 border border-zinc-800 font-mono">
+              {tr}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Index Metadata Grid */}
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-zinc-200 font-sans">
+        {data.castTime && <div><strong className="text-cyan-400">Conjuração:</strong> {renderContentWithMentions(data.castTime, onSelectEntity)}</div>}
+        {data.range && <div><strong className="text-cyan-400">Alcance:</strong> {renderContentWithMentions(data.range, onSelectEntity)}</div>}
+        {data.area && <div><strong className="text-emerald-400">Área:</strong> {renderContentWithMentions(data.area, onSelectEntity)}</div>}
+        {data.targets && <div className="col-span-2"><strong className="text-purple-400">Alvos:</strong> {renderContentWithMentions(data.targets, onSelectEntity)}</div>}
+        {data.trigger && <div className="col-span-2"><strong className="text-amber-400">Gatilho:</strong> {renderContentWithMentions(data.trigger, onSelectEntity)}</div>}
+        {data.savingThrow && <div><strong className="text-rose-400">Defesa:</strong> {renderContentWithMentions(data.savingThrow, onSelectEntity)}</div>}
+        {data.duration && <div><strong className="text-teal-400">Duração:</strong> {renderContentWithMentions(data.duration, onSelectEntity)}</div>}
+      </div>
+
+      {/* Full Description with No Scrolling */}
+      <div className="pt-2.5 border-t border-zinc-800/80 text-xs text-zinc-200 leading-relaxed">
+        <RichContentRenderer content={data.description || spell.summary || 'Sem descrição.'} onNavigate={onSelectEntity} />
+      </div>
+
+      {/* Degrees of Success */}
+      {(data.criticalSuccess || data.success || data.failure || data.criticalFailure) && (
+        <div className="pt-2.5 border-t border-zinc-800 text-xs space-y-1">
+          <div className="font-bold text-zinc-300 uppercase tracking-wider text-xs">Graus de Sucesso:</div>
+          {data.criticalSuccess && <div><span className="text-emerald-400 font-bold">Sucesso Crítico:</span> {renderContentWithMentions(data.criticalSuccess, onSelectEntity)}</div>}
+          {data.success && <div><span className="text-cyan-400 font-bold">Sucesso:</span> {renderContentWithMentions(data.success, onSelectEntity)}</div>}
+          {data.failure && <div><span className="text-amber-400 font-bold">Falha:</span> {renderContentWithMentions(data.failure, onSelectEntity)}</div>}
+          {data.criticalFailure && <div><span className="text-rose-400 font-bold">Falha Crítica:</span> {renderContentWithMentions(data.criticalFailure, onSelectEntity)}</div>}
+        </div>
+      )}
+
+      {/* Heightened Section */}
+      {data.heightened && (
+        <div className="pt-2.5 border-t border-zinc-800 text-xs text-purple-200 leading-relaxed">
+          <strong className="text-purple-400 uppercase text-xs mr-1 font-bold">Intensificado:</strong>
+          {renderContentWithMentions(data.heightened, onSelectEntity)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function SpellExplorer({
   entities,
   onSelectEntity,
@@ -237,12 +336,13 @@ export function SpellExplorer({
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'folders'>('grid');
 
-  // 3. Filters
+  // 3. Filters & Sorting
   const [filterRank, setFilterRank] = useState<string>('all'); // 'all', 'cantrip', '1'..'10'
   const [filterTradition, setFilterTradition] = useState<string>('all');
   const [filterRarity, setFilterRarity] = useState<string>('all');
   const [filterCastTime, setFilterCastTime] = useState<string>('all');
   const [filterTrait, setFilterTrait] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<SpellSortOption>('rank-asc');
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
 
   // 4. Modals & folder management
@@ -258,9 +358,41 @@ export function SpellExplorer({
   const [managingSpellFolders, setManagingSpellFolders] = useState<HecosEntity | null>(null);
   const [selectedSpellSubcats, setSelectedSpellSubcats] = useState<string[]>([]);
 
+  // 7. Manage Spells inside a specific Folder modal
+  const [managingFolderForSpells, setManagingFolderForSpells] = useState<string | null>(null);
+  const [searchSpellsInFolderModal, setSearchSpellsInFolderModal] = useState('');
+
+  // Real-time synchronization of spell categories config
+  useEffect(() => {
+    const unsub = HecosStorage.subscribeSpellCategories((cfg) => {
+      setCategoriesConfig(cfg);
+    });
+    return () => unsub();
+  }, []);
+
   // Refresh subcategories from storage
   const refreshConfig = () => {
     setCategoriesConfig(HecosStorage.getAllSpellSubcategoriesConfig());
+  };
+
+  // Helper: check if a spell belongs to a folder/subcategory
+  const isSpellInSubcategory = (sp: HecosEntity, folderName: string) => {
+    if (!folderName) return false;
+    const data = sp.spellData;
+    if (!data) return false;
+    const subcats = Array.from(
+      new Set([
+        ...(data.subcategories || []),
+        ...(sp.subcategories || []),
+        ...(sp.subcategory ? [sp.subcategory] : []),
+      ])
+    );
+    if (subcats.includes(folderName)) return true;
+    if (sp.tags?.includes(folderName)) return true;
+    if (folderName === 'Truques' && data.rank === 0) return true;
+    if (folderName === `${data.rank}º Círculo` || folderName === `${data.rank}º Rank`) return true;
+    if (data.traditions?.includes(folderName)) return true;
+    return false;
   };
 
   // Extract all Spell Entities with parsed spell data
@@ -346,12 +478,7 @@ export function SpellExplorer({
           const subs = data.subcategories || sp.subcategories || (sp.subcategory ? [sp.subcategory] : []);
           if (subs.length > 0) return false;
         } else {
-          const hasSub =
-            data.subcategories?.includes(activeSubcategory) ||
-            sp.subcategories?.includes(activeSubcategory) ||
-            sp.subcategory === activeSubcategory ||
-            sp.tags?.includes(activeSubcategory);
-          if (!hasSub) return false;
+          if (!isSpellInSubcategory(sp, activeSubcategory)) return false;
         }
       }
 
@@ -415,21 +542,115 @@ export function SpellExplorer({
     filterTrait,
   ]);
 
+  // Sorted Spells according to chosen sorting mode
+  const sortedSpells = useMemo(() => {
+    const list = [...filteredSpells];
+    const rarityOrder: Record<string, number> = {
+      comum: 1,
+      incomum: 2,
+      raro: 3,
+      único: 4,
+      unico: 4,
+    };
+
+    const getActionScore = (sp: HecosEntity) => {
+      const ct = (sp.spellData?.castTime || '').toLowerCase();
+      if (ct.includes('livre') || ct.includes('free')) return 0;
+      if (ct.includes('reação') || ct.includes('reaction')) return 0.5;
+      if (ct.includes('1 a 3') || ct.includes('1 ou 2 ou 3')) return 1.5;
+      if (ct.startsWith('1') || ct.includes('1 ação') || ct.includes('1 acao') || ct === '1') return 1;
+      if (ct.startsWith('2') || ct.includes('2 ações') || ct.includes('2 acoes') || ct === '2') return 2;
+      if (ct.startsWith('3') || ct.includes('3 ações') || ct.includes('3 acoes') || ct === '3') return 3;
+      if (ct.includes('minuto') || ct.includes('hora')) return 10;
+      return 5;
+    };
+
+    list.sort((a, b) => {
+      const dataA = a.spellData!;
+      const dataB = b.spellData!;
+
+      switch (sortBy) {
+        case 'name-asc':
+          return a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' });
+
+        case 'name-desc':
+          return b.title.localeCompare(a.title, 'pt-BR', { sensitivity: 'base' });
+
+        case 'rank-asc': {
+          const diff = (dataA.rank ?? 0) - (dataB.rank ?? 0);
+          if (diff !== 0) return diff;
+          return a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' });
+        }
+
+        case 'rank-desc': {
+          const diff = (dataB.rank ?? 0) - (dataA.rank ?? 0);
+          if (diff !== 0) return diff;
+          return a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' });
+        }
+
+        case 'rarity': {
+          const rA = rarityOrder[(dataA.rarity || 'comum').toLowerCase()] || 1;
+          const rB = rarityOrder[(dataB.rarity || 'comum').toLowerCase()] || 1;
+          if (rA !== rB) return rA - rB;
+          const diff = (dataA.rank ?? 0) - (dataB.rank ?? 0);
+          if (diff !== 0) return diff;
+          return a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' });
+        }
+
+        case 'actions': {
+          const sA = getActionScore(a);
+          const sB = getActionScore(b);
+          if (sA !== sB) return sA - sB;
+          const diff = (dataA.rank ?? 0) - (dataB.rank ?? 0);
+          if (diff !== 0) return diff;
+          return a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' });
+        }
+
+        case 'tradition': {
+          const tA = (dataA.traditions || [])[0] || 'zzz';
+          const tB = (dataB.traditions || [])[0] || 'zzz';
+          const tradDiff = tA.localeCompare(tB, 'pt-BR', { sensitivity: 'base' });
+          if (tradDiff !== 0) return tradDiff;
+          const diff = (dataA.rank ?? 0) - (dataB.rank ?? 0);
+          if (diff !== 0) return diff;
+          return a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' });
+        }
+
+        case 'recent': {
+          const dateA = a.updatedAt || a.createdAt || 0;
+          const dateB = b.updatedAt || b.createdAt || 0;
+          return dateB - dateA;
+        }
+
+        default:
+          return 0;
+      }
+    });
+
+    return list;
+  }, [filteredSpells, sortBy]);
+
   // Folder Counts
   const subcategoryCounts = useMemo(() => {
     const counts: Record<string, number> = { __none__: 0 };
+    const allSubs = new Set<string>();
+    (Object.values(categoriesConfig) as string[][]).forEach((list) => {
+      (list || []).forEach((s) => allSubs.add(s));
+    });
+
     spellEntities.forEach((sp) => {
       const subs = sp.spellData?.subcategories || sp.subcategories || (sp.subcategory ? [sp.subcategory] : []);
       if (subs.length === 0) {
         counts.__none__ = (counts.__none__ || 0) + 1;
-      } else {
-        subs.forEach((s) => {
-          counts[s] = (counts[s] || 0) + 1;
-        });
       }
     });
+
+    allSubs.forEach((fName) => {
+      counts[fName] = spellEntities.filter((sp) => isSpellInSubcategory(sp, fName)).length;
+    });
+
     return counts;
-  }, [spellEntities]);
+  }, [spellEntities, categoriesConfig]);
 
   // Category counts
   const categoryCounts = useMemo(() => {
@@ -821,6 +1042,26 @@ export function SpellExplorer({
               <option value="Omni">Omni</option>
             </select>
 
+            {/* Sort Selector Dropdown */}
+            <div className="flex items-center gap-1.5 bg-zinc-900/90 border border-zinc-800 hover:border-zinc-700 rounded-xl px-2.5 py-1.5 transition-all">
+              <ArrowUpDown className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SpellSortOption)}
+                className="bg-transparent text-xs font-semibold text-zinc-200 outline-none cursor-pointer pr-1"
+                title="Ordenar Feitiços"
+              >
+                <option value="rank-asc" className="bg-[#0f0d1a] text-zinc-200">Círculo (Truques → 10º)</option>
+                <option value="rank-desc" className="bg-[#0f0d1a] text-zinc-200">Círculo (10º → Truques)</option>
+                <option value="name-asc" className="bg-[#0f0d1a] text-zinc-200">Nome (A → Z)</option>
+                <option value="name-desc" className="bg-[#0f0d1a] text-zinc-200">Nome (Z → A)</option>
+                <option value="actions" className="bg-[#0f0d1a] text-zinc-200">Ações / Conjuração</option>
+                <option value="rarity" className="bg-[#0f0d1a] text-zinc-200">Raridade (Comum → Único)</option>
+                <option value="tradition" className="bg-[#0f0d1a] text-zinc-200">Tradição Mágica</option>
+                <option value="recent" className="bg-[#0f0d1a] text-zinc-200">Mais Recentes</option>
+              </select>
+            </div>
+
             {/* More Filters Toggle */}
             <button
               type="button"
@@ -981,7 +1222,7 @@ export function SpellExplorer({
       ) : viewMode === 'grid' ? (
         /* GRID VIEW (ADAPTIVE: MAX 3 COLS <1080P, UP TO 5 COLS >=1080P) */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 min-[1800px]:grid-cols-5 2xl:grid-cols-5 gap-3 sm:gap-4 items-stretch">
-          {filteredSpells.map((sp) => {
+          {sortedSpells.map((sp) => {
             const data = sp.spellData!;
             const perm = HecosStorage.getEntityPermission(sp.id);
             const rankLabel = data.rank === 0 ? 'Truque' : `${data.rank}º Círculo`;
@@ -998,69 +1239,9 @@ export function SpellExplorer({
                     <div className="min-w-0 flex-1">
                       <Tooltip
                         side="right"
-                        delay={250}
+                        delay={200}
                         className="w-full"
-                        content={
-                          <div className="p-3.5 space-y-2.5 max-w-sm sm:max-w-md text-xs text-left bg-[#0e0c18] border border-cyan-500/50 rounded-2xl shadow-2xl">
-                            <div className="border-b border-zinc-800 pb-2">
-                              <div className="flex items-center justify-between gap-2">
-                                <h4 className="text-sm font-extrabold text-cyan-200 font-serif">{sp.title}</h4>
-                                <span className="text-[10px] font-mono font-bold text-purple-300 uppercase px-1.5 py-0.2 rounded bg-purple-950 border border-purple-800">
-                                  {rankLabel}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1 flex-wrap mt-1">
-                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 font-bold">
-                                  {data.rarity || 'Comum'}
-                                </span>
-                                {data.traditions?.map((tr) => (
-                                  <span key={`tt-trad-${tr}`} className="text-[10px] px-1.5 py-0.2 rounded bg-zinc-900 text-zinc-300">
-                                    {tr}
-                                  </span>
-                                ))}
-                                {data.traits?.map((tr) => (
-                                  <span key={`tt-trait-${tr}`} className="text-[10px] px-1.5 py-0.2 rounded bg-zinc-900 text-zinc-400">
-                                    {tr}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* Tooltip Index Info */}
-                            <div className="grid grid-cols-2 gap-1 text-[10px] text-zinc-300 font-sans">
-                              {data.castTime && <div><strong className="text-cyan-400">Conjuração:</strong> {data.castTime}</div>}
-                              {data.range && <div><strong className="text-cyan-400">Alcance:</strong> {data.range}</div>}
-                              {data.area && <div><strong className="text-emerald-400">Área:</strong> {data.area}</div>}
-                              {data.targets && <div className="col-span-2"><strong className="text-purple-400">Alvos:</strong> {data.targets}</div>}
-                              {data.trigger && <div className="col-span-2"><strong className="text-amber-400">Gatilho:</strong> {data.trigger}</div>}
-                              {data.savingThrow && <div><strong className="text-rose-400">Defesa:</strong> {data.savingThrow}</div>}
-                              {data.duration && <div><strong className="text-teal-400">Duração:</strong> {data.duration}</div>}
-                            </div>
-
-                            {/* Full Description */}
-                            <div className="pt-2 border-t border-zinc-800/80 text-[11px] text-zinc-300 leading-relaxed max-h-48 overflow-y-auto pr-1">
-                              <RichContentRenderer content={data.description || sp.summary || 'Sem descrição.'} />
-                            </div>
-
-                            {/* Degrees of success in tooltip if present */}
-                            {(data.criticalSuccess || data.success || data.failure || data.criticalFailure) && (
-                              <div className="pt-2 border-t border-zinc-800 text-[10px] space-y-1">
-                                <div className="font-bold text-zinc-400 uppercase tracking-wider text-[9px]">Graus de Sucesso:</div>
-                                {data.criticalSuccess && <div><span className="text-emerald-400 font-bold">Sucesso Crítico:</span> {data.criticalSuccess}</div>}
-                                {data.success && <div><span className="text-cyan-400 font-bold">Sucesso:</span> {data.success}</div>}
-                                {data.failure && <div><span className="text-amber-400 font-bold">Falha:</span> {data.failure}</div>}
-                                {data.criticalFailure && <div><span className="text-rose-400 font-bold">Falha Crítica:</span> {data.criticalFailure}</div>}
-                              </div>
-                            )}
-
-                            {/* Heightened in tooltip */}
-                            {data.heightened && (
-                              <div className="pt-2 border-t border-zinc-800 text-[10px] text-purple-200">
-                                <strong className="text-purple-400 uppercase text-[9px]">Intensificado:</strong> {data.heightened}
-                              </div>
-                            )}
-                          </div>
-                        }
+                        content={<SpellTooltipCard spell={sp} onSelectEntity={onSelectEntity} />}
                       >
                         <button
                           type="button"
@@ -1110,10 +1291,12 @@ export function SpellExplorer({
                     )}
                   </div>
 
-                  {/* Traits & Traditions Area: Rarity First, then Traditions as TraitBadges, then other Traits */}
-                  <div className="flex items-center gap-1.5 flex-wrap mt-3">
+                  {/* Traits & Traditions Area: Rarity First, then Traditions as TraitBadges, then other Traits (Compact) */}
+                  <div className="flex items-center gap-1 flex-wrap mt-2.5">
                     {/* 1. Rarity at the beginning of traits */}
                     <TraitBadge
+                      compact
+                      size="xs"
                       trait={data.rarity || 'Comum'}
                       onClick={() => {
                         window.dispatchEvent(
@@ -1127,6 +1310,8 @@ export function SpellExplorer({
                     {/* 2. Traditions as full interactive Traits */}
                     {data.traditions?.map((trad, tradIdx) => (
                       <TraitBadge
+                        compact
+                        size="xs"
                         key={`${sp.id}-trad-${trad}-${tradIdx}`}
                         trait={trad}
                         onClick={() => {
@@ -1142,6 +1327,8 @@ export function SpellExplorer({
                       ?.filter((t) => !data.traditions?.includes(t))
                       .map((t, tIdx) => (
                         <TraitBadge
+                          compact
+                          size="xs"
                           key={`${sp.id}-trait-${t}-${tIdx}`}
                           trait={t}
                           onClick={() => {
@@ -1195,10 +1382,10 @@ export function SpellExplorer({
                     </div>
                   )}
 
-                  {/* Description rendered with RichContentRenderer so bold, colors, and formatting display cleanly */}
-                  <div className="text-xs text-zinc-300 mt-3 leading-relaxed break-words">
+                  {/* Resumo Rápido displayed on card (rich formatted) */}
+                  <div className="text-xs text-zinc-300 mt-3 leading-relaxed break-words line-clamp-4">
                     <RichContentRenderer
-                      content={data.description || sp.summary || 'Sem descrição fornecida.'}
+                      content={sp.summary || data.description || 'Sem resumo cadastrado.'}
                       onNavigate={onSelectEntity}
                     />
                   </div>
@@ -1277,18 +1464,78 @@ export function SpellExplorer({
             <table className="w-full text-left text-xs">
               <thead className="bg-[#120f1c] border-b border-zinc-800 text-zinc-400 uppercase font-mono text-[10px]">
                 <tr>
-                  <th className="py-3 px-4">Nome do Feitiço</th>
-                  <th className="py-3 px-3">Círculo</th>
-                  <th className="py-3 px-3">Tradições</th>
-                  <th className="py-3 px-3">Conjuração</th>
+                  <th className="py-3 px-4">
+                    <button
+                      type="button"
+                      onClick={() => setSortBy(sortBy === 'name-asc' ? 'name-desc' : 'name-asc')}
+                      className="flex items-center gap-1.5 hover:text-cyan-300 transition-colors uppercase font-mono font-bold cursor-pointer"
+                      title="Ordenar por Nome"
+                    >
+                      <span>Nome do Feitiço</span>
+                      {sortBy === 'name-asc' && <ArrowUp className="w-3 h-3 text-cyan-400" />}
+                      {sortBy === 'name-desc' && <ArrowDown className="w-3 h-3 text-cyan-400" />}
+                      {sortBy !== 'name-asc' && sortBy !== 'name-desc' && <ArrowUpDown className="w-3 h-3 opacity-40 hover:opacity-100" />}
+                    </button>
+                  </th>
+                  <th className="py-3 px-3">
+                    <button
+                      type="button"
+                      onClick={() => setSortBy(sortBy === 'rank-asc' ? 'rank-desc' : 'rank-asc')}
+                      className="flex items-center gap-1.5 hover:text-cyan-300 transition-colors uppercase font-mono font-bold cursor-pointer"
+                      title="Ordenar por Círculo"
+                    >
+                      <span>Círculo</span>
+                      {sortBy === 'rank-asc' && <ArrowUp className="w-3 h-3 text-cyan-400" />}
+                      {sortBy === 'rank-desc' && <ArrowDown className="w-3 h-3 text-cyan-400" />}
+                      {sortBy !== 'rank-asc' && sortBy !== 'rank-desc' && <ArrowUpDown className="w-3 h-3 opacity-40 hover:opacity-100" />}
+                    </button>
+                  </th>
+                  <th className="py-3 px-3">
+                    <button
+                      type="button"
+                      onClick={() => setSortBy('tradition')}
+                      className={`flex items-center gap-1.5 hover:text-cyan-300 transition-colors uppercase font-mono font-bold cursor-pointer ${
+                        sortBy === 'tradition' ? 'text-cyan-300' : ''
+                      }`}
+                      title="Ordenar por Tradições"
+                    >
+                      <span>Tradições</span>
+                      {sortBy === 'tradition' ? <ArrowDown className="w-3 h-3 text-cyan-400" /> : <ArrowUpDown className="w-3 h-3 opacity-40 hover:opacity-100" />}
+                    </button>
+                  </th>
+                  <th className="py-3 px-3">
+                    <button
+                      type="button"
+                      onClick={() => setSortBy('actions')}
+                      className={`flex items-center gap-1.5 hover:text-cyan-300 transition-colors uppercase font-mono font-bold cursor-pointer ${
+                        sortBy === 'actions' ? 'text-cyan-300' : ''
+                      }`}
+                      title="Ordenar por Ações"
+                    >
+                      <span>Conjuração</span>
+                      {sortBy === 'actions' ? <ArrowDown className="w-3 h-3 text-cyan-400" /> : <ArrowUpDown className="w-3 h-3 opacity-40 hover:opacity-100" />}
+                    </button>
+                  </th>
                   <th className="py-3 px-3">Alcance / Área</th>
-                  <th className="py-3 px-3">Raridade</th>
+                  <th className="py-3 px-3">
+                    <button
+                      type="button"
+                      onClick={() => setSortBy('rarity')}
+                      className={`flex items-center gap-1.5 hover:text-cyan-300 transition-colors uppercase font-mono font-bold cursor-pointer ${
+                        sortBy === 'rarity' ? 'text-cyan-300' : ''
+                      }`}
+                      title="Ordenar por Raridade"
+                    >
+                      <span>Raridade</span>
+                      {sortBy === 'rarity' ? <ArrowDown className="w-3 h-3 text-cyan-400" /> : <ArrowUpDown className="w-3 h-3 opacity-40 hover:opacity-100" />}
+                    </button>
+                  </th>
                   <th className="py-3 px-3">Pastas</th>
                   <th className="py-3 px-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/60">
-                {filteredSpells.map((sp) => {
+                {sortedSpells.map((sp) => {
                   const data = sp.spellData!;
                   const perm = HecosStorage.getEntityPermission(sp.id);
                   const rankLabel = data.rank === 0 ? 'Truque' : `${data.rank}º`;
@@ -1296,16 +1543,22 @@ export function SpellExplorer({
                   return (
                     <tr key={sp.id} className="hover:bg-zinc-900/50 transition-colors group">
                       <td className="py-3 px-4">
-                        <button
-                          type="button"
-                          onClick={() => onSelectEntity(sp.id)}
-                          className="text-left font-bold text-zinc-200 group-hover:text-cyan-300 hover:drop-shadow-[0_0_10px_rgba(6,182,212,0.8)] transition-all flex items-center gap-2 cursor-pointer focus:outline-none"
+                        <Tooltip
+                          side="right"
+                          delay={200}
+                          content={<SpellTooltipCard spell={sp} onSelectEntity={onSelectEntity} />}
                         >
-                          <span className="hover:underline decoration-cyan-400/80 decoration-2 underline-offset-2">
-                            {sp.title}
-                          </span>
-                          {perm.visibility === 'gm' && <EyeOff className="w-3.5 h-3.5 text-rose-400" />}
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => onSelectEntity(sp.id)}
+                            className="text-left font-bold text-zinc-200 group-hover:text-cyan-300 hover:drop-shadow-[0_0_10px_rgba(6,182,212,0.8)] transition-all flex items-center gap-2 cursor-pointer focus:outline-none"
+                          >
+                            <span className="hover:underline decoration-cyan-400/80 decoration-2 underline-offset-2">
+                              {sp.title}
+                            </span>
+                            {perm.visibility === 'gm' && <EyeOff className="w-3.5 h-3.5 text-rose-400" />}
+                          </button>
+                        </Tooltip>
                       </td>
                       <td className="py-3 px-3 font-mono text-purple-300 font-bold">{rankLabel}</td>
                       <td className="py-3 px-3">
@@ -1392,68 +1645,174 @@ export function SpellExplorer({
         </div>
       ) : (
         /* FOLDER TREE VIEW */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {currentSubcategories.map((folderName) => {
-            const spellsInFolder = spellEntities.filter((sp) =>
-              sp.spellData?.subcategories?.includes(folderName)
-            );
+        <div className="space-y-4">
+          {currentSubcategories.length === 0 ? (
+            <div className="bg-[#0b0914] border border-zinc-800/80 rounded-2xl p-12 text-center space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-purple-950/50 border border-purple-800/40 flex items-center justify-center mx-auto text-purple-400">
+                <FolderTree className="w-6 h-6" />
+              </div>
+              <div className="max-w-md mx-auto space-y-1">
+                <h3 className="text-base font-bold text-zinc-200">Nenhuma pasta nesta categoria</h3>
+                <p className="text-xs text-zinc-400">
+                  Crie e organize pastas para estruturar os feitiços e rituais desta categoria.
+                </p>
+              </div>
+              {isActualGm && (
+                <button
+                  type="button"
+                  onClick={() => setIsFolderManagerOpen(true)}
+                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs inline-flex items-center gap-2 cursor-pointer shadow-md"
+                >
+                  <FolderPlus className="w-4 h-4" />
+                  <span>Criar Pastas para esta Categoria</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {currentSubcategories.map((folderName) => {
+                const isSecret = HecosStorage.isFolderSecret(folderName);
+                const spellsInFolder = sortedSpells.filter((sp) =>
+                  isSpellInSubcategory(sp, folderName)
+                );
 
-            return (
-              <div
-                key={folderName}
-                className="bg-[#0b0914] border border-zinc-800/80 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all shadow-md flex flex-col justify-between"
-              >
-                <div className="p-4 bg-purple-950/20 border-b border-zinc-800/60 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FolderOpen className="w-4 h-4 text-purple-400" />
-                    <h3 className="font-bold text-sm text-zinc-100">{folderName}</h3>
-                  </div>
-                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800/50">
-                    {spellsInFolder.length}
-                  </span>
-                </div>
+                return (
+                  <div
+                    key={folderName}
+                    className="bg-[#0b0914] border border-zinc-800/80 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all shadow-md flex flex-col justify-between"
+                  >
+                    {/* Folder Card Header */}
+                    <div className="p-3.5 bg-purple-950/20 border-b border-zinc-800/60 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="p-1.5 rounded-lg bg-purple-950/60 border border-purple-800/50 text-purple-400 shrink-0">
+                          {isSecret ? <Lock className="w-3.5 h-3.5 text-amber-400" /> : <FolderOpen className="w-3.5 h-3.5" />}
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-xs text-zinc-100 truncate">{folderName}</h3>
+                          {isSecret && (
+                            <span className="text-[9px] font-mono text-amber-400 font-bold block">
+                              SECRETA (GM)
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
-                <div className="p-3 flex-1">
-                  {spellsInFolder.length === 0 ? (
-                    <div className="text-center py-6 text-zinc-600 text-xs italic">
-                      Nenhum feitiço nesta pasta
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800/50">
+                          {spellsInFolder.length}
+                        </span>
+
+                        {isActualGm && (
+                          <Tooltip title="Organizar feitiços nesta pasta">
+                            <button
+                              type="button"
+                              onClick={() => setManagingFolderForSpells(folderName)}
+                              className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-cyan-300 transition-colors cursor-pointer"
+                              title="Organizar feitiços"
+                            >
+                              <Layers className="w-3.5 h-3.5" />
+                            </button>
+                          </Tooltip>
+                        )}
+                        <Tooltip title="Filtrar e ver em grade">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveSubcategory(folderName);
+                              setViewMode('grid');
+                            }}
+                            className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-purple-300 transition-colors cursor-pointer"
+                            title="Ver em grade"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </button>
+                        </Tooltip>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {spellsInFolder.map((sp) => (
-                        <div
-                          key={sp.id}
-                          onClick={() => onSelectEntity(sp.id)}
-                          className="flex items-center justify-between p-2 rounded-xl bg-zinc-900/40 hover:bg-cyan-950/30 border border-zinc-800/40 hover:border-cyan-500/40 cursor-pointer transition-all group"
-                        >
-                          <div>
-                            <div className="text-xs font-semibold text-zinc-200 group-hover:text-cyan-300">
-                              {sp.title}
-                            </div>
-                            <div className="text-[10px] text-zinc-400 font-mono">
-                              {sp.spellData?.rank === 0 ? 'Truque' : `${sp.spellData?.rank}º Círculo`} •{' '}
-                              {sp.spellData?.traditions?.join(', ') || 'Sem tradição'}
-                            </div>
-                          </div>
+
+                    {/* Folder Content / Spell List */}
+                    <div className="p-3 flex-1 flex flex-col justify-between">
+                      {spellsInFolder.length === 0 ? (
+                        <div className="text-center py-6 text-zinc-600 text-xs italic space-y-2">
+                          <p>Nenhum feitiço nesta pasta</p>
                           {isActualGm && (
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onEditEntity(sp.id);
-                              }}
-                              className="p-1 rounded text-zinc-500 hover:text-cyan-300"
+                              type="button"
+                              onClick={() => setManagingFolderForSpells(folderName)}
+                              className="text-[11px] font-bold text-cyan-400 hover:text-cyan-300 hover:underline cursor-pointer inline-flex items-center gap-1"
                             >
-                              <Edit className="w-3.5 h-3.5" />
+                              <Plus className="w-3 h-3" />
+                              <span>Adicionar Feitiços</span>
                             </button>
                           )}
                         </div>
-                      ))}
+                      ) : (
+                        <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+                          {spellsInFolder.map((sp) => (
+                            <div
+                              key={sp.id}
+                              onClick={() => onSelectEntity(sp.id)}
+                              className="flex items-center justify-between p-2 rounded-xl bg-zinc-900/40 hover:bg-cyan-950/30 border border-zinc-800/40 hover:border-cyan-500/40 cursor-pointer transition-all group"
+                            >
+                              <div className="min-w-0 flex-1 pr-2">
+                                <div className="text-xs font-semibold text-zinc-200 group-hover:text-cyan-300 truncate">
+                                  {sp.title}
+                                </div>
+                                <div className="text-[10px] text-zinc-400 font-mono flex items-center gap-1.5 truncate">
+                                  <span>{sp.spellData?.rank === 0 ? 'Truque' : `${sp.spellData?.rank}º Círculo`}</span>
+                                  <span>•</span>
+                                  <span className="truncate">{sp.spellData?.traditions?.join(', ') || 'Sem tradição'}</span>
+                                </div>
+                              </div>
+                              {isActualGm && (
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onEditEntity(sp.id);
+                                    }}
+                                    className="p-1 rounded text-zinc-500 hover:text-cyan-300"
+                                    title="Editar Feitiço"
+                                  >
+                                    <Edit className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Quick Add Spell to this folder button for GM */}
+                      {isActualGm && (
+                        <div className="pt-2 mt-2 border-t border-zinc-800/50 flex items-center justify-between">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onCreateSpell(activeCategory !== 'all' ? activeCategory : undefined, folderName);
+                            }}
+                            className="text-[11px] font-bold text-zinc-400 hover:text-cyan-300 transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span>Novo Feitiço</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setManagingFolderForSpells(folderName)}
+                            className="text-[11px] font-bold text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            <Layers className="w-3 h-3" />
+                            <span>Organizar</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -1546,6 +1905,117 @@ export function SpellExplorer({
                 className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-zinc-950 font-bold text-xs transition-colors cursor-pointer"
               >
                 Salvar Alterações
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8. Modal: Manage/Assign Spells in a Specific Folder */}
+      {managingFolderForSpells && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-[#0f0d18] border border-zinc-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl space-y-4 p-6 flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-purple-950/80 border border-purple-600/50 text-purple-300">
+                  <FolderOpen className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-zinc-100">Organizar Feitiços na Pasta</h3>
+                  <p className="text-xs text-cyan-400 font-medium">Pasta: "{managingFolderForSpells}"</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setManagingFolderForSpells(null);
+                  setSearchSpellsInFolderModal('');
+                }}
+                className="p-1 text-zinc-500 hover:text-zinc-300 rounded cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-zinc-400">
+              Marque ou desmarque os feitiços que pertencem a esta pasta. As alterações são sincronizadas imediatamente.
+            </p>
+
+            {/* Modal Search */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchSpellsInFolderModal}
+                onChange={(e) => setSearchSpellsInFolderModal(e.target.value)}
+                placeholder="Buscar feitiço para incluir..."
+                className="w-full pl-8 pr-3 py-1.5 bg-zinc-900/90 border border-zinc-800 focus:border-cyan-500 rounded-xl text-xs text-zinc-200 placeholder-zinc-500 outline-none"
+              />
+            </div>
+
+            {/* Spells List with Checkboxes */}
+            <div className="space-y-1.5 flex-1 overflow-y-auto pr-1">
+              {spellEntities
+                .filter((sp) => {
+                  if (!searchSpellsInFolderModal.trim()) return true;
+                  const q = searchSpellsInFolderModal.toLowerCase();
+                  return (
+                    sp.title.toLowerCase().includes(q) ||
+                    sp.spellData?.traditions?.some((t) => t.toLowerCase().includes(q)) ||
+                    sp.spellData?.traits?.some((t) => t.toLowerCase().includes(q))
+                  );
+                })
+                .map((sp) => {
+                  const isInFolder = isSpellInSubcategory(sp, managingFolderForSpells);
+
+                  return (
+                    <label
+                      key={sp.id}
+                      onClick={() => {
+                        HecosStorage.toggleSpellSubcategory(sp.id, managingFolderForSpells);
+                        refreshConfig();
+                      }}
+                      className={`flex items-center justify-between p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
+                        isInFolder
+                          ? 'bg-purple-950/80 border-purple-500/60 text-purple-100 font-semibold'
+                          : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      <div className="min-w-0 pr-2">
+                        <div className="truncate font-semibold">{sp.title}</div>
+                        <div className="text-[10px] text-zinc-400 font-mono">
+                          {sp.spellData?.rank === 0 ? 'Truque' : `${sp.spellData?.rank}º Círculo`} •{' '}
+                          {sp.spellData?.traditions?.join(', ') || 'Sem tradição'}
+                        </div>
+                      </div>
+                      <div
+                        className={`w-4 h-4 rounded flex items-center justify-center border shrink-0 ${
+                          isInFolder
+                            ? 'bg-purple-500 border-purple-400 text-zinc-950'
+                            : 'border-zinc-700 bg-zinc-800'
+                        }`}
+                      >
+                        {isInFolder && <Check className="w-3 h-3 stroke-[3]" />}
+                      </div>
+                    </label>
+                  );
+                })}
+            </div>
+
+            <div className="flex items-center justify-between pt-3 border-t border-zinc-800">
+              <span className="text-xs text-zinc-400">
+                {spellEntities.filter((sp) => isSpellInSubcategory(sp, managingFolderForSpells)).length} feitiço(s) nesta pasta
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setManagingFolderForSpells(null);
+                  setSearchSpellsInFolderModal('');
+                  refreshConfig();
+                }}
+                className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-zinc-950 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Concluir
               </button>
             </div>
           </div>

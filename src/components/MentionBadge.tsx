@@ -152,9 +152,9 @@ export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNa
             )}
 
             {/* Summary */}
-            <p className="text-xs text-zinc-300 line-clamp-2 my-2 leading-relaxed">
-              {entity.summary || 'Sem resumo cadastrado.'}
-            </p>
+            <div className="text-xs text-zinc-300 line-clamp-2 my-2 leading-relaxed">
+              {parseInlineFormatting(entity.summary || 'Sem resumo cadastrado.', onNavigate)}
+            </div>
 
             {/* Tags */}
             {(entity.tags || []).length > 0 && (

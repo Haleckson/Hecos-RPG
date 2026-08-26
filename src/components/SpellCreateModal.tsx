@@ -259,15 +259,51 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
     }
   }, [isOpen, entityToEdit, finalInitialTrad, presetCategory, finalInitialSub]);
 
-  // Available spell folders from storage
-  const spellConfig = useMemo(() => HecosStorage.getAllSpellSubcategoriesConfig(), []);
+  // Available spell folders from storage with full reactivity
+  const [spellConfig, setSpellConfig] = useState<Record<string, string[]>>(() =>
+    HecosStorage.getAllSpellSubcategoriesConfig()
+  );
+
+  useEffect(() => {
+    if (isOpen) {
+      setSpellConfig(HecosStorage.getAllSpellSubcategoriesConfig());
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    const unsub = HecosStorage.subscribeSpellCategories((cfg) => {
+      setSpellConfig(cfg);
+    });
+    return () => unsub();
+  }, []);
+
   const allExistingFolders = useMemo(() => {
     const set = new Set<string>();
+    
+    // 1. Folders from spell subcategories config
     (Object.values(spellConfig) as string[][]).forEach((list) => {
-      (list || []).forEach((sub) => set.add(sub));
+      (list || []).forEach((sub) => {
+        if (typeof sub === 'string' && sub.trim()) {
+          set.add(sub.trim());
+        }
+      });
     });
-    return Array.from(set).sort();
-  }, [spellConfig]);
+
+    // 2. Folders attached to existing spell entities
+    const entities = HecosStorage.getEntities();
+    entities.forEach((ent) => {
+      if (ent.category === 'spell' || ent.spellData || ent.tags?.includes('spell') || ent.tags?.includes('magia')) {
+        (ent.spellData?.subcategories || []).forEach((s) => s && set.add(s.trim()));
+        (ent.subcategories || []).forEach((s) => s && set.add(s.trim()));
+        if (ent.subcategory && ent.subcategory.trim()) set.add(ent.subcategory.trim());
+      }
+    });
+
+    // 3. Current selected subcategories
+    selectedSubcategories.forEach((s) => s && set.add(s.trim()));
+
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [spellConfig, selectedSubcategories]);
 
   if (!isOpen) return null;
 
@@ -286,8 +322,12 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
 
   const handleAddSubcategory = () => {
     const trimmed = newSubcategoryInput.trim();
-    if (trimmed && !selectedSubcategories.includes(trimmed)) {
-      setSelectedSubcategories([...selectedSubcategories, trimmed]);
+    if (trimmed) {
+      if (!selectedSubcategories.includes(trimmed)) {
+        setSelectedSubcategories([...selectedSubcategories, trimmed]);
+      }
+      HecosStorage.addScopeSubcategory('spell', 'all', trimmed);
+      setSpellConfig(HecosStorage.getAllSpellSubcategoriesConfig());
       setNewSubcategoryInput('');
     }
   };
@@ -1016,11 +1056,11 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                     className="px-3 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-300 outline-none focus:border-cyan-400"
                   >
                     <option value="" disabled>
-                      + Selecionar Pasta Existente...
+                      + Selecionar Pasta ({allExistingFolders.length} disponíveis)...
                     </option>
                     {allExistingFolders.map((f) => (
-                      <option key={f} value={f}>
-                        {f}
+                      <option key={f} value={f} disabled={selectedSubcategories.includes(f)}>
+                        {f} {selectedSubcategories.includes(f) ? '(já adicionada)' : ''}
                       </option>
                     ))}
                   </select>
@@ -1029,6 +1069,12 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                     type="text"
                     value={newSubcategoryInput}
                     onChange={(e) => setNewSubcategoryInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddSubcategory();
+                      }
+                    }}
                     placeholder="Ou criar nova pasta..."
                     className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 placeholder-zinc-500 outline-none focus:border-cyan-400"
                   />
@@ -1042,6 +1088,27 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                     + Adicionar
                   </button>
                 </div>
+
+                {/* Available Quick Suggestion Chips */}
+                {allExistingFolders.filter((f) => !selectedSubcategories.includes(f)).length > 0 && (
+                  <div className="pt-2 flex items-center gap-1.5 flex-wrap border-t border-zinc-800/60 mt-2">
+                    <span className="text-[11px] text-zinc-500 font-medium mr-1">Sugestões rápidas:</span>
+                    {allExistingFolders
+                      .filter((f) => !selectedSubcategories.includes(f))
+                      .map((f) => (
+                        <button
+                          key={f}
+                          type="button"
+                          onClick={() => setSelectedSubcategories([...selectedSubcategories, f])}
+                          className="px-2 py-0.5 rounded-md bg-zinc-900 hover:bg-purple-950/80 border border-zinc-800 hover:border-purple-600/60 text-zinc-400 hover:text-purple-200 text-[11px] font-medium transition-all cursor-pointer flex items-center gap-1"
+                          title={`Adicionar pasta "${f}"`}
+                        >
+                          <Plus className="w-2.5 h-2.5 text-cyan-400" />
+                          <span>{f}</span>
+                        </button>
+                      ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

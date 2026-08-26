@@ -68,6 +68,8 @@ export const TraitBadge: React.FC<TraitBadgeProps> = ({
   onRemove,
   removable = false,
   interactive = true,
+  size = 'md',
+  compact = false,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
@@ -83,6 +85,14 @@ export const TraitBadge: React.FC<TraitBadgeProps> = ({
   };
 
   const isActuallyRemovable = removable || Boolean(onRemove);
+
+  const sizeClass = compact || size === 'xs'
+    ? 'px-1.5 py-0.5 rounded text-[9.5px] leading-tight font-mono font-bold tracking-tight uppercase'
+    : size === 'sm'
+    ? 'px-1.5 py-0.5 rounded-md text-[10px] leading-tight font-mono font-bold tracking-tight uppercase'
+    : size === 'lg'
+    ? 'px-2.5 py-1 rounded-lg text-xs leading-normal font-mono font-bold tracking-wider uppercase'
+    : 'px-2 py-0.5 rounded-md text-[11px] leading-tight font-mono font-bold tracking-wide uppercase';
 
   const handleMouseEnter = (e: React.MouseEvent) => {
     if (showConfirmDelete) return;
@@ -146,7 +156,7 @@ export const TraitBadge: React.FC<TraitBadgeProps> = ({
           onKeyDown={interactive ? handleKeyDown : undefined}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={() => setIsHovered(false)}
-          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-mono font-bold tracking-wide uppercase border transition-all ${
+          className={`inline-flex items-center gap-1.5 border transition-all ${sizeClass} ${
             interactive ? 'cursor-pointer shadow-sm hover:scale-[1.03] active:scale-95' : 'cursor-default select-none'
           } ${info.color} ${className}`}
           title={interactive ? `Ver artigos com o traço ${clean}` : clean}

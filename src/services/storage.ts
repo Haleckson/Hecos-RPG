@@ -70,14 +70,19 @@ export const DEFAULT_FEAT_CATEGORIES_CONFIG: Record<string, string[]> = {
 };
 
 export const DEFAULT_SPELL_CATEGORIES_CONFIG: Record<string, string[]> = {
-  all: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo'],
+  all: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Magias de Ataque', 'Magias Utilitárias', 'Defesa & Abjuração'],
+  e_fisica: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Cinética & Força', 'Calor & Fogo', 'Eletricidade & Raios', 'Gravidade'],
+  e_meta: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Espaço & Teleporte', 'Tempo & Cronurgia', 'Ilusões & Mente', 'Dimensões & Alma'],
+  m_organica: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Cura & Regeneração', 'Biomassa & Carne', 'Flora & Venenos', 'Sangue & Metamorfose'],
+  m_inorganica: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Metal & Forja', 'Cristais & Vidro Estelar', 'Terra & Rochas', 'Obsidiana & Selos'],
+  omni: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Magia Primordial', 'Unificação de Hecos', 'Ecos do Eclipse'],
+  focus: ['Bruxo', 'Clérigo', 'Druida', 'Feiticeiro', 'Mago', 'Monge', 'Oráculo', 'Campeão', 'Bardo', 'Domínios Divinos', 'Sentinela do Vazio'],
+  ritual: ['Rituais de Nível 1-3', 'Rituais de Nível 4-6', 'Rituais de Nível 7-9', 'Rituais de 10º Círculo', 'Grandes Rituais de Hecos'],
+  extras: ['Magias do Eclipse', 'Feitiços de Obsidiana', 'Trama da Penumbra', 'Homebrew & Variantes'],
   arcane: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Evocação', 'Transmutação', 'Ilusão', 'Abjuração'],
   divine: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Cura', 'Necromancia', 'Proteção & Bênção'],
   occult: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Adivinhação', 'Encantamento', 'Mente & Sombras'],
-  primal: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Elemental (Fogo/Gelo/Terra/Ar)', 'Metamorfose', 'Plantas & Animais'],
-  focus: ['Bruxo', 'Clérigo', 'Druida', 'Feiticeiro', 'Mago', 'Monge', 'Oráculo', 'Campeão', 'Bardo', 'Domínios Divinos'],
-  ritual: ['Rituais de Nível 1-3', 'Rituais de Nível 4-6', 'Rituais de Nível 7-9', 'Rituais de 10º Círculo', 'Grandes Rituais de Hecos'],
-  extras: ['Magias do Eclipse', 'Feitiços de Obsidiana', 'Trama da Penumbra', 'Homebrew & Variantes']
+  primal: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Elemental (Fogo/Gelo/Terra/Ar)', 'Metamorfose', 'Plantas & Animais']
 };
 
 export const DEFAULT_ITEM_CATEGORIES_CONFIG: Record<string, string[]> = {
@@ -154,6 +159,7 @@ export const DEFAULT_TAG_CATEGORIES_CONFIG: Record<string, string[]> = {
 type EntitySubscriber = (entities: HecosEntity[]) => void;
 type MapSubscriber = (maps: InteractiveMapData[]) => void;
 type FeatCategoriesSubscriber = (config: Record<string, string[]>) => void;
+export type SpellCategoriesSubscriber = (config: Record<string, string[]>) => void;
 
 export class HecosStorage {
   private static entitiesCache: HecosEntity[] | null = null;
@@ -161,6 +167,7 @@ export class HecosStorage {
   private static tracksCache: YouTubeAmbianceTrack[] | null = null;
   private static driveCache: GoogleDriveResource[] | null = null;
   private static featCategoriesCache: Record<string, string[]> | null = null;
+  private static spellCategoriesCache: Record<string, string[]> | null = null;
   private static usersCache: HecosUser[] | null = null;
   private static currentUserCache: HecosUser | null = null;
   private static folderPermissionsCache: Record<string, FolderPermission> | null = null;
@@ -169,6 +176,7 @@ export class HecosStorage {
   private static entitySubscribers = new Set<EntitySubscriber>();
   private static mapSubscribers = new Set<MapSubscriber>();
   private static featCategoriesSubscribers = new Set<FeatCategoriesSubscriber>();
+  private static spellCategoriesSubscribers = new Set<SpellCategoriesSubscriber>();
   private static userSubscribers = new Set<(user: HecosUser | null) => void>();
   private static usersListSubscribers = new Set<(users: HecosUser[]) => void>();
   private static folderPermissionsSubscribers = new Set<(perms: Record<string, FolderPermission>) => void>();
@@ -195,6 +203,28 @@ export class HecosStorage {
         sub(config);
       } catch (e) {
         console.warn("Error notifying feat categories subscriber:", e);
+      }
+    });
+  }
+
+  /**
+   * Subscribe to spell subcategories configuration
+   */
+  static subscribeSpellCategories(subscriber: SpellCategoriesSubscriber): () => void {
+    subscriber(this.getAllSpellSubcategoriesConfig());
+    this.spellCategoriesSubscribers.add(subscriber);
+    return () => {
+      this.spellCategoriesSubscribers.delete(subscriber);
+    };
+  }
+
+  private static notifySpellCategoriesSubscribers(): void {
+    const config = this.getAllSpellSubcategoriesConfig();
+    this.spellCategoriesSubscribers.forEach((sub) => {
+      try {
+        sub(config);
+      } catch (e) {
+        console.warn("Error notifying spell categories subscriber:", e);
       }
     });
   }
@@ -1153,14 +1183,13 @@ export class HecosStorage {
           );
 
           for (const key of allKeys) {
-            const defs = DEFAULT_FEAT_CATEGORIES_CONFIG[key] || [];
-            const customs = Array.isArray(parsed[key]) ? parsed[key] : [];
-            const subSet = new Set<string>();
-            defs.forEach((s) => subSet.add(s));
-            customs.forEach((s: string) => {
-              if (typeof s === 'string' && s.trim()) subSet.add(s.trim());
-            });
-            merged[key] = Array.from(subSet);
+            if (Array.isArray(parsed[key])) {
+              merged[key] = parsed[key];
+            } else if (DEFAULT_FEAT_CATEGORIES_CONFIG[key]) {
+              merged[key] = [...DEFAULT_FEAT_CATEGORIES_CONFIG[key]];
+            } else {
+              merged[key] = [];
+            }
           }
 
           this.featCategoriesCache = merged;
@@ -1334,30 +1363,53 @@ export class HecosStorage {
    * Spell Subcategories & Folders Configuration
    */
   static getAllSpellSubcategoriesConfig(): Record<string, string[]> {
+    if (this.spellCategoriesCache) {
+      return this.spellCategoriesCache;
+    }
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.SPELL_CATEGORIES);
       if (stored) {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === 'object') {
+          const merged: Record<string, string[]> = {};
+          const allKeys = Array.from(
+            new Set([...Object.keys(DEFAULT_SPELL_CATEGORIES_CONFIG), ...Object.keys(parsed)])
+          );
+          for (const key of allKeys) {
+            if (Array.isArray(parsed[key])) {
+              merged[key] = parsed[key];
+            } else if (DEFAULT_SPELL_CATEGORIES_CONFIG[key]) {
+              merged[key] = [...DEFAULT_SPELL_CATEGORIES_CONFIG[key]];
+            } else {
+              merged[key] = [];
+            }
+          }
+          this.spellCategoriesCache = merged;
+          return merged;
+        }
       }
     } catch (e) {
       console.warn("Error reading spell categories config:", e);
     }
-    return DEFAULT_SPELL_CATEGORIES_CONFIG;
+    this.spellCategoriesCache = { ...DEFAULT_SPELL_CATEGORIES_CONFIG };
+    return this.spellCategoriesCache;
   }
 
   static saveAllSpellSubcategoriesConfig(config: Record<string, string[]>): void {
+    this.spellCategoriesCache = { ...config };
     try {
       localStorage.setItem(STORAGE_KEYS.SPELL_CATEGORIES, JSON.stringify(config));
     } catch (e) {
       console.warn("Error saving spell categories config:", e);
     }
+    this.notifySpellCategoriesSubscribers();
     this.notifyEntitySubscribers();
   }
 
   static addSpellSubcategory(categoryKey: string, subcategoryName: string): boolean {
     const trimmed = subcategoryName.trim();
     if (!trimmed || !categoryKey) return false;
-    const config = this.getAllSpellSubcategoriesConfig();
+    const config = { ...this.getAllSpellSubcategoriesConfig() };
     const list = config[categoryKey] ? [...config[categoryKey]] : [];
     if (list.includes(trimmed)) return false;
     list.push(trimmed);
@@ -1369,7 +1421,7 @@ export class HecosStorage {
   static renameSpellSubcategory(categoryKey: string, oldName: string, newName: string): boolean {
     const trimmedNew = newName.trim();
     if (!trimmedNew || !categoryKey || oldName === trimmedNew) return false;
-    const config = this.getAllSpellSubcategoriesConfig();
+    const config = { ...this.getAllSpellSubcategoriesConfig() };
     const list = config[categoryKey] ? [...config[categoryKey]] : [];
     const idx = list.indexOf(oldName);
     if (idx === -1) return false;
@@ -1379,16 +1431,23 @@ export class HecosStorage {
 
     const entities = this.getEntities();
     entities.forEach((ent) => {
-      if (ent.category === 'spell') {
+      if (ent.category === 'spell' || ent.spellData || ent.tags?.includes('spell') || ent.tags?.includes('magia')) {
         let updated = false;
-        let subcats = ent.subcategories || [];
+        let subcats = ent.spellData?.subcategories || ent.subcategories || [];
         if (subcats.includes(oldName)) {
           subcats = subcats.map((s) => (s === oldName ? trimmedNew : s));
           ent.subcategories = subcats;
+          if (ent.spellData) {
+            ent.spellData.subcategories = subcats;
+          }
           updated = true;
         }
         if (ent.subcategory === oldName) {
           ent.subcategory = trimmedNew;
+          updated = true;
+        }
+        if (ent.tags?.includes(oldName)) {
+          ent.tags = ent.tags.map((t) => (t === oldName ? trimmedNew : t));
           updated = true;
         }
         if (updated) {
@@ -1401,30 +1460,54 @@ export class HecosStorage {
 
   static deleteSpellSubcategory(categoryKey: string, subcategoryName: string): boolean {
     if (!categoryKey || !subcategoryName) return false;
-    const config = this.getAllSpellSubcategoriesConfig();
+    const config = { ...this.getAllSpellSubcategoriesConfig() };
     if (!config[categoryKey]) return false;
     config[categoryKey] = config[categoryKey].filter((s) => s !== subcategoryName);
     this.saveAllSpellSubcategoriesConfig(config);
 
+    // Unlink the deleted folder from ALL spell entities thoroughly
     const entities = this.getEntities();
     entities.forEach((ent) => {
-      if (ent.category === 'spell') {
+      if (ent.category === 'spell' || ent.spellData || ent.tags?.includes('spell') || ent.tags?.includes('magia')) {
         let updated = false;
-        let subcats = ent.subcategories || [];
-        if (subcats.includes(subcategoryName)) {
-          subcats = subcats.filter((s) => s !== subcategoryName);
-          ent.subcategories = subcats;
+
+        // 1. Unlink from ent.subcategories
+        if (ent.subcategories?.includes(subcategoryName)) {
+          ent.subcategories = ent.subcategories.filter((s) => s !== subcategoryName);
           updated = true;
         }
+
+        // 2. Unlink from ent.spellData.subcategories
+        if (ent.spellData?.subcategories?.includes(subcategoryName)) {
+          ent.spellData.subcategories = ent.spellData.subcategories.filter((s) => s !== subcategoryName);
+          updated = true;
+        }
+
+        // 3. Unlink from ent.subcategory field
         if (ent.subcategory === subcategoryName) {
-          ent.subcategory = subcats[0] || '';
+          ent.subcategory = ent.spellData?.subcategories?.[0] || ent.subcategories?.[0] || '';
           updated = true;
         }
+
+        // 4. Unlink from ent.tags if present
+        if (ent.tags?.includes(subcategoryName)) {
+          ent.tags = ent.tags.filter((t) => t !== subcategoryName);
+          updated = true;
+        }
+
         if (updated) {
           HecosStorage.saveEntity(ent);
         }
       }
     });
+
+    // Remove folder secret flag if no longer present in any category
+    const allRemaining = new Set<string>();
+    Object.values(config).forEach((list) => (list || []).forEach((s) => allRemaining.add(s)));
+    if (!allRemaining.has(subcategoryName)) {
+      HecosStorage.setFolderSecret(subcategoryName, false);
+    }
+
     return true;
   }
 
@@ -1433,12 +1516,28 @@ export class HecosStorage {
     if (!ent) return false;
     const cleanSubcats = Array.from(new Set(subcategories.map((s) => s.trim()).filter(Boolean)));
     ent.subcategories = cleanSubcats;
+    if (ent.spellData) {
+      ent.spellData.subcategories = cleanSubcats;
+    }
     ent.subcategory = cleanSubcats[0] || ent.subcategory || '';
     const currentTags = new Set(ent.tags || []);
     cleanSubcats.forEach((s) => currentTags.add(s));
     ent.tags = Array.from(currentTags);
     this.saveEntity(ent);
     return true;
+  }
+
+  static toggleSpellSubcategory(spellId: string, subcategoryName: string): boolean {
+    const ent = this.getEntityById(spellId);
+    if (!ent) return false;
+    const current = ent.spellData?.subcategories || ent.subcategories || (ent.subcategory ? [ent.subcategory] : []);
+    const set = new Set(current);
+    if (set.has(subcategoryName)) {
+      set.delete(subcategoryName);
+    } else {
+      set.add(subcategoryName);
+    }
+    return this.assignSpellSubcategories(spellId, Array.from(set));
   }
 
   /**
@@ -1660,6 +1759,16 @@ export class HecosStorage {
 
   static deleteScopeSubcategory(scope: string, categoryKey: string, subcategoryName: string): boolean {
     if (!categoryKey || !subcategoryName) return false;
+    if (scope === 'spell') {
+      return this.deleteSpellSubcategory(categoryKey, subcategoryName);
+    }
+    if (scope === 'feat') {
+      return this.deleteFeatSubcategory(categoryKey, subcategoryName);
+    }
+    if (scope === 'item') {
+      return this.deleteItemSubcategory(categoryKey, subcategoryName);
+    }
+
     const config = this.getScopeSubcategoriesConfig(scope);
     if (!config[categoryKey]) return false;
     config[categoryKey] = config[categoryKey].filter((s) => s !== subcategoryName);
@@ -1668,14 +1777,12 @@ export class HecosStorage {
     const entities = this.getEntities();
     entities.forEach((ent) => {
       let updated = false;
-      let subcats = ent.subcategories || [];
-      if (subcats.includes(subcategoryName)) {
-        subcats = subcats.filter((s) => s !== subcategoryName);
-        ent.subcategories = subcats;
+      if (ent.subcategories?.includes(subcategoryName)) {
+        ent.subcategories = ent.subcategories.filter((s) => s !== subcategoryName);
         updated = true;
       }
       if (ent.subcategory === subcategoryName) {
-        ent.subcategory = subcats[0] || '';
+        ent.subcategory = ent.subcategories?.[0] || '';
         updated = true;
       }
       if (ent.featData?.subcategories?.includes(subcategoryName)) {
@@ -1690,10 +1797,32 @@ export class HecosStorage {
         ent.itemData.subcategories = ent.itemData.subcategories.filter((s) => s !== subcategoryName);
         updated = true;
       }
+      if (ent.perilData?.subcategories?.includes(subcategoryName)) {
+        ent.perilData.subcategories = ent.perilData.subcategories.filter((s) => s !== subcategoryName);
+        updated = true;
+      }
+      if (ent.classData?.subcategories?.includes(subcategoryName)) {
+        ent.classData.subcategories = ent.classData.subcategories.filter((s) => s !== subcategoryName);
+        updated = true;
+      }
+      if (ent.ancestryData?.subcategories?.includes(subcategoryName)) {
+        ent.ancestryData.subcategories = ent.ancestryData.subcategories.filter((s) => s !== subcategoryName);
+        updated = true;
+      }
+      if (ent.tags?.includes(subcategoryName)) {
+        ent.tags = ent.tags.filter((t) => t !== subcategoryName);
+        updated = true;
+      }
       if (updated) {
         HecosStorage.saveEntity(ent);
       }
     });
+
+    const allRemaining = new Set<string>();
+    Object.values(config).forEach((list) => (list || []).forEach((s) => allRemaining.add(s)));
+    if (!allRemaining.has(subcategoryName)) {
+      HecosStorage.setFolderSecret(subcategoryName, false);
+    }
 
     return true;
   }

@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 
 export interface TooltipProps {
   content?: React.ReactNode;
@@ -41,34 +42,67 @@ export const Tooltip: React.FC<TooltipProps> = ({
     return <>{children}</>;
   }
 
+  const updatePosition = useCallback(() => {
+    if (!triggerRef.current) return;
+    const triggerRect = triggerRef.current.getBoundingClientRect();
+    const tooltipEl = tooltipRef.current;
+
+    // Measured exact size with fallback
+    const tooltipWidth = tooltipEl ? tooltipEl.offsetWidth : 360;
+    const tooltipHeight = tooltipEl ? tooltipEl.offsetHeight : 160;
+
+    let rawTop = 0;
+    let rawLeft = 0;
+
+    if (side === 'top') {
+      rawTop = triggerRect.top - tooltipHeight - 8;
+      if (align === 'start') rawLeft = triggerRect.left;
+      else if (align === 'end') rawLeft = triggerRect.right - tooltipWidth;
+      else rawLeft = triggerRect.left + (triggerRect.width - tooltipWidth) / 2;
+    } else if (side === 'bottom') {
+      rawTop = triggerRect.bottom + 8;
+      if (align === 'start') rawLeft = triggerRect.left;
+      else if (align === 'end') rawLeft = triggerRect.right - tooltipWidth;
+      else rawLeft = triggerRect.left + (triggerRect.width - tooltipWidth) / 2;
+    } else if (side === 'left') {
+      rawLeft = triggerRect.left - tooltipWidth - 8;
+      rawTop = triggerRect.top + (triggerRect.height - tooltipHeight) / 2;
+    } else if (side === 'right') {
+      rawLeft = triggerRect.right + 8;
+      rawTop = triggerRect.top + (triggerRect.height - tooltipHeight) / 2;
+    }
+
+    // Flip vertically if overflowing viewport
+    if (side === 'top' && rawTop < 12) {
+      rawTop = triggerRect.bottom + 8;
+    } else if (side === 'bottom' && rawTop + tooltipHeight > window.innerHeight - 12) {
+      rawTop = triggerRect.top - tooltipHeight - 8;
+    }
+
+    // Flip horizontally if overflowing viewport
+    if (side === 'left' && rawLeft < 12) {
+      rawLeft = triggerRect.right + 8;
+    } else if (side === 'right' && rawLeft + tooltipWidth > window.innerWidth - 12) {
+      rawLeft = triggerRect.left - tooltipWidth - 8;
+    }
+
+    // Strict pixel-bound clamping within screen
+    const clampedLeft = Math.max(12, Math.min(window.innerWidth - tooltipWidth - 12, rawLeft));
+    const clampedTop = Math.max(12, Math.min(window.innerHeight - tooltipHeight - 12, rawTop));
+
+    // Force strictly integer coordinates to avoid subpixel text anti-aliasing blur
+    setCoords({
+      left: Math.round(clampedLeft),
+      top: Math.round(clampedTop),
+    });
+  }, [side, align]);
+
   const showTooltip = () => {
     if (disabled) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+
     timerRef.current = setTimeout(() => {
       if (triggerRef.current) {
-        const rect = triggerRef.current.getBoundingClientRect();
-        let top = 0;
-        let left = 0;
-
-        // Approximate positioning based on side and align
-        if (side === 'top') {
-          top = rect.top - 8;
-          if (align === 'start') left = rect.left;
-          else if (align === 'end') left = rect.right;
-          else left = rect.left + rect.width / 2;
-        } else if (side === 'bottom') {
-          top = rect.bottom + 8;
-          if (align === 'start') left = rect.left;
-          else if (align === 'end') left = rect.right;
-          else left = rect.left + rect.width / 2;
-        } else if (side === 'left') {
-          left = rect.left - 8;
-          top = rect.top + rect.height / 2;
-        } else if (side === 'right') {
-          left = rect.right + 8;
-          top = rect.top + rect.height / 2;
-        }
-
-        setCoords({ top, left });
         setIsVisible(true);
       }
     }, delay);
@@ -78,6 +112,97 @@ export const Tooltip: React.FC<TooltipProps> = ({
     if (timerRef.current) clearTimeout(timerRef.current);
     setIsVisible(false);
   };
+
+  // Recalculate exact position once DOM element is mounted or size changes
+  useLayoutEffect(() => {
+    if (isVisible) {
+      updatePosition();
+    }
+  }, [isVisible, updatePosition]);
+
+  useEffect(() => {
+    if (!isVisible) return;
+
+    const handleScrollOrResize = () => {
+      hideTooltip();
+    };
+
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [isVisible]);
+
+  const isCustomContentOnly = Boolean(content && !title && !description && !englishTitle && !badge);
+
+  const tooltipElement = isVisible && coords && (
+    <div
+      ref={tooltipRef}
+      style={{
+        position: 'fixed',
+        top: `${coords.top}px`,
+        left: `${coords.left}px`,
+        zIndex: 99999,
+        WebkitFontSmoothing: 'antialiased',
+        MozOsxFontSmoothing: 'grayscale',
+        textRendering: 'optimizeLegibility',
+        transform: 'translate3d(0, 0, 0)',
+        backfaceVisibility: 'hidden',
+        willChange: 'transform, opacity',
+      }}
+      className={`pointer-events-none transition-opacity duration-150 ease-out text-left ${
+        isCustomContentOnly
+          ? 'w-auto max-w-[calc(100vw-24px)]'
+          : 'max-w-xs sm:max-w-sm rounded-xl p-3.5 bg-[#0d0a17] border border-zinc-700/90 shadow-[0_16px_40px_rgba(0,0,0,0.95)] ring-1 ring-white/10'
+      }`}
+    >
+      {/* Header with Title and English/Badge */}
+      {(title || englishTitle || badge) && (
+        <div className="flex items-center justify-between gap-2 border-b border-zinc-800/80 pb-2 mb-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {title && <span className="font-extrabold text-xs text-amber-200">{title}</span>}
+            {englishTitle && (
+              <span className="text-xs text-zinc-400 font-mono italic">
+                ({englishTitle})
+              </span>
+            )}
+          </div>
+          {badge && (
+            <span className="text-xs font-mono px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800/60 uppercase font-bold">
+              {badge}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Main Description */}
+      {description && (
+        <p className="text-xs leading-relaxed text-zinc-200 font-normal">
+          {description}
+        </p>
+      )}
+
+      {/* Custom Node Content */}
+      {content && (
+        <div className={isCustomContentOnly ? '' : 'text-xs text-zinc-200 mt-1'}>
+          {content}
+        </div>
+      )}
+
+      {/* Footer / Shortcut */}
+      {shortcut && (
+        <div className="mt-2.5 pt-1.5 border-t border-zinc-800/60 flex items-center justify-between text-xs text-zinc-400 font-mono">
+          <span>Atalho:</span>
+          <kbd className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-zinc-200">
+            {shortcut}
+          </kbd>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div
@@ -89,72 +214,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
       className={`inline-flex items-center ${className}`}
     >
       {children}
-
-      {isVisible && coords && (
-        <div
-          ref={tooltipRef}
-          style={{
-            top: `${coords.top}px`,
-            left: `${coords.left}px`,
-            transform:
-              side === 'top'
-                ? align === 'start'
-                  ? 'translate(0, -100%)'
-                  : align === 'end'
-                  ? 'translate(-100%, -100%)'
-                  : 'translate(-50%, -100%)'
-                : side === 'bottom'
-                ? align === 'start'
-                  ? 'translate(0, 0)'
-                  : align === 'end'
-                  ? 'translate(-100%, 0)'
-                  : 'translate(-50%, 0)'
-                : side === 'left'
-                ? 'translate(-100%, -50%)'
-                : 'translate(0, -50%)',
-          }}
-          className="fixed z-[99999] pointer-events-none max-w-xs sm:max-w-sm rounded-xl p-3 bg-[#0c0915]/95 backdrop-blur-xl border border-zinc-700/80 shadow-[0_10px_35px_rgba(0,0,0,0.85)] ring-1 ring-white/10 text-left animate-in fade-in zoom-in-95 duration-150"
-        >
-          {/* Header with Title and English/Badge */}
-          {(title || englishTitle || badge) && (
-            <div className="flex items-center justify-between gap-2 border-b border-zinc-800/80 pb-1.5 mb-1.5">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {title && <span className="font-extrabold text-xs text-amber-200">{title}</span>}
-                {englishTitle && (
-                  <span className="text-[10px] text-zinc-400 font-mono italic">
-                    ({englishTitle})
-                  </span>
-                )}
-              </div>
-              {badge && (
-                <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-950 text-amber-300 border border-amber-800/60 uppercase">
-                  {badge}
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Main Description */}
-          {description && (
-            <p className="text-[11px] leading-relaxed text-zinc-300 font-normal">
-              {description}
-            </p>
-          )}
-
-          {/* Custom Node Content */}
-          {content && <div className="text-[11px] text-zinc-300 mt-1">{content}</div>}
-
-          {/* Footer / Shortcut */}
-          {shortcut && (
-            <div className="mt-2 pt-1 border-t border-zinc-800/60 flex items-center justify-between text-[9px] text-zinc-500 font-mono">
-              <span>Atalho:</span>
-              <kbd className="px-1 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-zinc-300">
-                {shortcut}
-              </kbd>
-            </div>
-          )}
-        </div>
-      )}
+      {typeof document !== 'undefined' && tooltipElement && createPortal(tooltipElement, document.body)}
     </div>
   );
 };

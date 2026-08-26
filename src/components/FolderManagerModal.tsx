@@ -259,10 +259,20 @@ export const FolderManagerModal: React.FC<FolderManagerModalProps> = ({
 
   // Helper to extract folders from an entity
   const getEntityFolders = (ent: HecosEntity): string[] => {
-    if (scope === 'feat' && ent.featData?.subcategories) return ent.featData.subcategories;
-    if (scope === 'spell' && ent.spellData?.subcategories) return ent.spellData.subcategories;
-    if (scope === 'item' && ent.itemData?.subcategories) return ent.itemData.subcategories;
-    if (scope === 'peril' && ent.perilData?.subcategories) return ent.perilData.subcategories;
+    if (scope === 'feat') {
+      return ent.featData?.subcategories || ent.subcategories || (ent.subcategory ? [ent.subcategory] : []);
+    }
+    if (scope === 'spell') {
+      const set = new Set<string>();
+      (ent.spellData?.subcategories || []).forEach((s) => set.add(s));
+      (ent.subcategories || []).forEach((s) => set.add(s));
+      if (ent.subcategory) set.add(ent.subcategory);
+      return Array.from(set);
+    }
+    if (scope === 'item') {
+      return ent.itemData?.subcategories || ent.subcategories || (ent.subcategory ? [ent.subcategory] : []);
+    }
+    if (scope === 'peril') return ent.perilData?.subcategories || ent.subcategories || (ent.subcategory ? [ent.subcategory] : []);
     if ((scope === 'class' || scope === 'archetype') && ent.classData?.subcategories) return ent.classData.subcategories;
     if (scope === 'ancestry' && ent.ancestryData?.subcategories) return ent.ancestryData.subcategories;
     return ent.subcategories || (ent.subcategory ? [ent.subcategory] : []);
