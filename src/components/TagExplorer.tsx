@@ -15,11 +15,20 @@ import {
   ArrowUpDown,
   SortAsc,
   SortDesc,
+  Settings,
+  Folder,
+  FolderTree,
+  LayoutGrid,
+  List,
+  ChevronDown,
+  X,
+  Layers
 } from 'lucide-react';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { TraitBadge } from './TraitBadge';
 import { TraitModal } from './TraitModal';
 import { TagModal } from './TagModal';
+import { FolderManagerModal } from './FolderManagerModal';
 
 interface TagExplorerProps {
   onNavigateEntity: (id: string) => void;
@@ -220,121 +229,195 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
         })
       : [];
 
+  const [isFolderManagerOpen, setIsFolderManagerOpen] = useState(false);
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  const tagCategoriesConfig = HecosStorage.getScopeSubcategoriesConfig('tag');
+  const tagFolderOptions = useMemo(() => {
+    return [
+      { id: 'all', name: 'Todas as Pastas' },
+      { id: 'tags', name: 'Tags de Campanha & Lore' },
+      { id: 'traits', name: 'Traços Oficiais PF2e' },
+      { id: 'homebrew', name: 'Traços Homebrew' },
+    ];
+  }, []);
+
   const tagFolderPerm = HecosStorage.getFolderPermission('tags');
 
   return (
     <div key={refreshKey} className="bg-[#09080d] text-zinc-100 rounded-2xl border border-zinc-800/80 shadow-2xl p-6 sm:p-8 space-y-6">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 pb-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h2 className="text-xl sm:text-2xl font-black text-zinc-100 flex items-center gap-2.5">
-              <TagIcon className="w-6 h-6 text-cyan-400" />
-              <span>Explorador de Tags & Traços (Traits)</span>
-            </h2>
-            {isActualGm && (
-              <VisibilityBadgeMenu
-                visibility={tagFolderPerm.visibility}
-                allowedUserIds={tagFolderPerm.allowedUserIds}
-                onChange={(newVis, newAllowed) => {
-                  HecosStorage.setFolderPermission('tags', newVis, newAllowed);
-                }}
-              />
-            )}
+      {/* 1. STANDARDIZED HEADER BANNER */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
+        <div className="flex items-center gap-3.5">
+          <div className="p-3 rounded-2xl bg-black/60 border border-cyan-700/60 shadow-[0_0_20px_rgba(6,182,212,0.25)]">
+            <TagIcon className="w-6 h-6 text-cyan-400" />
           </div>
-          <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-            Navegue por tópicos de narrativa (Tags) e palavras-chave de regras oficiais PF2e (Traços).
-          </p>
+          <div>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h1 className="text-xl sm:text-2xl font-black text-zinc-100 tracking-tight flex items-center gap-2">
+                <span>Tags & Traços (Traits)</span>
+                <span className="text-xs px-2 py-0.5 rounded-full font-mono font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-800">
+                  {activeTab === 'tags' ? `${tags.length} tags` : `${traits.length} traços`}
+                </span>
+              </h1>
+              {isActualGm && (
+                <VisibilityBadgeMenu
+                  visibility={tagFolderPerm.visibility}
+                  allowedUserIds={tagFolderPerm.allowedUserIds}
+                  onChange={(newVis, newAllowed) => {
+                    HecosStorage.setFolderPermission('tags', newVis, newAllowed);
+                  }}
+                />
+              )}
+            </div>
+            <p className="text-xs sm:text-sm text-zinc-400 mt-1">
+              Navegue por tópicos de narrativa (Tags) e palavras-chave de regras oficiais PF2e (Traços).
+            </p>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Tab Switcher: Tags vs Traits */}
-          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#120e1e] border border-zinc-800">
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2.5 shrink-0 w-full md:w-auto justify-end flex-wrap">
+          {isActualGm && (
             <button
               type="button"
-              onClick={() => {
-                setActiveTab('tags');
-                setSelectedTrait(null);
-              }}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'tags'
-                  ? 'bg-cyan-500 text-zinc-950 shadow-[0_0_12px_rgba(6,182,212,0.4)]'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
+              onClick={() => setIsFolderManagerOpen(true)}
+              className="px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-300 hover:text-cyan-300 text-xs font-semibold transition-all flex items-center gap-2 shadow-sm cursor-pointer"
+              title="Gerenciar estrutura de pastas e grupos"
             >
-              <TagIcon className="w-3.5 h-3.5" />
-              <span>Tags ({tags.length})</span>
+              <Settings className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Gerenciar Pastas</span>
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('traits');
-                setSelectedTag(null);
-              }}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'traits'
-                  ? 'bg-amber-500 text-zinc-950 shadow-[0_0_12px_rgba(245,158,11,0.4)]'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
-            >
-              <Award className="w-3.5 h-3.5" />
-              <span>Traços PF2e ({traits.length})</span>
-            </button>
-          </div>
+          )}
 
-          {/* Action buttons for GM: New Trait */}
-          {activeTab === 'traits' && (
+          {activeTab === 'traits' && isActualGm && (
             <button
               type="button"
               onClick={() => {
                 setEditingTraitName(null);
                 setTraitModalOpen(true);
               }}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-950/70 hover:bg-amber-900 border border-amber-800/80 text-amber-300 text-xs font-bold shadow-sm transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 text-xs font-extrabold shadow-md transition-all cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-4 h-4 stroke-[3]" />
               <span>Novo Traço</span>
+            </button>
+          )}
+
+          {activeTab === 'tags' && isActualGm && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditingTagName(null);
+                setTagModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-zinc-950 text-xs font-extrabold shadow-md transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" />
+              <span>Nova Tag</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Filter and Sort Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-[#0f0c1b] border border-zinc-800/70">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
+      {/* 2. SUB-CATEGORY TABS (Tags vs Traits) */}
+      <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#120e1e] border border-zinc-800 w-fit">
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('tags');
+            setSelectedTrait(null);
+          }}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'tags'
+              ? 'bg-cyan-500 text-zinc-950 shadow-[0_0_12px_rgba(6,182,212,0.4)]'
+              : 'text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          <TagIcon className="w-3.5 h-3.5" />
+          <span>Tags de Campanha ({tags.length})</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('traits');
+            setSelectedTag(null);
+          }}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'traits'
+              ? 'bg-amber-500 text-zinc-950 shadow-[0_0_12px_rgba(245,158,11,0.4)]'
+              : 'text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          <Award className="w-3.5 h-3.5" />
+          <span>Traços PF2e ({traits.length})</span>
+        </button>
+      </div>
+
+      {/* 3. STANDARDIZED FILTER & VIEW TOOLBAR */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-[#0f0c1b] border border-zinc-800/80 shadow-md">
+        <div className="relative flex-1 min-w-[220px] max-w-md">
           <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder={`Filtrar ${activeTab === 'tags' ? 'tags' : 'traços'} por nome...`}
-            className="w-full pl-9 pr-4 py-1.5 text-xs rounded-lg bg-zinc-900/90 border border-zinc-700/70 text-zinc-200 placeholder-zinc-500 outline-none focus:border-cyan-400"
+            placeholder={`Filtrar ${activeTab === 'tags' ? 'tags' : 'traços'} por nome ou descrição...`}
+            className="w-full pl-9 pr-8 py-2 text-xs rounded-xl bg-zinc-900/90 border border-zinc-700/70 text-zinc-200 placeholder-zinc-500 outline-none focus:border-cyan-400"
           />
           {searchTerm && (
             <button
               onClick={() => setSearchTerm('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-zinc-500 hover:text-zinc-300"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
             >
-              ×
+              <X className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-zinc-400 flex items-center gap-1">
-            <ArrowUpDown className="w-3 h-3 text-zinc-500" />
-            <span>Ordenar por:</span>
-          </span>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
-            className="px-2.5 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 outline-none focus:border-cyan-400 cursor-pointer"
-          >
-            <option value="count-desc">Mais usados primeiro</option>
-            <option value="count-asc">Menos usados primeiro</option>
-            <option value="alpha-asc">Ordem Alfabética (A-Z)</option>
-            <option value="alpha-desc">Ordem Alfabética (Z-A)</option>
-          </select>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="flex items-center gap-1.5 text-xs text-zinc-400">
+            <ArrowUpDown className="w-3.5 h-3.5 text-zinc-500" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="px-3 py-1.5 text-xs rounded-xl bg-zinc-900 border border-zinc-700 text-zinc-200 outline-none focus:border-cyan-400 cursor-pointer"
+            >
+              <option value="count-desc">Mais usados primeiro</option>
+              <option value="count-asc">Menos usados primeiro</option>
+              <option value="alpha-asc">Ordem Alfabética (A-Z)</option>
+              <option value="alpha-desc">Ordem Alfabética (Z-A)</option>
+            </select>
+          </div>
+
+          {/* View Mode Switcher */}
+          <div className="flex items-center bg-black/60 border border-zinc-800 p-0.5 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                viewMode === 'grid'
+                  ? 'bg-zinc-800 text-cyan-300 shadow-sm'
+                  : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+              title="Visualização em Grade/Nuvem"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                viewMode === 'list'
+                  ? 'bg-zinc-800 text-cyan-300 shadow-sm'
+                  : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+              title="Visualização em Lista"
+            >
+              <List className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -506,6 +589,17 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
           </div>
         </div>
       )}
+
+      {/* Universal Folder Management Modal */}
+      <FolderManagerModal
+        isOpen={isFolderManagerOpen}
+        onClose={() => setIsFolderManagerOpen(false)}
+        scope="tag"
+        categories={tagFolderOptions}
+        entities={accessibleEntities}
+        themeColor="cyan"
+        onRefresh={() => setRefreshKey((k) => k + 1)}
+      />
 
       {/* Trait Management Modal */}
       <TraitModal

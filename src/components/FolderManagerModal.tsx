@@ -31,7 +31,23 @@ import {
   Filter,
 } from 'lucide-react';
 
-export type FolderScope = 'feat' | 'spell' | 'item' | 'general';
+export type FolderScope =
+  | 'feat'
+  | 'spell'
+  | 'item'
+  | 'peril'
+  | 'class'
+  | 'archetype'
+  | 'ancestry'
+  | 'fauna'
+  | 'flora'
+  | 'location'
+  | 'pc'
+  | 'npc'
+  | 'organization'
+  | 'map'
+  | 'tag'
+  | 'general';
 
 export interface FolderCategoryOption {
   id: string;
@@ -48,7 +64,7 @@ interface FolderManagerModalProps {
   categories: FolderCategoryOption[];
   entities: HecosEntity[];
   initialCategoryId?: string;
-  themeColor?: 'amber' | 'cyan' | 'purple' | 'emerald';
+  themeColor?: 'amber' | 'cyan' | 'purple' | 'emerald' | 'rose';
   onRefresh?: () => void;
 }
 
@@ -75,9 +91,11 @@ export const FolderManagerModal: React.FC<FolderManagerModalProps> = ({
   // Theme styling resolver
   const activeTheme = useMemo(() => {
     if (themeColor) return themeColor;
-    if (scope === 'spell') return 'cyan';
-    if (scope === 'feat') return 'amber';
-    if (scope === 'item') return 'purple';
+    if (scope === 'spell' || scope === 'pc' || scope === 'location' || scope === 'ancestry') return 'cyan';
+    if (scope === 'feat' || scope === 'tag') return 'amber';
+    if (scope === 'item' || scope === 'class' || scope === 'npc') return 'purple';
+    if (scope === 'fauna' || scope === 'flora') return 'emerald';
+    if (scope === 'peril' || scope === 'organization') return 'rose';
     return 'cyan';
   }, [themeColor, scope]);
 
@@ -94,6 +112,18 @@ export const FolderManagerModal: React.FC<FolderManagerModalProps> = ({
           hoverBg: 'hover:bg-amber-950/20',
           activeTab: 'bg-amber-500 text-black font-bold shadow-md shadow-amber-500/20',
           selectionHighlight: 'bg-amber-950/60 border-amber-500/80 text-amber-100 ring-1 ring-amber-500/30',
+        };
+      case 'rose':
+        return {
+          primary: 'bg-rose-500 hover:bg-rose-400 text-black font-bold',
+          primarySoft: 'bg-rose-950/40 text-rose-300 border-rose-500/40',
+          accentBorder: 'border-rose-500/40',
+          focusRing: 'focus:border-rose-400',
+          badge: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+          iconText: 'text-rose-400',
+          hoverBg: 'hover:bg-rose-950/20',
+          activeTab: 'bg-rose-500 text-black font-bold shadow-md shadow-rose-500/20',
+          selectionHighlight: 'bg-rose-950/60 border-rose-500/80 text-rose-100 ring-1 ring-rose-500/30',
         };
       case 'cyan':
         return {
@@ -187,15 +217,7 @@ export const FolderManagerModal: React.FC<FolderManagerModalProps> = ({
 
   // Load configs based on scope
   const loadConfig = () => {
-    if (scope === 'feat') {
-      setCategoriesConfig(HecosStorage.getAllFeatSubcategoriesConfig());
-    } else if (scope === 'spell') {
-      setCategoriesConfig(HecosStorage.getAllSpellSubcategoriesConfig());
-    } else if (scope === 'item') {
-      setCategoriesConfig(HecosStorage.getAllItemSubcategoriesConfig());
-    } else {
-      setCategoriesConfig(HecosStorage.getAllFeatSubcategoriesConfig());
-    }
+    setCategoriesConfig(HecosStorage.getScopeSubcategoriesConfig(scope));
   };
 
   useEffect(() => {
@@ -217,6 +239,21 @@ export const FolderManagerModal: React.FC<FolderManagerModalProps> = ({
     if (scope === 'item') {
       return entities.filter((e) => e.category === 'item' || e.itemData || e.tags?.includes('item'));
     }
+    if (scope === 'peril') {
+      return entities.filter((e) => e.category === 'peril' || e.perilData || e.category === 'creature');
+    }
+    if (scope === 'class') {
+      return entities.filter((e) => (e.category === 'class' || e.classData?.kind === 'class') && e.category !== 'archetype' && e.classData?.kind !== 'archetype');
+    }
+    if (scope === 'archetype') {
+      return entities.filter((e) => e.category === 'archetype' || e.classData?.kind === 'archetype');
+    }
+    if (scope === 'ancestry') {
+      return entities.filter((e) => e.category === 'ancestry' || e.ancestryData);
+    }
+    if (['fauna', 'flora', 'location', 'pc', 'npc', 'organization'].includes(scope)) {
+      return entities.filter((e) => e.category === scope);
+    }
     return entities;
   }, [entities, scope]);
 
@@ -225,6 +262,9 @@ export const FolderManagerModal: React.FC<FolderManagerModalProps> = ({
     if (scope === 'feat' && ent.featData?.subcategories) return ent.featData.subcategories;
     if (scope === 'spell' && ent.spellData?.subcategories) return ent.spellData.subcategories;
     if (scope === 'item' && ent.itemData?.subcategories) return ent.itemData.subcategories;
+    if (scope === 'peril' && ent.perilData?.subcategories) return ent.perilData.subcategories;
+    if ((scope === 'class' || scope === 'archetype') && ent.classData?.subcategories) return ent.classData.subcategories;
+    if (scope === 'ancestry' && ent.ancestryData?.subcategories) return ent.ancestryData.subcategories;
     return ent.subcategories || (ent.subcategory ? [ent.subcategory] : []);
   };
 
@@ -309,13 +349,7 @@ export const FolderManagerModal: React.FC<FolderManagerModalProps> = ({
     if (!trimmed) return;
     const cat = singleCategoryTarget || categories[0]?.id || 'general';
 
-    if (scope === 'feat') {
-      HecosStorage.addFeatSubcategory(cat, trimmed);
-    } else if (scope === 'spell') {
-      HecosStorage.addSpellSubcategory(cat, trimmed);
-    } else if (scope === 'item') {
-      HecosStorage.addItemSubcategory(cat, trimmed);
-    }
+    HecosStorage.addScopeSubcategory(scope, cat, trimmed);
 
     if (singleIsSecret) {
       HecosStorage.setFolderSecret(trimmed, true);
@@ -341,15 +375,7 @@ export const FolderManagerModal: React.FC<FolderManagerModalProps> = ({
     let createdCount = 0;
 
     lines.forEach((folderName) => {
-      let success = false;
-      if (scope === 'feat') {
-        success = HecosStorage.addFeatSubcategory(cat, folderName);
-      } else if (scope === 'spell') {
-        success = HecosStorage.addSpellSubcategory(cat, folderName);
-      } else if (scope === 'item') {
-        success = HecosStorage.addItemSubcategory(cat, folderName);
-      }
-
+      const success = HecosStorage.addScopeSubcategory(scope, cat, folderName);
       if (success) {
         createdCount++;
         if (bulkIsSecret) {
@@ -373,13 +399,7 @@ export const FolderManagerModal: React.FC<FolderManagerModalProps> = ({
       return;
     }
 
-    if (scope === 'feat') {
-      HecosStorage.renameFeatSubcategory(catKey, oldName, trimmed);
-    } else if (scope === 'spell') {
-      HecosStorage.renameSpellSubcategory(catKey, oldName, trimmed);
-    } else if (scope === 'item') {
-      HecosStorage.renameItemSubcategory(catKey, oldName, trimmed);
-    }
+    HecosStorage.renameScopeSubcategory(scope, catKey, oldName, trimmed);
 
     setEditingFolderKey(null);
     loadConfig();
@@ -423,13 +443,7 @@ export const FolderManagerModal: React.FC<FolderManagerModalProps> = ({
   // Execute Confirmed Delete
   const executeDelete = () => {
     confirmDeleteInfo.folderNames.forEach(({ name, categoryKey }) => {
-      if (scope === 'feat') {
-        HecosStorage.deleteFeatSubcategory(categoryKey, name);
-      } else if (scope === 'spell') {
-        HecosStorage.deleteSpellSubcategory(categoryKey, name);
-      } else if (scope === 'item') {
-        HecosStorage.deleteItemSubcategory(categoryKey, name);
-      }
+      HecosStorage.deleteScopeSubcategory(scope, categoryKey, name);
     });
 
     setSelectedFolderKeys(new Set());

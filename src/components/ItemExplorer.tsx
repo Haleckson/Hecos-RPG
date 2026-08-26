@@ -433,63 +433,29 @@ export function ItemExplorer({
             </div>
           </div>
 
-          {/* Buttons: View Modes & Create */}
-          <div className="flex items-center gap-2.5 flex-wrap">
-            {/* View Mode Toggle */}
-            <div className="flex items-center bg-zinc-900/80 border border-zinc-800 p-1 rounded-xl">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded-lg transition-colors ${
-                  viewMode === 'grid' ? 'bg-amber-950 text-amber-300 border border-amber-700/50' : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-                title="Visualização em Grade (Cards)"
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded-lg transition-colors ${
-                  viewMode === 'list' ? 'bg-amber-950 text-amber-300 border border-amber-700/50' : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-                title="Visualização em Lista / Tabela"
-              >
-                <List className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('folders')}
-                className={`p-1.5 rounded-lg transition-colors ${
-                  viewMode === 'folders' ? 'bg-amber-950 text-amber-300 border border-amber-700/50' : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-                title="Visualização em Árvore de Pastas"
-              >
-                <FolderTree className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Gerenciar Pastas Modal Button */}
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 relative z-10 shrink-0">
             {isActualGm && (
-              <Tooltip title="Gerenciar Pastas" description="Adicionar, renomear ou excluir pastas de itens">
+              <>
                 <button
                   type="button"
                   onClick={() => setIsFolderManagerOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-200 text-xs font-semibold transition-all hover:border-amber-500/40 cursor-pointer"
+                  className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-300 hover:text-amber-300 text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  title="Gerenciar estrutura de pastas e subcategorias"
                 >
-                  <Settings className="w-4 h-4 text-amber-400" />
-                  <span className="hidden sm:inline">Pastas</span>
+                  <Settings className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Gerenciar Pastas</span>
                 </button>
-              </Tooltip>
-            )}
 
-            {/* Novo Item Button */}
-            {isActualGm && (
-              <button
-                type="button"
-                onClick={() => setIsItemCreateModalOpen(true)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 text-zinc-950 text-xs font-extrabold shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-all cursor-pointer"
-              >
-                <Plus className="w-4 h-4 stroke-[3]" />
-                <span>Novo Item</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setIsItemCreateModalOpen(true)}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 text-zinc-950 text-xs font-extrabold shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-all cursor-pointer"
+                >
+                  <Plus className="w-4 h-4 stroke-[3]" />
+                  <span>Novo Item</span>
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -790,6 +756,46 @@ export function ItemExplorer({
                 Limpar
               </button>
             )}
+
+            {/* View Mode Switcher */}
+            <div className="flex items-center gap-0.5 p-0.5 rounded-xl bg-zinc-900 border border-zinc-800">
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+                  viewMode === 'grid'
+                    ? 'bg-amber-500 text-black font-bold shadow-sm'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+                title="Visualização em Grade (Cards)"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+                  viewMode === 'list'
+                    ? 'bg-amber-500 text-black font-bold shadow-sm'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+                title="Visualização em Lista / Tabela"
+              >
+                <List className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('folders')}
+                className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+                  viewMode === 'folders'
+                    ? 'bg-amber-500 text-black font-bold shadow-sm'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+                title="Visualização em Árvore de Pastas"
+              >
+                <FolderTree className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1221,120 +1227,27 @@ export function ItemExplorer({
         </div>
       )}
 
-      {/* 6. Folder Management Modal */}
+      {/* 6. Folder Management Modal (Standardized 90% Screen Width Modal) */}
       {isFolderManagerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#0f0d18] border border-zinc-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl space-y-4 p-6">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-              <div className="flex items-center gap-2">
-                <Folder className="w-5 h-5 text-amber-400" />
-                <h3 className="text-base font-bold text-zinc-100">Gerenciar Pastas de Itens</h3>
-              </div>
-              <button
-                onClick={() => setIsFolderManagerOpen(false)}
-                className="p-1 text-zinc-500 hover:text-zinc-300 rounded"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Create new folder */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-zinc-300">Nova Pasta ({activeCategory.toUpperCase()}):</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={newFolderName}
-                  onChange={(e) => setNewFolderName(e.target.value)}
-                  placeholder="Nome da nova pasta..."
-                  className="flex-1 bg-black/50 border border-zinc-800 focus:border-amber-500 rounded-xl px-3 py-2 text-xs text-zinc-200 outline-none"
-                />
-                <button
-                  onClick={handleAddFolder}
-                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-zinc-950 font-bold text-xs transition-colors flex items-center gap-1"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Criar</span>
-                </button>
-              </div>
-            </div>
-
-            {/* List existing folders */}
-            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-              <label className="text-xs font-bold text-zinc-400">Pastas Existentes:</label>
-              {currentSubcategories.map((folderName) => {
-                const count = subcategoryCounts[folderName] || 0;
-                const isEditing = editingFolderOriginalName === folderName;
-
-                return (
-                  <div
-                    key={folderName}
-                    className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800/80 text-xs"
-                  >
-                    {isEditing ? (
-                      <div className="flex items-center gap-2 flex-1">
-                        <input
-                          type="text"
-                          value={editingFolderNewName}
-                          onChange={(e) => setEditingFolderNewName(e.target.value)}
-                          className="flex-1 bg-black/60 border border-amber-500 rounded-lg px-2 py-1 text-xs text-zinc-100 outline-none"
-                        />
-                        <button
-                          onClick={handleRenameFolder}
-                          className="p-1.5 bg-amber-600 hover:bg-amber-500 text-zinc-950 rounded-lg"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => setEditingFolderOriginalName(null)}
-                          className="p-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-lg"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <Folder className="w-3.5 h-3.5 text-amber-400" />
-                          <span className="font-semibold text-zinc-200">{folderName}</span>
-                          <span className="text-[10px] text-zinc-500 font-mono">({count} itens)</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => {
-                              setEditingFolderOriginalName(folderName);
-                              setEditingFolderNewName(folderName);
-                            }}
-                            className="p-1 text-zinc-400 hover:text-amber-300"
-                            title="Renomear Pasta"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteFolder(folderName)}
-                            className="p-1 text-zinc-500 hover:text-rose-400"
-                            title="Excluir Pasta"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="flex justify-end pt-3 border-t border-zinc-800">
-              <button
-                onClick={() => setIsFolderManagerOpen(false)}
-                className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold text-xs transition-colors"
-              >
-                Concluir
-              </button>
-            </div>
-          </div>
-        </div>
+        <FolderManagerModal
+          isOpen={isFolderManagerOpen}
+          scope="item"
+          categories={MAIN_ITEM_CATEGORIES.map((c) => ({
+            id: c.id,
+            name: c.name,
+            englishName: c.englishName,
+            icon: c.icon,
+            color: c.color,
+          }))}
+          entities={itemEntities}
+          initialCategoryId={activeCategory}
+          themeColor="purple"
+          onClose={() => {
+            setIsFolderManagerOpen(false);
+            refreshConfig();
+          }}
+          onRefresh={refreshConfig}
+        />
       )}
 
       {/* 7. Assign Folders to Specific Item Modal */}

@@ -22,10 +22,13 @@ import {
 
 interface RichContentRendererProps {
   content: string;
-  onNavigate: (entityId: string) => void;
+  onNavigate?: (entityId: string) => void;
   className?: string;
   isGmMode?: boolean;
+  inline?: boolean;
 }
+
+export { renderContentWithMentions };
 
 /**
  * Robust Rich Markdown and HTML Renderer for Hecos Codex
@@ -45,12 +48,21 @@ interface RichContentRendererProps {
  */
 export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
   content,
-  onNavigate,
+  onNavigate = () => {},
   className = '',
   isGmMode: propIsGmMode,
+  inline = false,
 }) => {
   if (!content || !content.trim()) {
-    return <p className="text-zinc-500 italic text-sm">Nenhum conteúdo adicionado ainda.</p>;
+    return inline ? null : <p className="text-zinc-500 italic text-sm">Nenhum conteúdo adicionado ainda.</p>;
+  }
+
+  if (inline) {
+    return (
+      <span className={className}>
+        {renderContentWithMentions(content, onNavigate)}
+      </span>
+    );
   }
 
   const effectiveGmMode = propIsGmMode !== undefined ? propIsGmMode : HecosStorage.getGmMode();

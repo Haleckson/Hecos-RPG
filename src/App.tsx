@@ -24,6 +24,7 @@ import { TrashBinModal } from './components/TrashBinModal';
 import { FeatExplorer } from './components/FeatExplorer';
 import { SpellExplorer } from './components/SpellExplorer';
 import { ItemExplorer } from './components/ItemExplorer';
+import { CategoryEntityExplorer } from './components/CategoryEntityExplorer';
 import { SpellCreateModal } from './components/SpellCreateModal';
 import { ItemCreateModal } from './components/ItemCreateModal';
 import { AncestryCard } from './components/AncestryCard';
@@ -202,6 +203,25 @@ export function App() {
   const [firebaseStatus, setFirebaseStatus] = useState(getFirebaseConnectionState());
 
   const isActualGm = HecosStorage.isUserGm(currentUser);
+
+  // Compute effective category key based on selectedCategoryKey and activeSubcategory
+  const effectiveCategoryKey = useMemo(() => {
+    if (selectedCategoryKey === 'feat' || activeSubcategory === 'Talentos') return 'feat';
+    if (selectedCategoryKey === 'spell' || activeSubcategory === 'Feitiços') return 'spell';
+    if (selectedCategoryKey === 'item' || activeSubcategory === 'Itens') return 'item';
+    if (selectedCategoryKey === 'quest' || activeSubcategory === 'Quests' || activeSubcategory === 'Missões') return 'quest';
+    if (selectedCategoryKey === 'peril' || selectedCategoryKey === 'creature' || activeSubcategory === 'Perigos' || activeSubcategory === 'Ameaças') return 'peril';
+    if (selectedCategoryKey === 'class' || activeSubcategory === 'Classes') return 'class';
+    if (selectedCategoryKey === 'archetype' || selectedCategoryKey === 'arquetipos' || selectedCategoryKey === 'vocacao' || activeSubcategory === 'Vocação' || activeSubcategory === 'Arquétipos') return 'archetype';
+    if (selectedCategoryKey === 'ancestry' || activeSubcategory === 'Ancestralidades') return 'ancestry';
+    if (selectedCategoryKey === 'fauna' || activeSubcategory === 'Fauna') return 'fauna';
+    if (selectedCategoryKey === 'flora' || activeSubcategory === 'Flora') return 'flora';
+    if (selectedCategoryKey === 'location' || selectedCategoryKey === 'locais' || activeSubcategory === 'Locais') return 'location';
+    if (selectedCategoryKey === 'npc' || activeSubcategory === 'NPC') return 'npc';
+    if (selectedCategoryKey === 'pc' || activeSubcategory === 'PC') return 'pc';
+    if (selectedCategoryKey === 'organization' || selectedCategoryKey === 'organizacoes' || activeSubcategory === 'Organizações') return 'organization';
+    return selectedCategoryKey;
+  }, [selectedCategoryKey, activeSubcategory]);
 
   // Trait Drawer Event Listener (hecos:open-trait-drawer)
   useEffect(() => {
@@ -424,6 +444,36 @@ export function App() {
   };
 
   const handleCreateNewEntity = (presetCategoryOrSub?: string) => {
+    if (presetCategoryOrSub === 'spell') {
+      handleCreateSpellDirectly();
+      return;
+    }
+    if (presetCategoryOrSub === 'item') {
+      handleCreateItemDirectly();
+      return;
+    }
+    if (presetCategoryOrSub === 'feat') {
+      handleCreateFeatDirectly();
+      return;
+    }
+    if (presetCategoryOrSub === 'peril' || presetCategoryOrSub === 'creature') {
+      setIsPerilCreateModalOpen(true);
+      return;
+    }
+    if (presetCategoryOrSub === 'class') {
+      setClassModalPresetKind('class');
+      setIsClassCreateModalOpen(true);
+      return;
+    }
+    if (presetCategoryOrSub === 'archetype' || presetCategoryOrSub === 'arquetipos' || presetCategoryOrSub === 'vocacao') {
+      setClassModalPresetKind('archetype');
+      setIsClassCreateModalOpen(true);
+      return;
+    }
+    if (presetCategoryOrSub === 'ancestry') {
+      handleCreateEntityOfCategory('ancestry');
+      return;
+    }
     // Open Category selector modal so user can choose ANY category from anywhere
     setIsNewArticleModalOpen(true);
   };
@@ -757,7 +807,8 @@ export function App() {
                             {isGroupExpanded && (
                               <div className="pl-2 space-y-0.5 border-l border-zinc-800/60 ml-2">
                                 {group.items.map((child) => {
-                                  const isChildSelected = activeSubcategory === child.subcategory;
+                                  const targetCat = child.categoryKey || child.id || category.id;
+                                  const isChildSelected = (effectiveCategoryKey === targetCat || activeSubcategory === child.subcategory) && activeView === (child.viewType || 'entities');
                                   const ChildIcon = child.icon;
                                   const subcatKey = child.subcategory || child.id;
                                   const folderPerm = HecosStorage.getFolderPermission(subcatKey);
@@ -773,9 +824,10 @@ export function App() {
                                     >
                                       <div
                                         onClick={() => {
-                                          setSelectedCategoryKey(category.id);
-                                          setActiveSubcategory(child.subcategory!);
+                                          setSelectedCategoryKey(targetCat);
+                                          setActiveSubcategory(child.subcategory || null);
                                           setSelectedEntityId(null);
+                                          setEditingEntity(null);
                                           if (child.viewType && child.viewType !== 'entities') {
                                             setActiveView(child.viewType);
                                           } else {
@@ -817,7 +869,8 @@ export function App() {
                       })
                     ) : (
                       category.children!.map((child) => {
-                        const isChildSelected = activeSubcategory === child.subcategory;
+                        const targetCat = child.categoryKey || child.id || category.id;
+                        const isChildSelected = (effectiveCategoryKey === targetCat || activeSubcategory === child.subcategory) && activeView === (child.viewType || 'entities');
                         const ChildIcon = child.icon;
                         const subcatKey = child.subcategory || child.id;
                         const folderPerm = HecosStorage.getFolderPermission(subcatKey);
@@ -833,9 +886,10 @@ export function App() {
                           >
                             <div
                               onClick={() => {
-                                setSelectedCategoryKey(category.id);
-                                setActiveSubcategory(child.subcategory!);
+                                setSelectedCategoryKey(targetCat);
+                                setActiveSubcategory(child.subcategory || null);
                                 setSelectedEntityId(null);
+                                setEditingEntity(null);
                                 if (child.viewType && child.viewType !== 'entities') {
                                   setActiveView(child.viewType);
                                 } else {
@@ -1002,7 +1056,7 @@ export function App() {
 
               {/* Category Level (only if not at root Codex) */}
               {(() => {
-                const effectiveCatKey = currentEntity ? currentEntity.category : selectedCategoryKey;
+                const effectiveCatKey = currentEntity ? currentEntity.category : effectiveCategoryKey;
                 if (effectiveCatKey === 'codex' && !currentEntity) return null;
                 const catMeta = getCategoryMeta(effectiveCatKey);
                 return (
@@ -1032,7 +1086,7 @@ export function App() {
 
               {/* Subcategory Level (prevent duplicating category name) */}
               {(() => {
-                const effectiveCatKey = currentEntity ? currentEntity.category : selectedCategoryKey;
+                const effectiveCatKey = currentEntity ? currentEntity.category : effectiveCategoryKey;
                 const catMeta = getCategoryMeta(effectiveCatKey);
                 const sub = activeSubcategory || currentEntity?.subcategory;
                 if (!sub || sub.toLowerCase() === catMeta.name.toLowerCase()) return null;
@@ -1264,7 +1318,7 @@ export function App() {
 
           {/* VIEW: Category Entities Grid View (Default) OR Custom Explorers for Feats, Spells, Items */}
           {activeView === 'entities' && (
-            selectedCategoryKey === 'feat' || activeSubcategory === 'Talentos' ? (
+            effectiveCategoryKey === 'feat' ? (
               <FeatExplorer
                 entities={entities}
                 onSelectEntity={handleNavigateEntity}
@@ -1283,7 +1337,7 @@ export function App() {
                 }}
                 isGmMode={isGmMode}
               />
-            ) : selectedCategoryKey === 'spell' || activeSubcategory === 'Feitiços' ? (
+            ) : effectiveCategoryKey === 'spell' ? (
               <SpellExplorer
                 entities={entities}
                 onSelectEntity={handleNavigateEntity}
@@ -1302,7 +1356,7 @@ export function App() {
                 }}
                 isGmMode={isGmMode}
               />
-            ) : selectedCategoryKey === 'item' || activeSubcategory === 'Itens' ? (
+            ) : effectiveCategoryKey === 'item' ? (
               <ItemExplorer
                 entities={entities}
                 onSelectEntity={handleNavigateEntity}
@@ -1321,7 +1375,7 @@ export function App() {
                 }}
                 isGmMode={isGmMode}
               />
-            ) : selectedCategoryKey === 'quest' || activeSubcategory === 'Quests' || activeSubcategory === 'Missões' ? (
+            ) : effectiveCategoryKey === 'quest' ? (
               <QuestBoard
                 onNavigateEntity={handleNavigateEntity}
                 onEditEntity={(ent) => {
@@ -1331,7 +1385,7 @@ export function App() {
                 onCreateQuest={() => handleCreateNewEntity('quest')}
                 isGmMode={isGmMode}
               />
-            ) : selectedCategoryKey === 'codex' && !activeSubcategory && !searchFilter.trim() && !selectedTagFilter ? (
+            ) : effectiveCategoryKey === 'codex' && !activeSubcategory && !searchFilter.trim() && !selectedTagFilter ? (
               <HomePage
                 entities={entities}
                 onSelectEntity={handleNavigateEntity}
@@ -1344,6 +1398,29 @@ export function App() {
                 }}
                 onCreateArticle={() => setIsNewArticleModalOpen(true)}
                 isGm={isActualGm}
+              />
+            ) : !['diary', 'rule', 'gm_notes', 'timeline'].includes(effectiveCategoryKey) ? (
+              <CategoryEntityExplorer
+                categoryKey={effectiveCategoryKey}
+                activeSubcategory={activeSubcategory}
+                onSelectEntity={handleNavigateEntity}
+                onEditEntity={(id) => {
+                  const ent = entities.find((e) => e.id === id || e.slug === id);
+                  if (ent) {
+                    if (ent.category === 'spell') {
+                      setEditingSpellEntity(ent);
+                      setIsSpellCreateModalOpen(true);
+                    } else {
+                      setEditingEntity(ent);
+                      setActiveView('edit');
+                    }
+                  }
+                }}
+                onDeleteEntity={handleDeleteEntity}
+                onCreateNewEntity={(cat) => handleCreateNewEntity(cat)}
+                isActualGm={isActualGm}
+                selectedTagFilter={selectedTagFilter}
+                onClearTagFilter={() => setSelectedTagFilter(null)}
               />
             ) : (
               <div className="space-y-6">

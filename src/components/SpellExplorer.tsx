@@ -508,69 +508,29 @@ export function SpellExplorer({
             </div>
           </div>
 
-          {/* Quick Create & Mode Buttons */}
-          <div className="flex items-center gap-2.5 flex-wrap">
-            {/* View Mode Toggle */}
-            <div className="flex items-center bg-zinc-900/80 border border-zinc-800 p-1 rounded-xl">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                  viewMode === 'grid'
-                    ? 'bg-cyan-950 text-cyan-300 border border-cyan-700/50'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-                title="Visualização em Grade (Cards)"
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                  viewMode === 'list'
-                    ? 'bg-cyan-950 text-cyan-300 border border-cyan-700/50'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-                title="Visualização em Lista / Tabela"
-              >
-                <List className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('folders')}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                  viewMode === 'folders'
-                    ? 'bg-cyan-950 text-cyan-300 border border-cyan-700/50'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-                title="Visualização em Árvore de Pastas"
-              >
-                <FolderTree className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Gerenciar Pastas Modal Button */}
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 relative z-10 shrink-0">
             {isActualGm && (
-              <Tooltip title="Gerenciar Pastas" description="Adicionar, renomear ou excluir pastas de feitiços">
+              <>
                 <button
                   type="button"
                   onClick={() => setIsFolderManagerOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-200 text-xs font-semibold transition-all hover:border-cyan-500/40 cursor-pointer"
+                  className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-300 hover:text-cyan-300 text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  title="Gerenciar estrutura de pastas e subcategorias"
                 >
-                  <Settings className="w-4 h-4 text-cyan-400" />
-                  <span className="hidden sm:inline">Pastas</span>
+                  <Settings className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Gerenciar Pastas</span>
                 </button>
-              </Tooltip>
-            )}
 
-            {/* Novo Feitiço Button */}
-            {isActualGm && (
-              <button
-                type="button"
-                onClick={() => setIsSpellCreateModalOpen(true)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-zinc-950 text-xs font-extrabold shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all cursor-pointer"
-              >
-                <Plus className="w-4 h-4 stroke-[3]" />
-                <span>Novo Feitiço</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSpellCreateModalOpen(true)}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-zinc-950 text-xs font-extrabold shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all cursor-pointer"
+                >
+                  <Plus className="w-4 h-4 stroke-[3]" />
+                  <span>Novo Feitiço</span>
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -891,6 +851,46 @@ export function SpellExplorer({
                 Limpar
               </button>
             )}
+
+            {/* View Mode Switcher */}
+            <div className="flex items-center gap-0.5 p-0.5 rounded-xl bg-zinc-900 border border-zinc-800">
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+                  viewMode === 'grid'
+                    ? 'bg-cyan-500 text-black font-bold shadow-sm'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+                title="Visualização em Grade (Cards)"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+                  viewMode === 'list'
+                    ? 'bg-cyan-500 text-black font-bold shadow-sm'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+                title="Visualização em Lista / Tabela"
+              >
+                <List className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('folders')}
+                className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+                  viewMode === 'folders'
+                    ? 'bg-cyan-500 text-black font-bold shadow-sm'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+                title="Visualização em Árvore de Pastas"
+              >
+                <FolderTree className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1460,13 +1460,23 @@ export function SpellExplorer({
       {/* 6. Folder Management Modal (Standardized 90% Screen Width Modal) */}
       {isFolderManagerOpen && (
         <FolderManagerModal
+          isOpen={isFolderManagerOpen}
           scope="spell"
-          categoriesConfig={categoriesConfig}
-          allEntities={spellEntities}
+          categories={MAIN_SPELL_CATEGORIES.map((c) => ({
+            id: c.id,
+            name: c.name,
+            englishName: c.englishName,
+            icon: c.icon,
+            color: c.color,
+          }))}
+          entities={spellEntities}
+          initialCategoryId={activeCategory}
+          themeColor="cyan"
           onClose={() => {
             setIsFolderManagerOpen(false);
             refreshConfig();
           }}
+          onRefresh={refreshConfig}
         />
       )}
 

@@ -41,6 +41,7 @@ import { renderContentWithMentions } from './MentionBadge';
 import { ConfirmModal } from './ConfirmModal';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { ImageUploadInput } from './ImageUploadInput';
+import { FolderManagerModal } from './FolderManagerModal';
 
 interface InteractiveMapProps {
   onNavigateEntity: (entityId: string) => void;
@@ -94,6 +95,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity
 
   // Modals state
   const [showMapSettings, setShowMapSettings] = useState(false);
+  const [isFolderManagerOpen, setIsFolderManagerOpen] = useState(false);
   const [editingPin, setEditingPin] = useState<MapPin | null>(null);
   const [pinToDelete, setPinToDelete] = useState<{ id: string; title: string } | null>(null);
   const [isDeletingMap, setIsDeletingMap] = useState(false);
@@ -578,6 +580,18 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity
             {showGMSecrets ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
             <span className="hidden sm:inline">GM</span>
           </button>
+
+          {/* Gerenciar Pastas button */}
+          {isActualGm && (
+            <button
+              onClick={() => setIsFolderManagerOpen(true)}
+              className="p-1.5 px-2.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-cyan-300 transition-colors flex items-center gap-1.5 text-xs font-semibold"
+              title="Gerenciar Pastas e Categorias de Mapas"
+            >
+              <Settings className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden md:inline">Gerenciar Pastas</span>
+            </button>
+          )}
 
           {/* Map Settings button */}
           <button
@@ -1344,6 +1358,23 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity
         cancelLabel="Cancelar"
         onConfirm={confirmDeleteMap}
         onCancel={() => setIsDeletingMap(false)}
+      />
+
+      {/* Universal Folder Manager Modal for Maps */}
+      <FolderManagerModal
+        isOpen={isFolderManagerOpen}
+        onClose={() => setIsFolderManagerOpen(false)}
+        scope="map"
+        categories={[
+          { id: 'all', name: 'Todos os Mapas' },
+          { id: 'regional', name: 'Mapas Regionais' },
+          { id: 'cities', name: 'Cidades & Assentamentos' },
+          { id: 'dungeons', name: 'Masmorras & Covis' },
+          { id: 'battlemaps', name: 'Mapas Táticos de Batalha' }
+        ]}
+        entities={[]}
+        themeColor="cyan"
+        onRefresh={() => setMaps(HecosStorage.getMaps())}
       />
     </div>
   );

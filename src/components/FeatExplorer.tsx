@@ -191,6 +191,10 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
   const [inlineNewSubcategoryName, setInlineNewSubcategoryName] = useState('');
   const [showInlineNewSubcategory, setShowInlineNewSubcategory] = useState(false);
 
+  const refreshConfig = () => {
+    setCategoriesConfig(HecosStorage.getAllFeatSubcategoriesConfig());
+  };
+
   // Subscribe to category config changes
   useEffect(() => {
     return HecosStorage.subscribeFeatCategories((cfg) => {
@@ -1175,10 +1179,23 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
       {/* --- MODAL 1: GERENCIAR ESTRUTURA DE PASTAS E SUBCATEGORIAS --- */}
       {isManageSubcategoriesModalOpen && (
         <FolderManagerModal
+          isOpen={isManageSubcategoriesModalOpen}
           scope="feat"
-          categoriesConfig={categoriesConfig}
-          allEntities={allFeatEntities}
-          onClose={() => setIsManageSubcategoriesModalOpen(false)}
+          categories={MAIN_FEAT_CATEGORIES.map((c) => ({
+            id: c.id,
+            name: c.name,
+            englishName: c.englishName,
+            icon: c.icon,
+            color: c.color,
+          }))}
+          entities={allFeatEntities}
+          initialCategoryId={selectedMainCategory}
+          themeColor="amber"
+          onClose={() => {
+            setIsManageSubcategoriesModalOpen(false);
+            refreshConfig();
+          }}
+          onRefresh={refreshConfig}
         />
       )}
 

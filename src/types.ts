@@ -317,6 +317,7 @@ export interface AncestryAlbumImage {
 }
 
 export interface AncestryAttributes {
+  subcategories?: string[];
   // Álbum & Galeria Visual (Subcategoria colapsável no topo de Lore)
   album?: AncestryAlbumImage[];
 
@@ -442,6 +443,7 @@ export interface PerilFieldVisibility {
 }
 
 export interface PerilAttributes {
+  subcategories?: string[];
   perilKind: PerilKind;
   level: number;
   rarity: 'Comum' | 'Incomum' | 'Raro' | 'Único';
@@ -530,6 +532,7 @@ export interface ClassArchetypeFeat {
 }
 
 export interface ClassAttributes {
+  subcategories?: string[];
   kind: 'class' | 'archetype';
   hpPerLevel?: number; // e.g. 6, 8, 10, 12
   keyAttribute?: string; // Força, Destreza, etc.

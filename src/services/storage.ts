@@ -92,6 +92,65 @@ export const DEFAULT_ITEM_CATEGORIES_CONFIG: Record<string, string[]> = {
   extras: ['Itens de Hecos', 'Materiais Especiais (Vidro Estelar, Adamante)', 'Tesouros de Sessão', 'Homebrew']
 };
 
+export const DEFAULT_PERIL_CATEGORIES_CONFIG: Record<string, string[]> = {
+  all: ['Nível -1 a 4', 'Nível 5 a 9', 'Nível 10 a 14', 'Nível 15 a 20', 'Chefes & Lendários'],
+  monsters: ['Bestas & Feras', 'Mortos-Vivos', 'Humanoides & Bandidos', 'Aberrantes & Vazio', 'Constructos', 'Dragões', 'Extraplanares'],
+  hazards_simple: ['Armadilhas Mecânicas', 'Armadilhas Mágicas', 'Alarmes & Emboscadas'],
+  hazards_complex: ['Salões Mortais', 'Gatilhos de Masmorra', 'Mecanismos Antigos'],
+  haunts: ['Espíritos Vingativos', 'Ecos do Eclipse', 'Maldições Locais'],
+  environmental: ['Ventos Solares', 'Chuva Ácida', 'Frio Extremo', 'Terrenos Instáveis']
+};
+
+export const DEFAULT_CLASS_CATEGORIES_CONFIG: Record<string, string[]> = {
+  all: ['Combatentes', 'Conjuradores Arcanos', 'Conjuradores Divinos', 'Conjuradores Primal', 'Conjuradores Ocultistas', 'Especialistas'],
+  classes: ['Combatentes de Linha de Frente', 'Magos & Feiticeiros', 'Curandeiros & Santos', 'Furtivos & Especialistas', 'Disciplinas de Hecos']
+};
+
+export const DEFAULT_ARCHETYPE_CATEGORIES_CONFIG: Record<string, string[]> = {
+  all: ['Dedicações Marciais', 'Vocações Místicas', 'Vocações de Perícia & Ofício', 'Vocações de Prestígio', 'Vocações de Hecos'],
+  combat: ['Caminhante da Penumbra', 'Cavaleiro', 'Duelista', 'Mestre de Armas', 'Guerreiro de Obsidiana'],
+  mystic: ['Arquimago do Eclipse', 'Oráculo das Estrelas', 'Invocador de Ecos', 'Sentinela do Vazio'],
+  specialist: ['Assassino da Corte', 'Médico de Batalha', 'Alquimista do Vidro', 'Explorador dos Ermos']
+};
+
+export const DEFAULT_ANCESTRY_CATEGORIES_CONFIG: Record<string, string[]> = {
+  all: ['Ancestralidades Comuns', 'Ancestralidades Incomuns', 'Ancestralidades Raras', 'Heranças Versáteis', 'Povos de Hecos'],
+  ancestries: ['Povos da Obsidiana', 'Povos do Lago', 'Povos das Alturas', 'Nômades do Deserto'],
+  heritages: ['Heranças Elementais', 'Heranças Místicas', 'Heranças Sombrias', 'Heranças Dracônicas']
+};
+
+export const DEFAULT_FAUNA_CATEGORIES_CONFIG: Record<string, string[]> = {
+  all: ['Predadores de Hecos', 'Herbívoros Silvestres', 'Aves & Criaturas Aladas', 'Bestas Aquáticas & do Lago', 'Criaturas Místicas']
+};
+
+export const DEFAULT_FLORA_CATEGORIES_CONFIG: Record<string, string[]> = {
+  all: ['Ervas Medicinais & Cura', 'Fungos & Esporos Luminescentes', 'Plantas Tóxicas & Venenosas', 'Árvores Sagradas & Antigas', 'Flora do Eclipse']
+};
+
+export const DEFAULT_LOCATION_CATEGORIES_CONFIG: Record<string, string[]> = {
+  all: ['Cidades & Capitais', 'Masmorras & Ruínas de Obsidiana', 'Santuários & Templos', 'Ermos & Florestas', 'Regiões & Províncias']
+};
+
+export const DEFAULT_PC_CATEGORIES_CONFIG: Record<string, string[]> = {
+  all: ['Personagens Ativos', 'Personagens da Reserva', 'Históricos & Falecidos', 'Aliados de Campanha']
+};
+
+export const DEFAULT_NPC_CATEGORIES_CONFIG: Record<string, string[]> = {
+  all: ['Aliados & Companheiros', 'Vilões & Antagonistas', 'Mercadores & Artesãos', 'Líderes & Autoridades', 'Contatos Neutros', 'Informantes']
+};
+
+export const DEFAULT_ORGANIZATION_CATEGORIES_CONFIG: Record<string, string[]> = {
+  all: ['Guildas & Facções', 'Cultos & Ordens Místicas', 'Governos & Casas Nobres', 'Ordens Militares & Guardas', 'Empórios Comerciais']
+};
+
+export const DEFAULT_MAP_CATEGORIES_CONFIG: Record<string, string[]> = {
+  all: ['Mapas Mundiais & Continentais', 'Mapas Regionais & Ermos', 'Cidades & Capitais', 'Masmorras & Plantas Baixas', 'Campos de Batalha']
+};
+
+export const DEFAULT_TAG_CATEGORIES_CONFIG: Record<string, string[]> = {
+  all: ['Tags de Campanha & Lore', 'Tags de Sessão & Quests', 'Traços Oficiais PF2e', 'Traços Homebrew & Hecos']
+};
+
 type EntitySubscriber = (entities: HecosEntity[]) => void;
 type MapSubscriber = (maps: InteractiveMapData[]) => void;
 type FeatCategoriesSubscriber = (config: Record<string, string[]>) => void;
@@ -1486,6 +1545,169 @@ export class HecosStorage {
     const cleanSubcats = Array.from(new Set(subcategories.map((s) => s.trim()).filter(Boolean)));
     ent.subcategories = cleanSubcats;
     ent.subcategory = cleanSubcats[0] || ent.subcategory || '';
+    const currentTags = new Set(ent.tags || []);
+    cleanSubcats.forEach((s) => currentTags.add(s));
+    ent.tags = Array.from(currentTags);
+    this.saveEntity(ent);
+    return true;
+  }
+
+  /**
+   * Universal Subcategories & Folders Management for all Scopes
+   */
+  static getScopeSubcategoriesConfig(scope: string): Record<string, string[]> {
+    if (scope === 'feat') return this.getAllFeatSubcategoriesConfig();
+    if (scope === 'spell') return this.getAllSpellSubcategoriesConfig();
+    if (scope === 'item') return this.getAllItemSubcategoriesConfig();
+
+    const key = `hecos_${scope}_categories_v1`;
+    try {
+      const stored = localStorage.getItem(key);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch (e) {
+      console.warn(`Error reading ${scope} categories:`, e);
+    }
+
+    let defs: Record<string, string[]> = { all: ['Geral', 'Favoritos', 'Arquivo'] };
+    if (scope === 'peril') defs = DEFAULT_PERIL_CATEGORIES_CONFIG;
+    else if (scope === 'class') defs = DEFAULT_CLASS_CATEGORIES_CONFIG;
+    else if (scope === 'archetype') defs = DEFAULT_ARCHETYPE_CATEGORIES_CONFIG;
+    else if (scope === 'ancestry') defs = DEFAULT_ANCESTRY_CATEGORIES_CONFIG;
+    else if (scope === 'fauna') defs = DEFAULT_FAUNA_CATEGORIES_CONFIG;
+    else if (scope === 'flora') defs = DEFAULT_FLORA_CATEGORIES_CONFIG;
+    else if (scope === 'location') defs = DEFAULT_LOCATION_CATEGORIES_CONFIG;
+    else if (scope === 'pc') defs = DEFAULT_PC_CATEGORIES_CONFIG;
+    else if (scope === 'npc') defs = DEFAULT_NPC_CATEGORIES_CONFIG;
+    else if (scope === 'organization') defs = DEFAULT_ORGANIZATION_CATEGORIES_CONFIG;
+    else if (scope === 'map') defs = DEFAULT_MAP_CATEGORIES_CONFIG;
+    else if (scope === 'tag') defs = DEFAULT_TAG_CATEGORIES_CONFIG;
+
+    return defs;
+  }
+
+  static saveScopeSubcategoriesConfig(scope: string, config: Record<string, string[]>): void {
+    if (scope === 'feat') return this.saveAllFeatSubcategoriesConfig(config);
+    if (scope === 'spell') return this.saveAllSpellSubcategoriesConfig(config);
+    if (scope === 'item') return this.saveAllItemSubcategoriesConfig(config);
+
+    const key = `hecos_${scope}_categories_v1`;
+    try {
+      localStorage.setItem(key, JSON.stringify(config));
+    } catch (e) {
+      console.warn(`Error saving ${scope} categories:`, e);
+    }
+    this.notifyEntitySubscribers();
+  }
+
+  static addScopeSubcategory(scope: string, categoryKey: string, subcategoryName: string): boolean {
+    const trimmed = subcategoryName.trim();
+    if (!trimmed || !categoryKey) return false;
+    const config = this.getScopeSubcategoriesConfig(scope);
+    const list = config[categoryKey] ? [...config[categoryKey]] : [];
+    if (list.includes(trimmed)) return false;
+    list.push(trimmed);
+    config[categoryKey] = list;
+    this.saveScopeSubcategoriesConfig(scope, config);
+    return true;
+  }
+
+  static renameScopeSubcategory(scope: string, categoryKey: string, oldName: string, newName: string): boolean {
+    const trimmedNew = newName.trim();
+    if (!trimmedNew || !categoryKey || oldName === trimmedNew) return false;
+    const config = this.getScopeSubcategoriesConfig(scope);
+    const list = config[categoryKey] ? [...config[categoryKey]] : [];
+    const idx = list.indexOf(oldName);
+    if (idx === -1) return false;
+    list[idx] = trimmedNew;
+    config[categoryKey] = list;
+    this.saveScopeSubcategoriesConfig(scope, config);
+
+    // Update entities in storage
+    const entities = this.getEntities();
+    entities.forEach((ent) => {
+      let updated = false;
+      let subcats = ent.subcategories || [];
+      if (subcats.includes(oldName)) {
+        subcats = subcats.map((s) => (s === oldName ? trimmedNew : s));
+        ent.subcategories = subcats;
+        updated = true;
+      }
+      if (ent.subcategory === oldName) {
+        ent.subcategory = trimmedNew;
+        updated = true;
+      }
+      if (ent.featData?.subcategories?.includes(oldName)) {
+        ent.featData.subcategories = ent.featData.subcategories.map((s) => (s === oldName ? trimmedNew : s));
+        updated = true;
+      }
+      if (ent.spellData?.subcategories?.includes(oldName)) {
+        ent.spellData.subcategories = ent.spellData.subcategories.map((s) => (s === oldName ? trimmedNew : s));
+        updated = true;
+      }
+      if (ent.itemData?.subcategories?.includes(oldName)) {
+        ent.itemData.subcategories = ent.itemData.subcategories.map((s) => (s === oldName ? trimmedNew : s));
+        updated = true;
+      }
+      if (updated) {
+        HecosStorage.saveEntity(ent);
+      }
+    });
+
+    return true;
+  }
+
+  static deleteScopeSubcategory(scope: string, categoryKey: string, subcategoryName: string): boolean {
+    if (!categoryKey || !subcategoryName) return false;
+    const config = this.getScopeSubcategoriesConfig(scope);
+    if (!config[categoryKey]) return false;
+    config[categoryKey] = config[categoryKey].filter((s) => s !== subcategoryName);
+    this.saveScopeSubcategoriesConfig(scope, config);
+
+    const entities = this.getEntities();
+    entities.forEach((ent) => {
+      let updated = false;
+      let subcats = ent.subcategories || [];
+      if (subcats.includes(subcategoryName)) {
+        subcats = subcats.filter((s) => s !== subcategoryName);
+        ent.subcategories = subcats;
+        updated = true;
+      }
+      if (ent.subcategory === subcategoryName) {
+        ent.subcategory = subcats[0] || '';
+        updated = true;
+      }
+      if (ent.featData?.subcategories?.includes(subcategoryName)) {
+        ent.featData.subcategories = ent.featData.subcategories.filter((s) => s !== subcategoryName);
+        updated = true;
+      }
+      if (ent.spellData?.subcategories?.includes(subcategoryName)) {
+        ent.spellData.subcategories = ent.spellData.subcategories.filter((s) => s !== subcategoryName);
+        updated = true;
+      }
+      if (ent.itemData?.subcategories?.includes(subcategoryName)) {
+        ent.itemData.subcategories = ent.itemData.subcategories.filter((s) => s !== subcategoryName);
+        updated = true;
+      }
+      if (updated) {
+        HecosStorage.saveEntity(ent);
+      }
+    });
+
+    return true;
+  }
+
+  static assignEntitySubcategories(entityId: string, subcategories: string[]): boolean {
+    const ent = this.getEntityById(entityId);
+    if (!ent) return false;
+    const cleanSubcats = Array.from(new Set(subcategories.map((s) => s.trim()).filter(Boolean)));
+    ent.subcategories = cleanSubcats;
+    ent.subcategory = cleanSubcats[0] || ent.subcategory || '';
+    if (ent.featData) ent.featData.subcategories = cleanSubcats;
+    if (ent.spellData) ent.spellData.subcategories = cleanSubcats;
+    if (ent.itemData) ent.itemData.subcategories = cleanSubcats;
+
     const currentTags = new Set(ent.tags || []);
     cleanSubcats.forEach((s) => currentTags.add(s));
     ent.tags = Array.from(currentTags);

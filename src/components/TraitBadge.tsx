@@ -3,13 +3,15 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Shield, Sparkles, HelpCircle, X, AlertTriangle } from 'lucide-react';
 import { HecosStorage } from '../services/storage';
 
-interface TraitBadgeProps {
+export interface TraitBadgeProps {
   trait: string;
   className?: string;
   onClick?: () => void;
   onRemove?: () => void;
   removable?: boolean;
   interactive?: boolean;
+  size?: 'xs' | 'sm' | 'md' | 'lg';
+  compact?: boolean;
 }
 
 // Common PF2e trait descriptions dictionary
