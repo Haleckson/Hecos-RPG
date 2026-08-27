@@ -893,34 +893,101 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
           </div>
         </div>
 
-        {/* Dynamic Trait Chips with deletion and quick suggestions */}
-        {traitsString.trim() && (
-          <div className="flex flex-wrap items-center gap-1.5 pt-1">
-            <span className="text-[10px] text-amber-400/80 font-mono uppercase font-bold mr-1">Traços ativos:</span>
-            {traitsString.split(',').map((t, idx) => {
-              const clean = t.trim();
-              if (!clean) return null;
-              return (
-                <span
-                  key={`edit-trait-chip-${clean}-${idx}`}
-                  className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-md text-[11px] font-mono font-bold tracking-wide uppercase bg-amber-950/80 border border-amber-800 text-amber-200 shadow-sm"
-                >
-                  <span>{clean}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const list = traitsString.split(',').map((s) => s.trim()).filter(Boolean);
-                      list.splice(idx, 1);
-                      setTraitsString(list.join(', '));
-                    }}
-                    className="p-0.5 rounded hover:bg-amber-900/80 text-amber-400/70 hover:text-amber-100 transition-colors cursor-pointer"
-                    title={`Remover traço "${clean}"`}
-                  >
-                    <Trash2 className="w-3 h-3 text-amber-400 hover:text-rose-300" />
-                  </button>
+        {/* Dynamic Tag & Trait Chips with deletion and drawer inspection */}
+        {(tagsString.trim() || traitsString.trim()) && (
+          <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-zinc-800/60 mt-1">
+            {/* Active Tags */}
+            {tagsString.trim() && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                  <TagIcon className="w-3 h-3 text-cyan-400" />
+                  <span>Tags:</span>
                 </span>
-              );
-            })}
+                {tagsString.split(',').map((t, idx) => {
+                  const clean = t.trim().replace(/^#/, '');
+                  if (!clean) return null;
+                  return (
+                    <span
+                      key={`edit-tag-chip-${clean}-${idx}`}
+                      className="inline-flex items-center gap-1.5 pl-2 pr-1 py-0.5 rounded-md text-[11px] font-medium bg-cyan-950/80 border border-cyan-800 text-cyan-200 shadow-sm"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          window.dispatchEvent(
+                            new CustomEvent('hecos:open-trait-drawer', {
+                              detail: { trait: clean },
+                            })
+                          );
+                        }}
+                        className="hover:underline flex items-center gap-1 cursor-pointer"
+                        title={`Visualizar tag "${clean}" no painel lateral`}
+                      >
+                        <span>#{clean}</span>
+                        <Eye className="w-2.5 h-2.5 opacity-70 hover:opacity-100" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const list = tagsString.split(',').map((s) => s.trim()).filter(Boolean);
+                          list.splice(idx, 1);
+                          setTagsString(list.join(', '));
+                        }}
+                        className="p-0.5 rounded hover:bg-cyan-900/80 text-cyan-400/70 hover:text-rose-300 transition-colors cursor-pointer"
+                        title={`Remover tag "${clean}"`}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Active Traits */}
+            {traitsString.trim() && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] text-amber-400/80 font-mono uppercase font-bold mr-0.5">Traços:</span>
+                {traitsString.split(',').map((t, idx) => {
+                  const clean = t.trim();
+                  if (!clean) return null;
+                  return (
+                    <span
+                      key={`edit-trait-chip-${clean}-${idx}`}
+                      className="inline-flex items-center gap-1.5 pl-2 pr-1 py-0.5 rounded-md text-[11px] font-mono font-bold tracking-wide uppercase bg-amber-950/80 border border-amber-800 text-amber-200 shadow-sm"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          window.dispatchEvent(
+                            new CustomEvent('hecos:open-trait-drawer', {
+                              detail: { trait: clean },
+                            })
+                          );
+                        }}
+                        className="hover:underline flex items-center gap-1 cursor-pointer"
+                        title={`Visualizar traço "${clean}" no painel lateral`}
+                      >
+                        <span>{clean}</span>
+                        <Eye className="w-2.5 h-2.5 opacity-70 hover:opacity-100" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const list = traitsString.split(',').map((s) => s.trim()).filter(Boolean);
+                          list.splice(idx, 1);
+                          setTraitsString(list.join(', '));
+                        }}
+                        className="p-0.5 rounded hover:bg-amber-900/80 text-amber-400/70 hover:text-amber-100 transition-colors cursor-pointer"
+                        title={`Remover traço "${clean}"`}
+                      >
+                        <Trash2 className="w-3 h-3 text-amber-400 hover:text-rose-300" />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>

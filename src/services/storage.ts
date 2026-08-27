@@ -15,6 +15,10 @@ import {
   seedDatabaseIfEmpty,
   subscribeToFeatCategoriesRealtime,
   syncFeatCategoriesToFirebase,
+  subscribeToSpellCategoriesRealtime,
+  syncSpellCategoriesToFirebase,
+  subscribeToScopeCategoriesRealtime,
+  syncScopeCategoriesToFirebase,
   subscribeToSecretFoldersRealtime,
   syncSecretFoldersToFirebase,
   subscribeToPublicFoldersRealtime,
@@ -49,6 +53,7 @@ const STORAGE_KEYS = {
   FOLDER_PERMISSIONS: 'hecos_folder_permissions_v1',
   IMAGE_ADJUSTMENTS: 'hecos_image_adjustments_v1',
   CUSTOM_TRAITS: 'hecos_custom_traits_v1',
+  CUSTOM_TAGS: 'hecos_custom_tags_v1',
 };
 
 export const INITIAL_ADMIN_USER: HecosUser = {
@@ -388,9 +393,21 @@ export class HecosStorage {
       try {
         localStorage.setItem(STORAGE_KEYS.FEAT_CATEGORIES, JSON.stringify(categoriesConfig));
       } catch (e) {
-        console.warn("Error saving categories to local:", e);
+        console.warn("Error saving feat categories to local:", e);
       }
       this.notifyFeatCategoriesSubscribers();
+    });
+
+    // Start real-time listener for spell categories & subcategories
+    subscribeToSpellCategoriesRealtime((categoriesConfig) => {
+      if (!categoriesConfig || typeof categoriesConfig !== 'object') return;
+      this.spellCategoriesCache = categoriesConfig;
+      try {
+        localStorage.setItem(STORAGE_KEYS.SPELL_CATEGORIES, JSON.stringify(categoriesConfig));
+      } catch (e) {
+        console.warn("Error saving spell categories to local:", e);
+      }
+      this.notifySpellCategoriesSubscribers();
     });
 
     // Start real-time listener for public (revealed) folders
@@ -1173,26 +1190,10 @@ export class HecosStorage {
     if (this.featCategoriesCache) return this.featCategoriesCache;
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.FEAT_CATEGORIES);
-      if (stored) {
+      if (stored !== null) {
         const parsed = JSON.parse(stored);
         if (parsed && typeof parsed === 'object') {
-          // Merge defaults with stored custom subcategories
-          const merged: Record<string, string[]> = {};
-          const allKeys = Array.from(
-            new Set([...Object.keys(DEFAULT_FEAT_CATEGORIES_CONFIG), ...Object.keys(parsed)])
-          );
-
-          for (const key of allKeys) {
-            if (Array.isArray(parsed[key])) {
-              merged[key] = parsed[key];
-            } else if (DEFAULT_FEAT_CATEGORIES_CONFIG[key]) {
-              merged[key] = [...DEFAULT_FEAT_CATEGORIES_CONFIG[key]];
-            } else {
-              merged[key] = [];
-            }
-          }
-
-          this.featCategoriesCache = merged;
+          this.featCategoriesCache = parsed;
           return this.featCategoriesCache;
         }
       }
@@ -1200,7 +1201,7 @@ export class HecosStorage {
       console.warn("Error reading feat categories from storage:", e);
     }
 
-    // Default configuration
+    // Default configuration on first run
     this.featCategoriesCache = { ...DEFAULT_FEAT_CATEGORIES_CONFIG };
     this.saveAllFeatSubcategoriesConfig(this.featCategoriesCache);
     return this.featCategoriesCache;
@@ -1212,7 +1213,9 @@ export class HecosStorage {
       // Return all subcategories combined
       const all = new Set<string>();
       Object.values(config).forEach((list) => {
-        list.forEach((sub) => all.add(sub));
+        if (Array.isArray(list)) {
+          list.forEach((sub) => all.add(sub));
+        }
       });
       return Array.from(all);
     }
@@ -1233,11 +1236,12 @@ export class HecosStorage {
   static addFeatSubcategory(categoryKey: string, subcategoryName: string): boolean {
     const trimmed = subcategoryName.trim();
     if (!trimmed || !categoryKey) return false;
-    const config = this.getAllFeatSubcategoriesConfig();
-    const list = config[categoryKey] ? [...config[categoryKey]] : [];
+    const config = { ...this.getAllFeatSubcategoriesConfig() };
+    const targetKey = categoryKey === 'all' ? 'general' : categoryKey;
+    const list = config[targetKey] ? [...config[targetKey]] : [];
     if (list.includes(trimmed)) return false;
     list.push(trimmed);
-    config[categoryKey] = list;
+    config[targetKey] = list;
     this.saveAllFeatSubcategoriesConfig(config);
     return true;
   }
@@ -1245,35 +1249,50 @@ export class HecosStorage {
   static renameFeatSubcategory(categoryKey: string, oldName: string, newName: string): boolean {
     const trimmedNew = newName.trim();
     if (!trimmedNew || !categoryKey || oldName === trimmedNew) return false;
-    const config = this.getAllFeatSubcategoriesConfig();
-    const list = config[categoryKey] ? [...config[categoryKey]] : [];
-    const idx = list.indexOf(oldName);
-    if (idx === -1) return false;
-    list[idx] = trimmedNew;
-    config[categoryKey] = list;
+    const config = { ...this.getAllFeatSubcategoriesConfig() };
+    let modified = false;
+
+    if (categoryKey && categoryKey !== 'all' && config[categoryKey]) {
+      const idx = config[categoryKey].indexOf(oldName);
+      if (idx !== -1) {
+        config[categoryKey][idx] = trimmedNew;
+        modified = true;
+      }
+    }
+    Object.keys(config).forEach((cat) => {
+      if (categoryKey === 'all' || !categoryKey) {
+        const idx = (config[cat] || []).indexOf(oldName);
+        if (idx !== -1) {
+          config[cat][idx] = trimmedNew;
+          modified = true;
+        }
+      }
+    });
+
+    if (!modified) return false;
     this.saveAllFeatSubcategoriesConfig(config);
 
     // Also update all entities that had this subcategory
     const entities = this.getEntities();
-    let changedEntities = false;
     entities.forEach((ent) => {
-      if (ent.category === 'feat' || ent.featData) {
-        let updated = false;
-        let subcats = ent.featData?.subcategories || ent.subcategories || [];
-        if (subcats.includes(oldName)) {
-          subcats = subcats.map((s) => (s === oldName ? trimmedNew : s));
-          if (ent.featData) ent.featData.subcategories = subcats;
-          ent.subcategories = subcats;
-          updated = true;
-        }
-        if (ent.subcategory === oldName) {
-          ent.subcategory = trimmedNew;
-          updated = true;
-        }
-        if (updated) {
-          HecosStorage.saveEntity(ent);
-          changedEntities = true;
-        }
+      let updated = false;
+      let subcats = ent.featData?.subcategories || ent.subcategories || [];
+      if (subcats.includes(oldName)) {
+        subcats = subcats.map((s) => (s === oldName ? trimmedNew : s));
+        if (ent.featData) ent.featData.subcategories = subcats;
+        ent.subcategories = subcats;
+        updated = true;
+      }
+      if (ent.subcategory === oldName) {
+        ent.subcategory = trimmedNew;
+        updated = true;
+      }
+      if (ent.tags?.includes(oldName)) {
+        ent.tags = ent.tags.map((t) => (t === oldName ? trimmedNew : t));
+        updated = true;
+      }
+      if (updated) {
+        HecosStorage.saveEntity(ent);
       }
     });
 
@@ -1281,33 +1300,53 @@ export class HecosStorage {
   }
 
   static deleteFeatSubcategory(categoryKey: string, subcategoryName: string): boolean {
-    if (!categoryKey || !subcategoryName) return false;
-    const config = this.getAllFeatSubcategoriesConfig();
-    if (!config[categoryKey]) return false;
-    config[categoryKey] = config[categoryKey].filter((s) => s !== subcategoryName);
-    this.saveAllFeatSubcategoriesConfig(config);
+    if (!subcategoryName) return false;
+    const config = { ...this.getAllFeatSubcategoriesConfig() };
 
-    // Also remove from affected entities
-    const entities = this.getEntities();
-    entities.forEach((ent) => {
-      if (ent.category === 'feat' || ent.featData) {
-        let updated = false;
-        let subcats = ent.featData?.subcategories || ent.subcategories || [];
-        if (subcats.includes(subcategoryName)) {
-          subcats = subcats.filter((s) => s !== subcategoryName);
-          if (ent.featData) ent.featData.subcategories = subcats;
-          ent.subcategories = subcats;
-          updated = true;
-        }
-        if (ent.subcategory === subcategoryName) {
-          ent.subcategory = subcats[0] || '';
-          updated = true;
-        }
-        if (updated) {
-          HecosStorage.saveEntity(ent);
+    if (categoryKey && categoryKey !== 'all' && config[categoryKey]) {
+      config[categoryKey] = config[categoryKey].filter((s) => s !== subcategoryName);
+    }
+    Object.keys(config).forEach((cat) => {
+      if (categoryKey === 'all' || !categoryKey) {
+        if (config[cat]?.includes(subcategoryName)) {
+          config[cat] = config[cat].filter((s) => s !== subcategoryName);
         }
       }
     });
+
+    this.saveAllFeatSubcategoriesConfig(config);
+
+    // Also remove from affected entities thoroughly
+    const entities = this.getEntities();
+    entities.forEach((ent) => {
+      let updated = false;
+      if (ent.featData?.subcategories?.includes(subcategoryName)) {
+        ent.featData.subcategories = ent.featData.subcategories.filter((s) => s !== subcategoryName);
+        updated = true;
+      }
+      if (ent.subcategories?.includes(subcategoryName)) {
+        ent.subcategories = ent.subcategories.filter((s) => s !== subcategoryName);
+        updated = true;
+      }
+      if (ent.subcategory === subcategoryName) {
+        ent.subcategory = ent.featData?.subcategories?.[0] || ent.subcategories?.[0] || '';
+        updated = true;
+      }
+      if (ent.tags?.includes(subcategoryName)) {
+        ent.tags = ent.tags.filter((t) => t !== subcategoryName);
+        updated = true;
+      }
+      if (updated) {
+        HecosStorage.saveEntity(ent);
+      }
+    });
+
+    // Remove folder secret flag if no longer present in any category
+    const allRemaining = new Set<string>();
+    Object.values(config).forEach((list) => (list || []).forEach((s) => allRemaining.add(s)));
+    if (!allRemaining.has(subcategoryName)) {
+      HecosStorage.setFolderSecret(subcategoryName, false);
+    }
 
     return true;
   }
@@ -1368,30 +1407,18 @@ export class HecosStorage {
     }
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.SPELL_CATEGORIES);
-      if (stored) {
+      if (stored !== null) {
         const parsed = JSON.parse(stored);
         if (parsed && typeof parsed === 'object') {
-          const merged: Record<string, string[]> = {};
-          const allKeys = Array.from(
-            new Set([...Object.keys(DEFAULT_SPELL_CATEGORIES_CONFIG), ...Object.keys(parsed)])
-          );
-          for (const key of allKeys) {
-            if (Array.isArray(parsed[key])) {
-              merged[key] = parsed[key];
-            } else if (DEFAULT_SPELL_CATEGORIES_CONFIG[key]) {
-              merged[key] = [...DEFAULT_SPELL_CATEGORIES_CONFIG[key]];
-            } else {
-              merged[key] = [];
-            }
-          }
-          this.spellCategoriesCache = merged;
-          return merged;
+          this.spellCategoriesCache = parsed;
+          return this.spellCategoriesCache;
         }
       }
     } catch (e) {
       console.warn("Error reading spell categories config:", e);
     }
     this.spellCategoriesCache = { ...DEFAULT_SPELL_CATEGORIES_CONFIG };
+    this.saveAllSpellSubcategoriesConfig(this.spellCategoriesCache);
     return this.spellCategoriesCache;
   }
 
@@ -1404,16 +1431,18 @@ export class HecosStorage {
     }
     this.notifySpellCategoriesSubscribers();
     this.notifyEntitySubscribers();
+    syncSpellCategoriesToFirebase(config).catch(() => {});
   }
 
   static addSpellSubcategory(categoryKey: string, subcategoryName: string): boolean {
     const trimmed = subcategoryName.trim();
     if (!trimmed || !categoryKey) return false;
     const config = { ...this.getAllSpellSubcategoriesConfig() };
-    const list = config[categoryKey] ? [...config[categoryKey]] : [];
+    const targetKey = categoryKey === 'all' ? 'e_fisica' : categoryKey;
+    const list = config[targetKey] ? [...config[targetKey]] : [];
     if (list.includes(trimmed)) return false;
     list.push(trimmed);
-    config[categoryKey] = list;
+    config[targetKey] = list;
     this.saveAllSpellSubcategoriesConfig(config);
     return true;
   }
@@ -1422,11 +1451,26 @@ export class HecosStorage {
     const trimmedNew = newName.trim();
     if (!trimmedNew || !categoryKey || oldName === trimmedNew) return false;
     const config = { ...this.getAllSpellSubcategoriesConfig() };
-    const list = config[categoryKey] ? [...config[categoryKey]] : [];
-    const idx = list.indexOf(oldName);
-    if (idx === -1) return false;
-    list[idx] = trimmedNew;
-    config[categoryKey] = list;
+    let modified = false;
+
+    if (categoryKey && categoryKey !== 'all' && config[categoryKey]) {
+      const idx = config[categoryKey].indexOf(oldName);
+      if (idx !== -1) {
+        config[categoryKey][idx] = trimmedNew;
+        modified = true;
+      }
+    }
+    Object.keys(config).forEach((cat) => {
+      if (categoryKey === 'all' || !categoryKey) {
+        const idx = (config[cat] || []).indexOf(oldName);
+        if (idx !== -1) {
+          config[cat][idx] = trimmedNew;
+          modified = true;
+        }
+      }
+    });
+
+    if (!modified) return false;
     this.saveAllSpellSubcategoriesConfig(config);
 
     const entities = this.getEntities();
@@ -1459,16 +1503,26 @@ export class HecosStorage {
   }
 
   static deleteSpellSubcategory(categoryKey: string, subcategoryName: string): boolean {
-    if (!categoryKey || !subcategoryName) return false;
+    if (!subcategoryName) return false;
     const config = { ...this.getAllSpellSubcategoriesConfig() };
-    if (!config[categoryKey]) return false;
-    config[categoryKey] = config[categoryKey].filter((s) => s !== subcategoryName);
+
+    if (categoryKey && categoryKey !== 'all' && config[categoryKey]) {
+      config[categoryKey] = config[categoryKey].filter((s) => s !== subcategoryName);
+    }
+    Object.keys(config).forEach((cat) => {
+      if (categoryKey === 'all' || !categoryKey) {
+        if (config[cat]?.includes(subcategoryName)) {
+          config[cat] = config[cat].filter((s) => s !== subcategoryName);
+        }
+      }
+    });
+
     this.saveAllSpellSubcategoriesConfig(config);
 
     // Unlink the deleted folder from ALL spell entities thoroughly
     const entities = this.getEntities();
     entities.forEach((ent) => {
-      if (ent.category === 'spell' || ent.spellData || ent.tags?.includes('spell') || ent.tags?.includes('magia')) {
+      if (ent.category === 'spell' || ent.spellData || ent.tags?.includes('spell') || ent.tags?.includes('magia') || ent.tags?.includes(subcategoryName) || ent.subcategories?.includes(subcategoryName)) {
         let updated = false;
 
         // 1. Unlink from ent.subcategories
@@ -2544,6 +2598,63 @@ export class HecosStorage {
 
   private static customTraitsCache: Record<string, { category: string; description: string; color: string }> | null = null;
   private static traitSubscribers = new Set<() => void>();
+  private static customTagsCache: Record<string, { description: string; category?: string; color?: string }> | null = null;
+  private static tagSubscribers = new Set<() => void>();
+
+  static getCustomTags(): Record<string, { description: string; category?: string; color?: string }> {
+    if (this.customTagsCache) return this.customTagsCache;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.CUSTOM_TAGS);
+      if (stored) {
+        this.customTagsCache = JSON.parse(stored);
+        return this.customTagsCache || {};
+      }
+    } catch (e) {
+      console.warn("Error reading custom tags:", e);
+    }
+    this.customTagsCache = {};
+    return this.customTagsCache;
+  }
+
+  static saveCustomTag(
+    tagName: string,
+    data: { description: string; category?: string; color?: string }
+  ): void {
+    if (!tagName) return;
+    const cleanKey = tagName.trim().toLowerCase().replace(/^#/, '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const all = { ...this.getCustomTags() };
+    all[cleanKey] = {
+      category: data.category || 'Campanha e Narrativa',
+      description: data.description || 'Tag temática ou de organização em Hecos.',
+      color: data.color || 'border-cyan-800/80 bg-cyan-950/80 text-cyan-300',
+    };
+    this.customTagsCache = all;
+    try {
+      localStorage.setItem(STORAGE_KEYS.CUSTOM_TAGS, JSON.stringify(all));
+    } catch (e) {
+      console.warn("Error saving custom tag:", e);
+    }
+    this.tagSubscribers.forEach((cb) => cb());
+  }
+
+  static deleteCustomTag(tagName: string): void {
+    if (!tagName) return;
+    const cleanKey = tagName.trim().toLowerCase().replace(/^#/, '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const all = { ...this.getCustomTags() };
+    delete all[cleanKey];
+    this.customTagsCache = all;
+    try {
+      localStorage.setItem(STORAGE_KEYS.CUSTOM_TAGS, JSON.stringify(all));
+    } catch (e) {
+      console.warn("Error deleting custom tag:", e);
+    }
+    this.tagSubscribers.forEach((cb) => cb());
+  }
+
+  static subscribeTags(callback: () => void): () => void {
+    this.tagSubscribers.add(callback);
+    return () => this.tagSubscribers.delete(callback);
+  }
 
   static getCustomTraits(): Record<string, { category: string; description: string; color: string }> {
     if (this.customTraitsCache) return this.customTraitsCache;

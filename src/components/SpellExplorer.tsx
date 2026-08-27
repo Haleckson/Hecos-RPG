@@ -14,6 +14,7 @@ import { SpellCreateModal } from './SpellCreateModal';
 import { TraitBadge } from './TraitBadge';
 import { RichContentRenderer, renderContentWithMentions } from './RichContentRenderer';
 import { FolderManagerModal } from './FolderManagerModal';
+import { SpellDrawer } from './SpellDrawer';
 import {
   Sparkles,
   Search,
@@ -61,7 +62,9 @@ export type SpellSortOption =
   | 'actions'
   | 'rarity'
   | 'tradition'
-  | 'recent';
+  | 'recent'
+  | 'recent-desc'
+  | 'recent-asc';
 
 interface SpellExplorerProps {
   entities: HecosEntity[];
@@ -229,6 +232,137 @@ function getActionGlyphProp(castTime?: string): { type: ActionGlyphType; show: b
   return { type: '1-action', show: false };
 }
 
+// Parse heightened lines supporting explicit newlines, paragraphs and PF2e heightened patterns
+export function parseHeightenedLines(heightened?: string): string[] {
+  if (!heightened) return [];
+  const text = heightened.trim();
+  if (!text) return [];
+
+  // Normalize linebreaks
+  const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  if (normalized.includes('\n')) {
+    return normalized
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+  }
+
+  // Split by heightened markers if on a single concatenated line
+  const parts = normalized.split(/(?=(?:Intensificado\s*\([^)]+\)|\(\+\d+\)|\(\d+[ºª]\)))/gi);
+  const cleaned = parts.map((p) => p.trim()).filter(Boolean);
+  if (cleaned.length > 1) {
+    return cleaned;
+  }
+
+  return [text];
+}
+
+// Intelligent, Compact Index Blocks for Spell Cards with Zero Wasted Space
+interface IndexBlockItem {
+  key: string;
+  label: string;
+  value: string;
+  bgBorderClass: string;
+  labelColorClass: string;
+  isWide?: boolean;
+}
+
+function SmartSpellCardIndexBlocks({ data }: { data: PF2eSpellAttributes }) {
+  const items: IndexBlockItem[] = [];
+
+  if (data.range && data.range.trim()) {
+    items.push({
+      key: 'range',
+      label: 'Alcance',
+      value: data.range.trim(),
+      bgBorderClass: 'bg-cyan-950/40 border-cyan-800/60 hover:border-cyan-500/60',
+      labelColorClass: 'text-cyan-400',
+    });
+  }
+
+  if (data.area && data.area.trim()) {
+    items.push({
+      key: 'area',
+      label: 'Área',
+      value: data.area.trim(),
+      bgBorderClass: 'bg-emerald-950/40 border-emerald-800/60 hover:border-emerald-500/60',
+      labelColorClass: 'text-emerald-400',
+    });
+  }
+
+  if (data.targets && data.targets.trim()) {
+    items.push({
+      key: 'targets',
+      label: 'Alvos',
+      value: data.targets.trim(),
+      bgBorderClass: 'bg-purple-950/40 border-purple-800/60 hover:border-purple-500/60',
+      labelColorClass: 'text-purple-400',
+      isWide: data.targets.trim().length > 22,
+    });
+  }
+
+  if (data.savingThrow && data.savingThrow.trim()) {
+    items.push({
+      key: 'savingThrow',
+      label: 'Defesa',
+      value: data.savingThrow.trim(),
+      bgBorderClass: 'bg-rose-950/40 border-rose-800/60 hover:border-rose-500/60',
+      labelColorClass: 'text-rose-400',
+    });
+  }
+
+  if (data.duration && data.duration.trim()) {
+    items.push({
+      key: 'duration',
+      label: 'Duração',
+      value: data.duration.trim(),
+      bgBorderClass: 'bg-teal-950/40 border-teal-800/60 hover:border-teal-500/60',
+      labelColorClass: 'text-teal-400',
+    });
+  }
+
+  if (data.trigger && data.trigger.trim()) {
+    items.push({
+      key: 'trigger',
+      label: 'Gatilho',
+      value: data.trigger.trim(),
+      bgBorderClass: 'bg-amber-950/40 border-amber-800/60 hover:border-amber-500/60',
+      labelColorClass: 'text-amber-400',
+      isWide: true,
+    });
+  }
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-3 pt-3 border-t border-zinc-800/80 text-[11px] auto-rows-min">
+      {items.map((item, idx) => {
+        // Dynamic smart fitting:
+        // - 1 item total -> full span
+        // - marked isWide -> full span
+        // - single leftover in odd total count -> full span to fill entire row nicely
+        const isLastOdd = items.length % 2 === 1 && idx === items.length - 1;
+        const colSpanClass = items.length === 1 || item.isWide || isLastOdd ? 'col-span-1 sm:col-span-2' : 'col-span-1';
+
+        return (
+          <div
+            key={item.key}
+            className={`p-1.5 px-2.5 rounded-lg border transition-all flex items-baseline gap-1.5 overflow-hidden shadow-xs ${item.bgBorderClass} ${colSpanClass}`}
+          >
+            <strong className={`font-bold uppercase text-[10px] font-mono tracking-wider shrink-0 ${item.labelColorClass}`}>
+              {item.label}:
+            </strong>
+            <span className="text-zinc-200 break-words font-medium truncate sm:whitespace-normal" title={item.value}>
+              {item.value}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // Crisp, pixel-perfect, zero-scroll Spell Popover Content
 function SpellTooltipCard({
   spell,
@@ -240,6 +374,7 @@ function SpellTooltipCard({
   const data = spell.spellData;
   if (!data) return null;
   const rankLabel = data.rank === 0 ? 'Truque' : `${data.rank}º Círculo`;
+  const heightenedLines = parseHeightenedLines(data.heightened);
 
   return (
     <div
@@ -302,11 +437,23 @@ function SpellTooltipCard({
         </div>
       )}
 
-      {/* Heightened Section */}
-      {data.heightened && (
-        <div className="pt-2.5 border-t border-zinc-800 text-xs text-purple-200 leading-relaxed">
-          <strong className="text-purple-400 uppercase text-xs mr-1 font-bold">Intensificado:</strong>
-          {renderContentWithMentions(data.heightened, onSelectEntity)}
+      {/* Heightened Section with line-break support */}
+      {heightenedLines.length > 0 && (
+        <div className="pt-2.5 border-t border-zinc-800 text-xs text-purple-200 leading-relaxed space-y-1.5">
+          <div className="flex items-center gap-1 font-bold text-purple-400 uppercase text-[11px] font-mono tracking-wider">
+            <Sparkles className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+            <span>Intensificado (Heightened):</span>
+          </div>
+          <div className="space-y-1.5 pl-1 text-zinc-200">
+            {heightenedLines.map((line, idx) => (
+              <div key={`heightened-line-${idx}`} className="flex items-start gap-1.5 text-xs text-zinc-200 leading-relaxed">
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-400/80 mt-1.5 shrink-0" />
+                <div className="flex-1">
+                  {renderContentWithMentions(line, onSelectEntity)}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -342,7 +489,20 @@ export function SpellExplorer({
   const [filterRarity, setFilterRarity] = useState<string>('all');
   const [filterCastTime, setFilterCastTime] = useState<string>('all');
   const [filterTrait, setFilterTrait] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<SpellSortOption>('rank-asc');
+  const [sortBy, setSortBy] = useState<SpellSortOption>(() => {
+    try {
+      const saved = localStorage.getItem('hecos_spell_sort_by');
+      if (saved) return saved as SpellSortOption;
+    } catch {}
+    return 'rank-asc';
+  });
+
+  const handleSortChange = (newSort: SpellSortOption) => {
+    setSortBy(newSort);
+    try {
+      localStorage.setItem('hecos_spell_sort_by', newSort);
+    } catch {}
+  };
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
 
   // 4. Modals & folder management
@@ -361,6 +521,35 @@ export function SpellExplorer({
   // 7. Manage Spells inside a specific Folder modal
   const [managingFolderForSpells, setManagingFolderForSpells] = useState<string | null>(null);
   const [searchSpellsInFolderModal, setSearchSpellsInFolderModal] = useState('');
+
+  // 8. Spell Article Drawer & Local Edit State
+  const [selectedDrawerSpellId, setSelectedDrawerSpellId] = useState<string | null>(null);
+  const [isSpellDrawerOpen, setIsSpellDrawerOpen] = useState(false);
+  const [editingSpellEntity, setEditingSpellEntity] = useState<HecosEntity | null>(null);
+
+  // Global event listener for hecos:open-spell-drawer
+  useEffect(() => {
+    const handleOpenSpellDrawer = (e: Event) => {
+      const customEvent = e as CustomEvent<{ spellId?: string; id?: string }>;
+      const targetId = customEvent.detail?.spellId || customEvent.detail?.id;
+      if (targetId) {
+        setSelectedDrawerSpellId(targetId);
+        setIsSpellDrawerOpen(true);
+      }
+    };
+    window.addEventListener('hecos:open-spell-drawer', handleOpenSpellDrawer);
+    return () => window.removeEventListener('hecos:open-spell-drawer', handleOpenSpellDrawer);
+  }, []);
+
+  const handleOpenSpellInDrawer = (spellId: string) => {
+    setSelectedDrawerSpellId(spellId);
+    setIsSpellDrawerOpen(true);
+  };
+
+  const handleStartEditSpell = (spell: HecosEntity) => {
+    setEditingSpellEntity(spell);
+    setIsSpellCreateModalOpen(true);
+  };
 
   // Real-time synchronization of spell categories config
   useEffect(() => {
@@ -616,10 +805,19 @@ export function SpellExplorer({
           return a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' });
         }
 
-        case 'recent': {
-          const dateA = a.updatedAt || a.createdAt || 0;
-          const dateB = b.updatedAt || b.createdAt || 0;
-          return dateB - dateA;
+        case 'recent':
+        case 'recent-desc': {
+          const dateA = new Date(a.updatedAt || a.createdAt || 0).getTime() || 0;
+          const dateB = new Date(b.updatedAt || b.createdAt || 0).getTime() || 0;
+          if (dateB !== dateA) return dateB - dateA;
+          return a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' });
+        }
+
+        case 'recent-asc': {
+          const dateA = new Date(a.updatedAt || a.createdAt || 0).getTime() || 0;
+          const dateB = new Date(b.updatedAt || b.createdAt || 0).getTime() || 0;
+          if (dateA !== dateB) return dateA - dateB;
+          return a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' });
         }
 
         default:
@@ -804,8 +1002,52 @@ export function SpellExplorer({
       {/* 3. Search & Multi-Filter Toolbar */}
       <div className="bg-[#0d0b14] p-4 rounded-2xl border border-zinc-800/80 shadow-md space-y-3">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-          {/* Left: Search Input & Folder Dropdown */}
+          {/* Left: Sort Icon Button, Search Input & Folder Dropdown */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1">
+            {/* Quick Sort Icon-Only Button at Start */}
+            <div className="relative shrink-0 flex items-center">
+              <div
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-zinc-900/90 border border-zinc-800 hover:border-cyan-500/80 hover:bg-cyan-950/40 text-cyan-400 hover:text-cyan-200 transition-all cursor-pointer shadow-sm relative group/sort"
+                title={`Ordenar Feitiços (Ativo: ${
+                  sortBy === 'recent-desc' || sortBy === 'recent'
+                    ? 'Mais recente para o mais antigo'
+                    : sortBy === 'recent-asc'
+                    ? 'Mais antigo para o mais recente'
+                    : sortBy === 'rank-asc'
+                    ? 'Círculo (Truques → 10º)'
+                    : sortBy === 'rank-desc'
+                    ? 'Círculo (10º → Truques)'
+                    : sortBy === 'name-asc'
+                    ? 'Nome (A → Z)'
+                    : sortBy === 'name-desc'
+                    ? 'Nome (Z → A)'
+                    : sortBy === 'actions'
+                    ? 'Ações / Conjuração'
+                    : sortBy === 'rarity'
+                    ? 'Raridade'
+                    : 'Tradição Mágica'
+                })`}
+              >
+                <ArrowUpDown className="w-4 h-4" />
+                <select
+                  value={sortBy}
+                  onChange={(e) => handleSortChange(e.target.value as SpellSortOption)}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-xs"
+                  title="Alterar ordenação de feitiços"
+                >
+                  <option value="rank-asc" className="bg-[#0f0d1a] text-zinc-200">Círculo (Truques → 10º)</option>
+                  <option value="rank-desc" className="bg-[#0f0d1a] text-zinc-200">Círculo (10º → Truques)</option>
+                  <option value="name-asc" className="bg-[#0f0d1a] text-zinc-200">Nome (A → Z)</option>
+                  <option value="name-desc" className="bg-[#0f0d1a] text-zinc-200">Nome (Z → A)</option>
+                  <option value="recent-desc" className="bg-[#0f0d1a] text-zinc-200">Mais recente para o mais antigo</option>
+                  <option value="recent-asc" className="bg-[#0f0d1a] text-zinc-200">Mais antigo para o mais recente</option>
+                  <option value="actions" className="bg-[#0f0d1a] text-zinc-200">Ações / Conjuração</option>
+                  <option value="rarity" className="bg-[#0f0d1a] text-zinc-200">Raridade (Comum → Único)</option>
+                  <option value="tradition" className="bg-[#0f0d1a] text-zinc-200">Tradição Mágica</option>
+                </select>
+              </div>
+            </div>
+
             {/* Search Input */}
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -1042,26 +1284,6 @@ export function SpellExplorer({
               <option value="Omni">Omni</option>
             </select>
 
-            {/* Sort Selector Dropdown */}
-            <div className="flex items-center gap-1.5 bg-zinc-900/90 border border-zinc-800 hover:border-zinc-700 rounded-xl px-2.5 py-1.5 transition-all">
-              <ArrowUpDown className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SpellSortOption)}
-                className="bg-transparent text-xs font-semibold text-zinc-200 outline-none cursor-pointer pr-1"
-                title="Ordenar Feitiços"
-              >
-                <option value="rank-asc" className="bg-[#0f0d1a] text-zinc-200">Círculo (Truques → 10º)</option>
-                <option value="rank-desc" className="bg-[#0f0d1a] text-zinc-200">Círculo (10º → Truques)</option>
-                <option value="name-asc" className="bg-[#0f0d1a] text-zinc-200">Nome (A → Z)</option>
-                <option value="name-desc" className="bg-[#0f0d1a] text-zinc-200">Nome (Z → A)</option>
-                <option value="actions" className="bg-[#0f0d1a] text-zinc-200">Ações / Conjuração</option>
-                <option value="rarity" className="bg-[#0f0d1a] text-zinc-200">Raridade (Comum → Único)</option>
-                <option value="tradition" className="bg-[#0f0d1a] text-zinc-200">Tradição Mágica</option>
-                <option value="recent" className="bg-[#0f0d1a] text-zinc-200">Mais Recentes</option>
-              </select>
-            </div>
-
             {/* More Filters Toggle */}
             <button
               type="button"
@@ -1220,8 +1442,8 @@ export function SpellExplorer({
           </div>
         </div>
       ) : viewMode === 'grid' ? (
-        /* GRID VIEW (ADAPTIVE: MAX 3 COLS <1080P, UP TO 5 COLS >=1080P) */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 min-[1800px]:grid-cols-5 2xl:grid-cols-5 gap-3 sm:gap-4 items-stretch">
+        /* GRID VIEW (ADAPTIVE: 3 COLS <1080P, 4 COLS FOR HIGH RESOLUTIONS) */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 min-[1800px]:grid-cols-4 gap-3 sm:gap-4 items-stretch">
           {sortedSpells.map((sp) => {
             const data = sp.spellData!;
             const perm = HecosStorage.getEntityPermission(sp.id);
@@ -1241,11 +1463,11 @@ export function SpellExplorer({
                         side="right"
                         delay={200}
                         className="w-full"
-                        content={<SpellTooltipCard spell={sp} onSelectEntity={onSelectEntity} />}
+                        content={<SpellTooltipCard spell={sp} onSelectEntity={handleOpenSpellInDrawer} />}
                       >
                         <button
                           type="button"
-                          onClick={() => onSelectEntity(sp.id)}
+                          onClick={() => handleOpenSpellInDrawer(sp.id)}
                           className="text-left group/title focus:outline-none cursor-pointer block w-full"
                           title={`Abrir feitiço ${sp.title}`}
                         >
@@ -1340,47 +1562,8 @@ export function SpellExplorer({
                       ))}
                   </div>
 
-                  {/* Highlighted Index Information: Range, Area, Targets, Trigger, Defense, Duration */}
-                  {(data.range || data.area || data.targets || data.trigger || data.savingThrow || data.duration) && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-3.5 pt-3 border-t border-zinc-800/80 text-[11px]">
-                      {data.range && (
-                        <div className="p-1.5 rounded-lg bg-cyan-950/30 border border-cyan-900/50 flex items-baseline gap-1.5 overflow-hidden">
-                          <strong className="text-cyan-400 font-bold uppercase text-[10px] font-mono tracking-wider shrink-0">Alcance:</strong>
-                          <span className="text-zinc-200 break-words">{data.range}</span>
-                        </div>
-                      )}
-                      {data.area && (
-                        <div className="p-1.5 rounded-lg bg-emerald-950/30 border border-emerald-900/50 flex items-baseline gap-1.5 overflow-hidden">
-                          <strong className="text-emerald-400 font-bold uppercase text-[10px] font-mono tracking-wider shrink-0">Área:</strong>
-                          <span className="text-zinc-200 break-words">{data.area}</span>
-                        </div>
-                      )}
-                      {data.targets && (
-                        <div className="p-1.5 rounded-lg bg-purple-950/30 border border-purple-900/50 col-span-1 sm:col-span-2 flex items-baseline gap-1.5 overflow-hidden">
-                          <strong className="text-purple-400 font-bold uppercase text-[10px] font-mono tracking-wider shrink-0">Alvos:</strong>
-                          <span className="text-zinc-200 break-words">{data.targets}</span>
-                        </div>
-                      )}
-                      {data.trigger && (
-                        <div className="p-1.5 rounded-lg bg-amber-950/30 border border-amber-900/50 col-span-1 sm:col-span-2 flex items-baseline gap-1.5 overflow-hidden">
-                          <strong className="text-amber-400 font-bold uppercase text-[10px] font-mono tracking-wider shrink-0">Gatilho:</strong>
-                          <span className="text-zinc-200 break-words">{data.trigger}</span>
-                        </div>
-                      )}
-                      {data.savingThrow && (
-                        <div className="p-1.5 rounded-lg bg-rose-950/30 border border-rose-900/50 flex items-baseline gap-1.5 overflow-hidden">
-                          <strong className="text-rose-400 font-bold uppercase text-[10px] font-mono tracking-wider shrink-0">Defesa:</strong>
-                          <span className="text-zinc-200 break-words">{data.savingThrow}</span>
-                        </div>
-                      )}
-                      {data.duration && (
-                        <div className="p-1.5 rounded-lg bg-teal-950/30 border border-teal-900/50 flex items-baseline gap-1.5 overflow-hidden">
-                          <strong className="text-teal-400 font-bold uppercase text-[10px] font-mono tracking-wider shrink-0">Duração:</strong>
-                          <span className="text-zinc-200 break-words">{data.duration}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {/* Smart, Compact and Auto-Fitting Index Metadata Blocks */}
+                  <SmartSpellCardIndexBlocks data={data} />
 
                   {/* Resumo Rápido displayed on card (rich formatted) */}
                   <div className="text-xs text-zinc-300 mt-3 leading-relaxed break-words line-clamp-4">
@@ -1435,7 +1618,7 @@ export function SpellExplorer({
                       <Tooltip title="Editar Feitiço" description="Modificar detalhes, estatísticas e descrição">
                         <button
                           type="button"
-                          onClick={() => onEditEntity(sp.id)}
+                          onClick={() => handleStartEditSpell(sp)}
                           className="p-1.5 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 hover:border-cyan-500/50 text-zinc-400 hover:text-cyan-300 transition-colors cursor-pointer"
                         >
                           <Edit className="w-3.5 h-3.5" />
@@ -1546,11 +1729,11 @@ export function SpellExplorer({
                         <Tooltip
                           side="right"
                           delay={200}
-                          content={<SpellTooltipCard spell={sp} onSelectEntity={onSelectEntity} />}
+                          content={<SpellTooltipCard spell={sp} onSelectEntity={handleOpenSpellInDrawer} />}
                         >
                           <button
                             type="button"
-                            onClick={() => onSelectEntity(sp.id)}
+                            onClick={() => handleOpenSpellInDrawer(sp.id)}
                             className="text-left font-bold text-zinc-200 group-hover:text-cyan-300 hover:drop-shadow-[0_0_10px_rgba(6,182,212,0.8)] transition-all flex items-center gap-2 cursor-pointer focus:outline-none"
                           >
                             <span className="hover:underline decoration-cyan-400/80 decoration-2 underline-offset-2">
@@ -1616,7 +1799,7 @@ export function SpellExplorer({
                             <Tooltip title="Editar">
                               <button
                                 type="button"
-                                onClick={() => onEditEntity(sp.id)}
+                                onClick={() => handleStartEditSpell(sp)}
                                 className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-cyan-300 cursor-pointer"
                               >
                                 <Edit className="w-3.5 h-3.5" />
@@ -1751,7 +1934,7 @@ export function SpellExplorer({
                           {spellsInFolder.map((sp) => (
                             <div
                               key={sp.id}
-                              onClick={() => onSelectEntity(sp.id)}
+                              onClick={() => handleOpenSpellInDrawer(sp.id)}
                               className="flex items-center justify-between p-2 rounded-xl bg-zinc-900/40 hover:bg-cyan-950/30 border border-zinc-800/40 hover:border-cyan-500/40 cursor-pointer transition-all group"
                             >
                               <div className="min-w-0 flex-1 pr-2">
@@ -1769,7 +1952,7 @@ export function SpellExplorer({
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      onEditEntity(sp.id);
+                                      handleStartEditSpell(sp);
                                     }}
                                     className="p-1 rounded text-zinc-500 hover:text-cyan-300"
                                     title="Editar Feitiço"
@@ -2022,17 +2205,50 @@ export function SpellExplorer({
         </div>
       )}
 
-      {/* Spell Creation Modal */}
+      {/* Spell Creation / Edit Modal */}
       <SpellCreateModal
         isOpen={isSpellCreateModalOpen}
-        onClose={() => setIsSpellCreateModalOpen(false)}
+        onClose={() => {
+          setIsSpellCreateModalOpen(false);
+          setEditingSpellEntity(null);
+        }}
+        entityToEdit={editingSpellEntity || undefined}
         presetTradition={activeCategory !== 'all' ? activeCategory : undefined}
         presetSubcategory={activeSubcategory || undefined}
         onSave={(newSpellEntity) => {
           HecosStorage.saveEntity(newSpellEntity);
           setIsSpellCreateModalOpen(false);
-          onSelectEntity(newSpellEntity.id);
+          setEditingSpellEntity(null);
+          // Return directly to the lateral drawer of this spell article!
+          setSelectedDrawerSpellId(newSpellEntity.id);
+          setIsSpellDrawerOpen(true);
         }}
+      />
+
+      {/* Lateral Spell Article Drawer */}
+      <SpellDrawer
+        spellId={selectedDrawerSpellId}
+        entities={entities}
+        isOpen={isSpellDrawerOpen}
+        onClose={() => {
+          setIsSpellDrawerOpen(false);
+          setSelectedDrawerSpellId(null);
+        }}
+        onNavigateFullPage={(targetId) => {
+          setIsSpellDrawerOpen(false);
+          setSelectedDrawerSpellId(null);
+          onSelectEntity(targetId);
+        }}
+        onEditSpell={(spellToEdit) => {
+          handleStartEditSpell(spellToEdit);
+        }}
+        onDeleteSpell={(deleteId) => {
+          onDeleteEntity(deleteId);
+          setIsSpellDrawerOpen(false);
+          setSelectedDrawerSpellId(null);
+        }}
+        onTagClick={onTagClick}
+        isGmMode={isActualGm}
       />
 
       {/* Confirm Delete Modal */}

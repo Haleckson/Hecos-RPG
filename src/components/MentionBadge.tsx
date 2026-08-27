@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { HecosEntity } from '../types';
 import { HecosStorage } from '../services/storage';
 import { Skull, Sparkles, Gem, Compass, User, Users, Lock, BookOpen, ExternalLink, Shield } from 'lucide-react';
@@ -89,94 +90,97 @@ export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNa
       </span>
 
       {/* Hover Preview Card Popup */}
-      <AnimatePresence>
-        {isHovered && (
-          <motion.div
-            initial={{ opacity: 0, y: 6, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 4, scale: 0.97 }}
-            transition={{ duration: 0.15 }}
-            className="fixed z-50 w-80 max-w-[90vw] p-3.5 rounded-xl bg-[#0e0c15]/95 backdrop-blur-md border border-zinc-800 shadow-2xl text-left pointer-events-auto"
-            style={{
-              top: Math.min(hoverPos.y, window.innerHeight - 300),
-              left: Math.min(hoverPos.x, window.innerWidth - 330)
-            }}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
-          >
-            {/* Header with cover or icon */}
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <div>
-                <span className={`inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded border ${
-                  isCiano ? 'bg-cyan-950 text-cyan-300 border-cyan-800' :
-                  isMalva ? 'bg-purple-950 text-purple-300 border-purple-800' :
-                  'bg-rose-950 text-rose-300 border-rose-900'
-                }`}>
-                  {entity.category.toUpperCase()} {entity.statblock ? `• Nível ${entity.statblock.level}` : ''}
-                </span>
-                <h4 className="text-sm font-semibold text-zinc-100 mt-1 line-clamp-1">{entity.title}</h4>
-                {entity.subtitle && (
-                  <p className="text-xs text-zinc-400 line-clamp-1">{entity.subtitle}</p>
-                )}
-              </div>
-            </div>
-
-            {/* Quick Stat Bar */}
-            {entity.statblock && (
-              <div className="grid grid-cols-4 gap-1 p-1.5 my-2 rounded bg-black/60 border border-zinc-800/80 text-center text-xs">
-                <div>
-                  <span className="text-[10px] text-zinc-500 block">CA</span>
-                  <span className="font-bold text-cyan-400">{entity.statblock.ac}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-zinc-500 block">PV</span>
-                  <span className="font-bold text-rose-400">{entity.statblock.hp}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-zinc-500 block">VEL</span>
-                  <span className="font-bold text-purple-400">{entity.statblock.speed || '25 ft'}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-zinc-500 block">PER</span>
-                  <span className="font-bold text-zinc-300">+{entity.statblock.perception || 0}</span>
-                </div>
-              </div>
-            )}
-
-            {entity.spellData && (
-              <div className="flex items-center gap-2 p-1.5 my-2 rounded bg-black/60 border border-cyan-900/40 text-xs">
-                <span className="text-cyan-400 font-bold">Rank {entity.spellData.rank}</span>
-                <span className="text-zinc-400">• {entity.spellData.castTime}</span>
-                <span className="text-zinc-500 text-[10px] ml-auto">{(entity.spellData.traditions || []).join(', ')}</span>
-              </div>
-            )}
-
-            {/* Summary */}
-            <div className="text-xs text-zinc-300 line-clamp-2 my-2 leading-relaxed">
-              {parseInlineFormatting(entity.summary || 'Sem resumo cadastrado.', onNavigate)}
-            </div>
-
-            {/* Tags */}
-            {(entity.tags || []).length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-zinc-800/80">
-                {(entity.tags || []).slice(0, 4).map(t => (
-                  <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">
-                    #{t}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            <button
-              onClick={() => onNavigate(entity.id)}
-              className="w-full mt-3 py-1 px-2 text-xs font-semibold text-center rounded bg-zinc-800 hover:bg-cyan-900 hover:text-cyan-200 transition-colors flex items-center justify-center gap-1"
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {isHovered && (
+            <motion.div
+              initial={{ opacity: 0, y: 6, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 4, scale: 0.97 }}
+              transition={{ duration: 0.15 }}
+              className="fixed z-50 w-80 max-w-[90vw] p-3.5 rounded-xl bg-[#0e0c15]/95 backdrop-blur-md border border-zinc-800 shadow-2xl text-left pointer-events-auto"
+              style={{
+                top: Math.min(hoverPos.y, window.innerHeight - 300),
+                left: Math.min(hoverPos.x, window.innerWidth - 330)
+              }}
+              onMouseEnter={() => setIsHovered(true)}
+              onMouseLeave={() => setIsHovered(false)}
             >
-              <span>Abrir Artigo de Hecos</span>
-              <ExternalLink className="w-3 h-3" />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              {/* Header with cover or icon */}
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div>
+                  <span className={`inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded border ${
+                    isCiano ? 'bg-cyan-950 text-cyan-300 border-cyan-800' :
+                    isMalva ? 'bg-purple-950 text-purple-300 border-purple-800' :
+                    'bg-rose-950 text-rose-300 border-rose-900'
+                  }`}>
+                    {entity.category.toUpperCase()} {entity.statblock ? `• Nível ${entity.statblock.level}` : ''}
+                  </span>
+                  <div className="text-sm font-semibold text-zinc-100 mt-1 line-clamp-1">{entity.title}</div>
+                  {entity.subtitle && (
+                    <div className="text-xs text-zinc-400 line-clamp-1">{entity.subtitle}</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Quick Stat Bar */}
+              {entity.statblock && (
+                <div className="grid grid-cols-4 gap-1 p-1.5 my-2 rounded bg-black/60 border border-zinc-800/80 text-center text-xs">
+                  <div>
+                    <span className="text-[10px] text-zinc-500 block">CA</span>
+                    <span className="font-bold text-cyan-400">{entity.statblock.ac}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-zinc-500 block">PV</span>
+                    <span className="font-bold text-rose-400">{entity.statblock.hp}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-zinc-500 block">VEL</span>
+                    <span className="font-bold text-purple-400">{entity.statblock.speed || '25 ft'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-zinc-500 block">PER</span>
+                    <span className="font-bold text-zinc-300">+{entity.statblock.perception || 0}</span>
+                  </div>
+                </div>
+              )}
+
+              {entity.spellData && (
+                <div className="flex items-center gap-2 p-1.5 my-2 rounded bg-black/60 border border-cyan-900/40 text-xs">
+                  <span className="text-cyan-400 font-bold">Rank {entity.spellData.rank}</span>
+                  <span className="text-zinc-400">• {entity.spellData.castTime}</span>
+                  <span className="text-zinc-500 text-[10px] ml-auto">{(entity.spellData.traditions || []).join(', ')}</span>
+                </div>
+              )}
+
+              {/* Summary */}
+              <div className="text-xs text-zinc-300 line-clamp-2 my-2 leading-relaxed">
+                {parseInlineFormatting(entity.summary || 'Sem resumo cadastrado.', onNavigate)}
+              </div>
+
+              {/* Tags */}
+              {(entity.tags || []).length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-zinc-800/80">
+                  {(entity.tags || []).slice(0, 4).map(t => (
+                    <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">
+                      #{t}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <button
+                onClick={() => onNavigate(entity.id)}
+                className="w-full mt-3 py-1 px-2 text-xs font-semibold text-center rounded bg-zinc-800 hover:bg-cyan-900 hover:text-cyan-200 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+              >
+                <span>Abrir Artigo de Hecos</span>
+                <ExternalLink className="w-3 h-3" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </span>
   );
 };

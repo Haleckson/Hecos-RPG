@@ -280,7 +280,7 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
   const allExistingFolders = useMemo(() => {
     const set = new Set<string>();
     
-    // 1. Folders from spell subcategories config
+    // 1. Valid folders from spell subcategories config
     (Object.values(spellConfig) as string[][]).forEach((list) => {
       (list || []).forEach((sub) => {
         if (typeof sub === 'string' && sub.trim()) {
@@ -289,17 +289,7 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
       });
     });
 
-    // 2. Folders attached to existing spell entities
-    const entities = HecosStorage.getEntities();
-    entities.forEach((ent) => {
-      if (ent.category === 'spell' || ent.spellData || ent.tags?.includes('spell') || ent.tags?.includes('magia')) {
-        (ent.spellData?.subcategories || []).forEach((s) => s && set.add(s.trim()));
-        (ent.subcategories || []).forEach((s) => s && set.add(s.trim()));
-        if (ent.subcategory && ent.subcategory.trim()) set.add(ent.subcategory.trim());
-      }
-    });
-
-    // 3. Current selected subcategories
+    // 2. Current selected subcategories in this editor session
     selectedSubcategories.forEach((s) => s && set.add(s.trim()));
 
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));

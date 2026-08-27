@@ -33,6 +33,7 @@ import { QuestBoard } from './components/QuestBoard';
 import { PerilCreateModal } from './components/PerilCreateModal';
 import { ClassCreateModal } from './components/ClassCreateModal';
 import { TraitDrawer } from './components/TraitDrawer';
+import { TagDrawer } from './components/TagDrawer';
 import { FeatCategoryType, SpellCategoryType, ItemCategoryType } from './types';
 import { HomePage } from './components/HomePage';
 import { setupGlobalTextFormattingShortcuts } from './utils/keyboardShortcuts';
@@ -197,6 +198,10 @@ export function App() {
   const [selectedDrawerTrait, setSelectedDrawerTrait] = useState<string | null>(null);
   const [isTraitDrawerOpen, setIsTraitDrawerOpen] = useState(false);
 
+  // Tag Drawer state
+  const [selectedDrawerTag, setSelectedDrawerTag] = useState<string | null>(null);
+  const [isTagDrawerOpen, setIsTagDrawerOpen] = useState(false);
+
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced'>('idle');
@@ -234,6 +239,19 @@ export function App() {
     };
     window.addEventListener('hecos:open-trait-drawer', handleOpenTraitDrawer);
     return () => window.removeEventListener('hecos:open-trait-drawer', handleOpenTraitDrawer);
+  }, []);
+
+  // Tag Drawer Event Listener (hecos:open-tag-drawer)
+  useEffect(() => {
+    const handleOpenTagDrawer = (e: Event) => {
+      const customEvent = e as CustomEvent<{ tag: string }>;
+      if (customEvent.detail?.tag) {
+        setSelectedDrawerTag(customEvent.detail.tag);
+        setIsTagDrawerOpen(true);
+      }
+    };
+    window.addEventListener('hecos:open-tag-drawer', handleOpenTagDrawer);
+    return () => window.removeEventListener('hecos:open-tag-drawer', handleOpenTagDrawer);
   }, []);
 
   // Real-time subscriptions and Initial load
@@ -1701,7 +1719,13 @@ export function App() {
         presetSubcategory={spellModalPresetSubcategory}
         onSave={(newSpellEntity) => {
           refreshEntities();
-          handleNavigateEntity(newSpellEntity.id);
+          if (activeView === 'entities') {
+            window.dispatchEvent(
+              new CustomEvent('hecos:open-spell-drawer', { detail: { spellId: newSpellEntity.id } })
+            );
+          } else {
+            handleNavigateEntity(newSpellEntity.id);
+          }
           setIsSpellCreateModalOpen(false);
           setEditingSpellEntity(null);
         }}
@@ -1775,6 +1799,16 @@ export function App() {
         onClose={() => setIsTraitDrawerOpen(false)}
         onNavigate={handleNavigateEntity}
         isGmMode={isGmMode}
+      />
+
+      {/* Hecos Codex Tag Drawer */}
+      <TagDrawer
+        tag={selectedDrawerTag}
+        isOpen={isTagDrawerOpen}
+        onClose={() => setIsTagDrawerOpen(false)}
+        onNavigate={handleNavigateEntity}
+        isGmMode={isGmMode}
+        onTagUpdated={refreshEntities}
       />
 
       {/* Global Tooltip that overlays all windows with highest z-index */}

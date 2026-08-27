@@ -421,11 +421,91 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
         </div>
       </div>
 
-      {/* Cloud Content */}
+      {/* Cloud & List Content */}
       {activeTab === 'tags' ? (
         tags.length === 0 ? (
           <div className="p-8 text-center bg-[#110e19] rounded-xl border border-zinc-800 text-zinc-400 text-xs">
             {searchTerm ? `Nenhuma tag encontrada para "${searchTerm}".` : 'Nenhuma tag encontrada nos artigos autorizados para o seu perfil.'}
+          </div>
+        ) : viewMode === 'list' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            {tags.map((tag) => {
+              const isSelected = selectedTag?.toLowerCase() === tag.name.toLowerCase();
+              return (
+                <div
+                  key={tag.name}
+                  className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
+                    isSelected
+                      ? 'bg-cyan-950/60 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)]'
+                      : 'bg-[#120f1b] hover:bg-[#181324] border-zinc-800/80 hover:border-cyan-500/50'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = isSelected ? null : tag.name;
+                      setSelectedTag(next);
+                      window.dispatchEvent(
+                        new CustomEvent('hecos:open-tag-drawer', {
+                          detail: { tag: tag.name },
+                        })
+                      );
+                    }}
+                    className="flex items-center gap-2 min-w-0 flex-1 text-left cursor-pointer group"
+                  >
+                    <div className="p-1.5 rounded-lg bg-cyan-950/80 border border-cyan-800/60 text-cyan-300 group-hover:text-cyan-200">
+                      <TagIcon className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-bold text-zinc-100 group-hover:text-cyan-300 truncate">
+                        #{tag.name}
+                      </h4>
+                      <p className="text-[10px] text-zinc-400 font-mono">
+                        {tag.count} artigo{tag.count !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  </button>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedTag(tag.name);
+                        window.dispatchEvent(
+                          new CustomEvent('hecos:open-tag-drawer', {
+                            detail: { tag: tag.name },
+                          })
+                        );
+                      }}
+                      className="px-2 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-cyan-400 hover:text-cyan-300 text-[11px] font-semibold transition-colors cursor-pointer"
+                      title="Abrir Gaveta Lateral"
+                    >
+                      Painel
+                    </button>
+
+                    {isActualGm && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingTagName(tag.name);
+                          setTagModalOpen(true);
+                          window.dispatchEvent(
+                            new CustomEvent('hecos:open-tag-drawer', {
+                              detail: { tag: tag.name },
+                            })
+                          );
+                        }}
+                        className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-400 hover:text-cyan-300 transition-colors cursor-pointer"
+                        title="Gerenciar Tag"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="flex flex-wrap gap-2">
@@ -442,7 +522,17 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
                 >
                   <button
                     type="button"
-                    onClick={() => setSelectedTag(isSelected ? null : tag.name)}
+                    onClick={() => {
+                      const next = isSelected ? null : tag.name;
+                      setSelectedTag(next);
+                      if (next) {
+                        window.dispatchEvent(
+                          new CustomEvent('hecos:open-tag-drawer', {
+                            detail: { tag: next },
+                          })
+                        );
+                      }
+                    }}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold cursor-pointer"
                   >
                     <span>#{tag.name}</span>
@@ -463,6 +553,11 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
                         e.stopPropagation();
                         setEditingTagName(tag.name);
                         setTagModalOpen(true);
+                        window.dispatchEvent(
+                          new CustomEvent('hecos:open-tag-drawer', {
+                            detail: { tag: tag.name },
+                          })
+                        );
                       }}
                       className="pr-2 pl-1 py-1 text-zinc-500 hover:text-cyan-300 transition-colors cursor-pointer"
                       title="Gerenciar Tag"
@@ -479,6 +574,81 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
         <div className="p-8 text-center bg-[#110e19] rounded-xl border border-zinc-800 text-zinc-400 text-xs">
           {searchTerm ? `Nenhum traço encontrado para "${searchTerm}".` : 'Nenhum traço de mecânica PF2e registrado nos artigos ainda.'}
         </div>
+      ) : viewMode === 'list' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          {traits.map((tr) => {
+            const isSelected = selectedTrait?.toLowerCase() === tr.name.toLowerCase();
+            return (
+              <div
+                key={tr.name}
+                className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
+                  isSelected
+                    ? 'bg-amber-950/60 border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]'
+                    : 'bg-[#161122] hover:bg-[#1f1730] border-amber-900/60 hover:border-amber-500/50'
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = isSelected ? null : tr.name;
+                    setSelectedTrait(next);
+                    window.dispatchEvent(
+                      new CustomEvent('hecos:open-trait-drawer', {
+                        detail: { trait: tr.name },
+                      })
+                    );
+                  }}
+                  className="flex items-center gap-2 min-w-0 flex-1 text-left cursor-pointer group"
+                >
+                  <div className="p-1.5 rounded-lg bg-amber-950/80 border border-amber-800/60 text-amber-300 group-hover:text-amber-200">
+                    <Layers className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-mono font-bold tracking-wide uppercase text-amber-200 group-hover:text-amber-100 truncate">
+                      {tr.name}
+                    </h4>
+                    <p className="text-[10px] text-zinc-400 font-mono">
+                      {tr.count} artigo{tr.count !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </button>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedTrait(tr.name);
+                      window.dispatchEvent(
+                        new CustomEvent('hecos:open-trait-drawer', {
+                          detail: { trait: tr.name },
+                        })
+                      );
+                    }}
+                    className="px-2 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-amber-400 hover:text-amber-300 text-[11px] font-semibold transition-colors cursor-pointer"
+                    title="Abrir Gaveta Lateral"
+                  >
+                    Painel
+                  </button>
+
+                  {isActualGm && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingTraitName(tr.name);
+                        setTraitModalOpen(true);
+                      }}
+                      className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-amber-400/80 hover:text-amber-200 transition-colors cursor-pointer"
+                      title="Editar ou Excluir Traço"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       ) : (
         <div className="flex flex-wrap gap-2">
           {traits.map((tr) => {
@@ -494,7 +664,17 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
               >
                 <button
                   type="button"
-                  onClick={() => setSelectedTrait(isSelected ? null : tr.name)}
+                  onClick={() => {
+                    const next = isSelected ? null : tr.name;
+                    setSelectedTrait(next);
+                    if (next) {
+                      window.dispatchEvent(
+                        new CustomEvent('hecos:open-trait-drawer', {
+                          detail: { trait: next },
+                        })
+                      );
+                    }
+                  }}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-bold tracking-wide uppercase cursor-pointer"
                 >
                   <span>{tr.name}</span>
@@ -539,6 +719,38 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
             </h3>
 
             <div className="flex items-center gap-3">
+              {selectedTag && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.dispatchEvent(
+                      new CustomEvent('hecos:open-tag-drawer', {
+                        detail: { tag: selectedTag },
+                      })
+                    );
+                  }}
+                  className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 font-semibold underline cursor-pointer"
+                >
+                  <TagIcon className="w-3.5 h-3.5" />
+                  <span>Abrir no Painel Lateral</span>
+                </button>
+              )}
+              {selectedTrait && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.dispatchEvent(
+                      new CustomEvent('hecos:open-trait-drawer', {
+                        detail: { trait: selectedTrait },
+                      })
+                    );
+                  }}
+                  className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 font-semibold underline cursor-pointer"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>Abrir no Painel Lateral</span>
+                </button>
+              )}
               {selectedTrait && (
                 <button
                   type="button"

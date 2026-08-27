@@ -432,13 +432,26 @@ export const SpellView: React.FC<SpellViewProps> = ({
 
           {/* INTENSIFICADO / AMPLIAÇÃO (HEIGHTENED) */}
           {spellData.heightened && (
-            <div className="p-4 rounded-xl bg-[#09141c] border border-cyan-500/30 text-xs sm:text-sm text-cyan-200 space-y-1.5">
+            <div className="p-4 rounded-xl bg-[#09141c] border border-cyan-500/30 text-xs sm:text-sm text-cyan-200 space-y-2">
               <strong className="text-cyan-300 font-bold uppercase font-mono text-[11px] flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
                 <span>Intensificado (Heightened):</span>
               </strong>
-              <div className="text-zinc-200">
-                <RichContentRenderer content={spellData.heightened} onNavigate={onNavigate} />
+              <div className="space-y-2 pl-1 text-zinc-200">
+                {(spellData.heightened.includes('\n')
+                  ? spellData.heightened.split('\n')
+                  : spellData.heightened.split(/(?=(?:Intensificado\s*\([^)]+\)|\(\+\d+\)|\(\d+[ºª]\)))/gi)
+                )
+                  .map((l) => l.trim())
+                  .filter(Boolean)
+                  .map((line, idx) => (
+                    <div key={`view-heightened-${idx}`} className="flex items-start gap-2 text-xs sm:text-sm text-zinc-200 leading-relaxed">
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-2 shrink-0" />
+                      <div className="flex-1">
+                        <RichContentRenderer content={line} onNavigate={onNavigate} />
+                      </div>
+                    </div>
+                  ))}
               </div>
             </div>
           )}

@@ -143,6 +143,22 @@ export const TagModal: React.FC<TagModalProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
+                    onClick={() => {
+                      window.dispatchEvent(
+                        new CustomEvent('hecos:open-tag-drawer', {
+                          detail: { tag: tagName },
+                        })
+                      );
+                      onClose();
+                    }}
+                    className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-cyan-400 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title="Visualizar artigos desta tag na Gaveta Lateral"
+                  >
+                    <TagIcon className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Ver no Painel Lateral</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={onClose}
                     className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold transition-colors"
                   >

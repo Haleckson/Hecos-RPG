@@ -408,6 +408,93 @@ export async function syncFeatCategoriesToFirebase(config: Record<string, string
 }
 
 /**
+ * Real-time listener for 'hecos_spell_categories'
+ */
+export function subscribeToSpellCategoriesRealtime(
+  onUpdate: (categories: Record<string, string[]>) => void
+): Unsubscribe | null {
+  if (!isFirebaseAvailable || !db) return null;
+
+  try {
+    const categoriesRef = ref(db, 'hecos_spell_categories');
+    return onValue(
+      categoriesRef,
+      (snapshot) => {
+        const val = snapshot.val();
+        if (val && typeof val === 'object') {
+          onUpdate(val);
+        }
+      },
+      (error) => {
+        console.warn("Real-time spell categories error:", error);
+      }
+    );
+  } catch (err) {
+    return null;
+  }
+}
+
+/**
+ * Save spell categories config to Firebase Realtime Database
+ */
+export async function syncSpellCategoriesToFirebase(config: Record<string, string[]>): Promise<boolean> {
+  if (!isFirebaseAvailable || !db || !config) return false;
+  try {
+    const categoriesRef = ref(db, 'hecos_spell_categories');
+    const payload = cleanForFirebase(config);
+    await withTimeout(set(categoriesRef, payload), 15000);
+    return true;
+  } catch (err) {
+    console.error("Error syncing spell categories to Firebase:", err);
+    return false;
+  }
+}
+
+/**
+ * Real-time listener for generic scope categories (e.g. 'hecos_item_categories', etc.)
+ */
+export function subscribeToScopeCategoriesRealtime(
+  scope: string,
+  onUpdate: (categories: Record<string, string[]>) => void
+): Unsubscribe | null {
+  if (!isFirebaseAvailable || !db || !scope) return null;
+
+  try {
+    const categoriesRef = ref(db, `hecos_${scope}_categories`);
+    return onValue(
+      categoriesRef,
+      (snapshot) => {
+        const val = snapshot.val();
+        if (val && typeof val === 'object') {
+          onUpdate(val);
+        }
+      },
+      (error) => {
+        console.warn(`Real-time ${scope} categories error:`, error);
+      }
+    );
+  } catch (err) {
+    return null;
+  }
+}
+
+/**
+ * Save generic scope categories config to Firebase Realtime Database
+ */
+export async function syncScopeCategoriesToFirebase(scope: string, config: Record<string, string[]>): Promise<boolean> {
+  if (!isFirebaseAvailable || !db || !config || !scope) return false;
+  try {
+    const categoriesRef = ref(db, `hecos_${scope}_categories`);
+    const payload = cleanForFirebase(config);
+    await withTimeout(set(categoriesRef, payload), 15000);
+    return true;
+  } catch (err) {
+    console.error(`Error syncing ${scope} categories to Firebase:`, err);
+    return false;
+  }
+}
+
+/**
  * Real-time listener for 'hecos_public_folders' (revealed folders)
  */
 export function subscribeToPublicFoldersRealtime(
