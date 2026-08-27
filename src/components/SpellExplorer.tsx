@@ -5,6 +5,7 @@ import {
   SpellCategoryType,
 } from '../types';
 import { parseSpellFromContent } from '../utils/spellSerializer';
+import { isTraditionTrait } from '../utils/spellMigration';
 import { HecosStorage } from '../services/storage';
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
@@ -12,6 +13,7 @@ import { Tooltip } from './Tooltip';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { SpellCreateModal } from './SpellCreateModal';
 import { TraitBadge } from './TraitBadge';
+import { sortTraitsHierarchically } from '../utils/traitUtils';
 import { RichContentRenderer, renderContentWithMentions } from './RichContentRenderer';
 import { FolderManagerModal } from './FolderManagerModal';
 import { SpellDrawer } from './SpellDrawer';
@@ -97,40 +99,40 @@ export const MAIN_SPELL_CATEGORIES: {
     badgeBorder: 'border-cyan-600/40',
   },
   {
-    id: 'e_fisica',
-    name: 'E. Física',
-    englishName: 'Physical Energy',
-    description: 'Manipulação de energia térmica, cinética, gravidade, calor, eletricidade e forças físicas materiais.',
+    id: 'cinetica',
+    name: 'Cinética',
+    englishName: 'Kinetic',
+    description: 'Manipulação de energia térmica, cinética, gravidade, eletricidade e forças físicas materiais.',
     icon: Zap,
     color: '#00f0ff',
     badgeBg: 'bg-cyan-950/40',
     badgeBorder: 'border-cyan-600/40',
   },
   {
-    id: 'e_meta',
-    name: 'E. Meta',
-    englishName: 'Metaphysical Energy',
-    description: 'Manipulação de tempo, espaço, alma, ilusões, dimensões e forças transcendentais.',
+    id: 'eterea',
+    name: 'Etérea',
+    englishName: 'Ethereal',
+    description: 'Manipulação do tempo, espaço, alma, ilusões e forças transcendentais.',
     icon: Moon,
     color: '#b877db',
     badgeBg: 'bg-purple-950/40',
     badgeBorder: 'border-purple-600/40',
   },
   {
-    id: 'm_organica',
-    name: 'M. Orgânica',
-    englishName: 'Organic Matter',
-    description: 'Manipulação e transmutação de carne, sangue, biomassa, flora, cura e organismos vivos.',
+    id: 'biologica',
+    name: 'Biológica',
+    englishName: 'Biological',
+    description: 'Manipulação e transmutação da carne, sangue, biomassa, flora, cura e organismos vivos.',
     icon: Flame,
     color: '#34d399',
     badgeBg: 'bg-emerald-950/40',
     badgeBorder: 'border-emerald-600/40',
   },
   {
-    id: 'm_inorganica',
-    name: 'M. Inorgânica',
-    englishName: 'Inorganic Matter',
-    description: 'Manipulação de metais, cristais, pedra, terra, minerais telúricos e matéria inanimada.',
+    id: 'abiotica',
+    name: 'Abiótica',
+    englishName: 'Abiotic',
+    description: 'Manipulação de metais, cristais, pedra, terra, minerais telúricos, matéria inanimada.',
     icon: Shield,
     color: '#fbbf24',
     badgeBg: 'bg-amber-950/40',
@@ -140,7 +142,7 @@ export const MAIN_SPELL_CATEGORIES: {
     id: 'omni',
     name: 'Omni',
     englishName: 'Omni Tradition',
-    description: 'Tradição mágica suprema que unifica todas as vertentes da energia e matéria de Hecos.',
+    description: 'Tradição magica universal que unifica todas as vertentes da energia e matéria de Hecos.',
     icon: Sparkles,
     color: '#f43f5e',
     badgeBg: 'bg-rose-950/40',
@@ -194,23 +196,23 @@ function matchesTradition(traditionsList: string[], target: string): boolean {
     const tNorm = norm(t);
     if (tNorm === targetNorm) return true;
     if (
-      (targetNorm === 'efisica' || targetNorm === 'arcano' || targetNorm === 'arcane') &&
-      (tNorm.includes('fisica') || tNorm.includes('arcano') || tNorm.includes('arcane'))
+      (targetNorm === 'cinetica' || targetNorm === 'efisica' || targetNorm === 'arcano' || targetNorm === 'arcane') &&
+      (tNorm.includes('cinetica') || tNorm.includes('fisica') || tNorm.includes('arcano') || tNorm.includes('arcane'))
     )
       return true;
     if (
-      (targetNorm === 'emeta' || targetNorm === 'oculto' || targetNorm === 'occult') &&
-      (tNorm.includes('meta') || tNorm.includes('oculto') || tNorm.includes('occult'))
+      (targetNorm === 'eterea' || targetNorm === 'emeta' || targetNorm === 'oculto' || targetNorm === 'occult') &&
+      (tNorm.includes('eterea') || tNorm.includes('meta') || tNorm.includes('oculto') || tNorm.includes('occult'))
     )
       return true;
     if (
-      (targetNorm === 'morganica' || targetNorm === 'primal') &&
-      (tNorm.includes('organica') || tNorm.includes('primal'))
+      (targetNorm === 'biologica' || targetNorm === 'morganica' || targetNorm === 'primal') &&
+      (tNorm.includes('biologica') || tNorm.includes('organica') || tNorm.includes('primal'))
     )
       return true;
     if (
-      (targetNorm === 'minorganica' || targetNorm === 'divino' || targetNorm === 'divine') &&
-      (tNorm.includes('inorganica') || tNorm.includes('divino') || tNorm.includes('divine'))
+      (targetNorm === 'abiotica' || targetNorm === 'minorganica' || targetNorm === 'divino' || targetNorm === 'divine') &&
+      (tNorm.includes('abiotica') || tNorm.includes('inorganica') || tNorm.includes('divino') || tNorm.includes('divine'))
     )
       return true;
     if (targetNorm === 'omni' && tNorm.includes('omni')) return true;
@@ -394,18 +396,19 @@ function SpellTooltipCard({
           </span>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap mt-2">
-          <span className="text-xs px-2 py-0.5 rounded bg-cyan-950/90 text-cyan-300 font-mono font-semibold border border-cyan-800/60">
-            {data.rarity || 'Comum'}
-          </span>
-          {data.traditions?.map((tr) => (
-            <span key={`tt-trad-${tr}`} className="text-xs px-2 py-0.5 rounded bg-zinc-900/90 text-zinc-200 border border-zinc-800 font-mono font-medium">
-              {tr}
-            </span>
-          ))}
-          {data.traits?.map((tr) => (
-            <span key={`tt-trait-${tr}`} className="text-xs px-2 py-0.5 rounded bg-zinc-900/90 text-zinc-300 border border-zinc-800 font-mono">
-              {tr}
-            </span>
+          {sortTraitsHierarchically(data.traits || [], {
+            rarity: data.rarity || 'Comum',
+            traditions: data.traditions || [],
+          }).map((tr) => (
+            <TraitBadge
+              key={`tt-trait-${tr}`}
+              trait={tr}
+              compact
+              size="xs"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('hecos:open-trait-drawer', { detail: { trait: tr } }));
+              }}
+            />
           ))}
         </div>
       </div>
@@ -651,10 +654,10 @@ export function SpellExplorer({
 
       // 1. Category tab match
       if (activeCategory !== 'all') {
-        if (activeCategory === 'e_fisica' && !matchesTradition(traditions, 'E. Física')) return false;
-        if (activeCategory === 'e_meta' && !matchesTradition(traditions, 'E. Meta')) return false;
-        if (activeCategory === 'm_organica' && !matchesTradition(traditions, 'M. Orgânica')) return false;
-        if (activeCategory === 'm_inorganica' && !matchesTradition(traditions, 'M. Inorgânica')) return false;
+        if ((activeCategory === 'cinetica' || activeCategory === 'e_fisica') && !matchesTradition(traditions, 'Cinética')) return false;
+        if ((activeCategory === 'eterea' || activeCategory === 'e_meta') && !matchesTradition(traditions, 'Etérea')) return false;
+        if ((activeCategory === 'biologica' || activeCategory === 'm_organica') && !matchesTradition(traditions, 'Biológica')) return false;
+        if ((activeCategory === 'abiotica' || activeCategory === 'm_inorganica') && !matchesTradition(traditions, 'Abiótica')) return false;
         if (activeCategory === 'omni' && !matchesTradition(traditions, 'Omni')) return false;
         if (activeCategory === 'focus' && data.spellType !== 'focus' && !data.traits?.includes('Foco')) return false;
         if (activeCategory === 'ritual' && data.spellType !== 'ritual' && !data.traits?.includes('Ritual')) return false;
@@ -755,54 +758,54 @@ export function SpellExplorer({
     };
 
     list.sort((a, b) => {
-      const dataA = a.spellData!;
-      const dataB = b.spellData!;
+      const dataA = a.spellData || parseSpellFromContent(a.content || '');
+      const dataB = b.spellData || parseSpellFromContent(b.content || '');
 
       switch (sortBy) {
         case 'name-asc':
-          return a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' });
+          return (a.title || '').localeCompare(b.title || '', 'pt-BR', { sensitivity: 'base' });
 
         case 'name-desc':
-          return b.title.localeCompare(a.title, 'pt-BR', { sensitivity: 'base' });
+          return (b.title || '').localeCompare(a.title || '', 'pt-BR', { sensitivity: 'base' });
 
         case 'rank-asc': {
-          const diff = (dataA.rank ?? 0) - (dataB.rank ?? 0);
+          const diff = (dataA?.rank ?? 0) - (dataB?.rank ?? 0);
           if (diff !== 0) return diff;
-          return a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' });
+          return (a.title || '').localeCompare(b.title || '', 'pt-BR', { sensitivity: 'base' });
         }
 
         case 'rank-desc': {
-          const diff = (dataB.rank ?? 0) - (dataA.rank ?? 0);
+          const diff = (dataB?.rank ?? 0) - (dataA?.rank ?? 0);
           if (diff !== 0) return diff;
-          return a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' });
+          return (a.title || '').localeCompare(b.title || '', 'pt-BR', { sensitivity: 'base' });
         }
 
         case 'rarity': {
-          const rA = rarityOrder[(dataA.rarity || 'comum').toLowerCase()] || 1;
-          const rB = rarityOrder[(dataB.rarity || 'comum').toLowerCase()] || 1;
+          const rA = rarityOrder[(dataA?.rarity || 'comum').toLowerCase()] || 1;
+          const rB = rarityOrder[(dataB?.rarity || 'comum').toLowerCase()] || 1;
           if (rA !== rB) return rA - rB;
-          const diff = (dataA.rank ?? 0) - (dataB.rank ?? 0);
+          const diff = (dataA?.rank ?? 0) - (dataB?.rank ?? 0);
           if (diff !== 0) return diff;
-          return a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' });
+          return (a.title || '').localeCompare(b.title || '', 'pt-BR', { sensitivity: 'base' });
         }
 
         case 'actions': {
           const sA = getActionScore(a);
           const sB = getActionScore(b);
           if (sA !== sB) return sA - sB;
-          const diff = (dataA.rank ?? 0) - (dataB.rank ?? 0);
+          const diff = (dataA?.rank ?? 0) - (dataB?.rank ?? 0);
           if (diff !== 0) return diff;
-          return a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' });
+          return (a.title || '').localeCompare(b.title || '', 'pt-BR', { sensitivity: 'base' });
         }
 
         case 'tradition': {
-          const tA = (dataA.traditions || [])[0] || 'zzz';
-          const tB = (dataB.traditions || [])[0] || 'zzz';
+          const tA = (dataA?.traditions || [])[0] || 'zzz';
+          const tB = (dataB?.traditions || [])[0] || 'zzz';
           const tradDiff = tA.localeCompare(tB, 'pt-BR', { sensitivity: 'base' });
           if (tradDiff !== 0) return tradDiff;
-          const diff = (dataA.rank ?? 0) - (dataB.rank ?? 0);
+          const diff = (dataA?.rank ?? 0) - (dataB?.rank ?? 0);
           if (diff !== 0) return diff;
-          return a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' });
+          return (a.title || '').localeCompare(b.title || '', 'pt-BR', { sensitivity: 'base' });
         }
 
         case 'recent':
@@ -858,10 +861,10 @@ export function SpellExplorer({
       counts[cat.id] = spellEntities.filter((sp) => {
         const data = sp.spellData!;
         const traditions = data.traditions || [];
-        if (cat.id === 'e_fisica') return matchesTradition(traditions, 'E. Física');
-        if (cat.id === 'e_meta') return matchesTradition(traditions, 'E. Meta');
-        if (cat.id === 'm_organica') return matchesTradition(traditions, 'M. Orgânica');
-        if (cat.id === 'm_inorganica') return matchesTradition(traditions, 'M. Inorgânica');
+        if (cat.id === 'cinetica' || cat.id === 'e_fisica') return matchesTradition(traditions, 'Cinética');
+        if (cat.id === 'eterea' || cat.id === 'e_meta') return matchesTradition(traditions, 'Etérea');
+        if (cat.id === 'biologica' || cat.id === 'm_organica') return matchesTradition(traditions, 'Biológica');
+        if (cat.id === 'abiotica' || cat.id === 'm_inorganica') return matchesTradition(traditions, 'Abiótica');
         if (cat.id === 'omni') return matchesTradition(traditions, 'Omni');
         if (cat.id === 'focus') return data.spellType === 'focus' || data.traits?.includes('Foco');
         if (cat.id === 'ritual') return data.spellType === 'ritual' || data.traits?.includes('Ritual');
@@ -1277,10 +1280,10 @@ export function SpellExplorer({
               }`}
             >
               <option value="all">Todas Tradições</option>
-              <option value="E. Física">E. Física</option>
-              <option value="E. Meta">E. Meta</option>
-              <option value="M. Orgânica">M. Orgânica</option>
-              <option value="M. Inorgânica">M. Inorgânica</option>
+              <option value="Cinética">Cinética</option>
+              <option value="Etérea">Etérea</option>
+              <option value="Biológica">Biológica</option>
+              <option value="Abiótica">Abiótica</option>
               <option value="Omni">Omni</option>
             </select>
 
@@ -1431,7 +1434,7 @@ export function SpellExplorer({
             <button
               onClick={() =>
                 onCreateSpell(
-                  activeCategory !== 'all' ? activeCategory : 'e_fisica',
+                  activeCategory !== 'all' ? activeCategory : 'cinetica',
                   activeSubcategory || undefined
                 )
               }
@@ -1513,53 +1516,24 @@ export function SpellExplorer({
                     )}
                   </div>
 
-                  {/* Traits & Traditions Area: Rarity First, then Traditions as TraitBadges, then other Traits (Compact) */}
+                  {/* Traits & Traditions Area: [Raridade] + [Tradição] + [Tamanho] + [Outros Traits em Ordem Alfabética] */}
                   <div className="flex items-center gap-1 flex-wrap mt-2.5">
-                    {/* 1. Rarity at the beginning of traits */}
-                    <TraitBadge
-                      compact
-                      size="xs"
-                      trait={data.rarity || 'Comum'}
-                      onClick={() => {
-                        window.dispatchEvent(
-                          new CustomEvent('hecos:open-trait-drawer', {
-                            detail: { trait: data.rarity || 'Comum' },
-                          })
-                        );
-                      }}
-                    />
-
-                    {/* 2. Traditions as full interactive Traits */}
-                    {data.traditions?.map((trad, tradIdx) => (
+                    {sortTraitsHierarchically(data.traits || [], {
+                      rarity: data.rarity || 'Comum',
+                      traditions: data.traditions || [],
+                    }).map((t, tIdx) => (
                       <TraitBadge
                         compact
                         size="xs"
-                        key={`${sp.id}-trad-${trad}-${tradIdx}`}
-                        trait={trad}
+                        key={`${sp.id}-trait-${t}-${tIdx}`}
+                        trait={t}
                         onClick={() => {
                           window.dispatchEvent(
-                            new CustomEvent('hecos:open-trait-drawer', { detail: { trait: trad } })
+                            new CustomEvent('hecos:open-trait-drawer', { detail: { trait: t } })
                           );
                         }}
                       />
                     ))}
-
-                    {/* 3. General Traits */}
-                    {data.traits
-                      ?.filter((t) => !data.traditions?.includes(t))
-                      .map((t, tIdx) => (
-                        <TraitBadge
-                          compact
-                          size="xs"
-                          key={`${sp.id}-trait-${t}-${tIdx}`}
-                          trait={t}
-                          onClick={() => {
-                            window.dispatchEvent(
-                              new CustomEvent('hecos:open-trait-drawer', { detail: { trait: t } })
-                            );
-                          }}
-                        />
-                      ))}
                   </div>
 
                   {/* Smart, Compact and Auto-Fitting Index Metadata Blocks */}

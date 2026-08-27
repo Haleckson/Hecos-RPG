@@ -174,31 +174,31 @@ export function parseFeatFromContent(
 
   // Try extracting traits
   const traitsMatch = rawContent.match(/Tra[çc]os:\s*([^\n\r<]+)/i);
-  if (traitsMatch) {
+  if (traitsMatch && traitsMatch[1]) {
     clean.traits = traitsMatch[1].split(',').map((t) => t.trim()).filter(Boolean);
   }
 
   // Try extracting prerequisites
   const prereqMatch = rawContent.match(/Pr[ée]-requisitos?:\s*([^\n\r<]+)/i);
-  if (prereqMatch) {
+  if (prereqMatch && prereqMatch[1]) {
     clean.prerequisites = prereqMatch[1].trim();
   }
 
   // Try extracting frequency
   const freqMatch = rawContent.match(/Frequ[êe]ncia:\s*([^\n\r<]+)/i);
-  if (freqMatch) {
+  if (freqMatch && freqMatch[1]) {
     clean.frequency = freqMatch[1].trim();
   }
 
   // Try extracting trigger
   const triggerMatch = rawContent.match(/Gatilho:\s*([^\n\r<]+)/i);
-  if (triggerMatch) {
+  if (triggerMatch && triggerMatch[1]) {
     clean.trigger = triggerMatch[1].trim();
   }
 
   // Try extracting requirements
   const reqMatch = rawContent.match(/Requisitos?:\s*([^\n\r<]+)/i);
-  if (reqMatch) {
+  if (reqMatch && reqMatch[1]) {
     clean.requirements = reqMatch[1].trim();
   }
 

@@ -370,7 +370,7 @@ export const VisibilityBadgeMenu: React.FC<VisibilityBadgeMenuProps> = ({
                       >
                         <div className="flex items-center gap-2">
                           <div className="w-5 h-5 rounded-full bg-cyan-900/80 text-cyan-300 border border-cyan-700/50 flex items-center justify-center font-bold text-[10px]">
-                            {player.name ? player.name[0].toUpperCase() : 'J'}
+                            {player?.name && player.name[0] ? player.name[0].toUpperCase() : 'J'}
                           </div>
                           <div>
                             <div className="font-medium text-xs text-zinc-200">{player.name}</div>

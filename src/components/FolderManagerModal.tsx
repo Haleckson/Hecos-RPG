@@ -61,8 +61,8 @@ interface FolderManagerModalProps {
   isOpen: boolean;
   onClose: () => void;
   scope: FolderScope;
-  categories: FolderCategoryOption[];
-  entities: HecosEntity[];
+  categories?: FolderCategoryOption[];
+  entities?: HecosEntity[];
   initialCategoryId?: string;
   themeColor?: 'amber' | 'cyan' | 'purple' | 'emerald' | 'rose';
   onRefresh?: () => void;
@@ -82,8 +82,8 @@ export const FolderManagerModal: React.FC<FolderManagerModalProps> = ({
   isOpen,
   onClose,
   scope,
-  categories,
-  entities,
+  categories = [],
+  entities = [],
   initialCategoryId = 'all',
   themeColor,
   onRefresh,
@@ -177,15 +177,15 @@ export const FolderManagerModal: React.FC<FolderManagerModalProps> = ({
   // Creation mode state: single vs bulk
   const [activeTab, setActiveTab] = useState<'manage' | 'create_single' | 'create_bulk'>('manage');
   const [singleFolderName, setSingleFolderName] = useState('');
-  const [singleCategoryTarget, setSingleCategoryTarget] = useState<string>(
-    initialCategoryId === 'all' ? (categories[0]?.id || 'general') : initialCategoryId
+  const [singleCategoryTarget, setSingleCategoryTarget] = useState<string>(() =>
+    initialCategoryId === 'all' ? (categories?.[0]?.id || 'general') : (initialCategoryId || categories?.[0]?.id || 'general')
   );
   const [singleIsSecret, setSingleIsSecret] = useState(false);
 
   // Bulk creation state
   const [bulkInputText, setBulkInputText] = useState('');
-  const [bulkCategoryTarget, setBulkCategoryTarget] = useState<string>(
-    initialCategoryId === 'all' ? (categories[0]?.id || 'general') : initialCategoryId
+  const [bulkCategoryTarget, setBulkCategoryTarget] = useState<string>(() =>
+    initialCategoryId === 'all' ? (categories?.[0]?.id || 'general') : (initialCategoryId || categories?.[0]?.id || 'general')
   );
   const [bulkIsSecret, setBulkIsSecret] = useState(false);
 
@@ -357,7 +357,7 @@ export const FolderManagerModal: React.FC<FolderManagerModalProps> = ({
   const handleCreateSingle = () => {
     const trimmed = singleFolderName.trim();
     if (!trimmed) return;
-    const cat = singleCategoryTarget || categories[0]?.id || 'general';
+    const cat = singleCategoryTarget || categories?.[0]?.id || 'general';
 
     HecosStorage.addScopeSubcategory(scope, cat, trimmed);
 
@@ -381,7 +381,7 @@ export const FolderManagerModal: React.FC<FolderManagerModalProps> = ({
       .filter(Boolean);
 
     if (lines.length === 0) return;
-    const cat = bulkCategoryTarget || categories[0]?.id || 'general';
+    const cat = bulkCategoryTarget || categories?.[0]?.id || 'general';
     let createdCount = 0;
 
     lines.forEach((folderName) => {
@@ -1232,9 +1232,9 @@ export const FolderManagerModal: React.FC<FolderManagerModalProps> = ({
               <div>
                 <h4 className="text-base font-black text-zinc-100">Confirmar Exclusão</h4>
                 <p className="text-xs text-zinc-400">
-                  {confirmDeleteInfo.folderNames.length === 1
+                  {confirmDeleteInfo.folderNames && confirmDeleteInfo.folderNames.length === 1 && confirmDeleteInfo.folderNames[0]
                     ? `Excluir a pasta "${confirmDeleteInfo.folderNames[0].name}"?`
-                    : `Excluir ${confirmDeleteInfo.folderNames.length} pastas selecionadas?`}
+                    : `Excluir ${(confirmDeleteInfo.folderNames || []).length} pastas selecionadas?`}
                 </p>
               </div>
             </div>

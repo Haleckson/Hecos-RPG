@@ -5,6 +5,7 @@ import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { RichContentRenderer } from './RichContentRenderer';
 import { renderContentWithMentions } from './MentionBadge';
 import { TraitBadge } from './TraitBadge';
+import { sortTraitsHierarchically } from '../utils/traitUtils';
 import {
   Copy,
   Check,
@@ -188,18 +189,28 @@ export const FeatView: React.FC<FeatViewProps> = ({
             </p>
           )}
 
-          {/* Traços PF2e (iniciando pela Raridade) */}
-          <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-zinc-800/60">
-            <TraitBadge trait={featData.rarity || 'Comum'} />
-            {featData.traits
-              ?.filter((t) => t.toLowerCase() !== (featData.rarity || 'Comum').toLowerCase())
-              .map((trait) => (
-                <TraitBadge
-                  key={trait}
-                  trait={trait}
-                />
-              ))}
-          </div>
+          {/* Traços PF2e ([Raridade] + [Tradição] + [Tamanho] + [Outros Traits em Ordem Alfabética]) */}
+          {(() => {
+            const orderedTraits = sortTraitsHierarchically(featData.traits, {
+              rarity: featData.rarity || 'Comum',
+            });
+            if (orderedTraits.length === 0) return null;
+            return (
+              <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-zinc-800/60">
+                {orderedTraits.map((trait) => (
+                  <TraitBadge
+                    key={trait}
+                    trait={trait}
+                    onClick={() => {
+                      window.dispatchEvent(
+                        new CustomEvent('hecos:open-trait-drawer', { detail: { trait } })
+                      );
+                    }}
+                  />
+                ))}
+              </div>
+            );
+          })()}
         </div>
 
         {/* METADADOS DE ATIVAÇÃO, PRÉ-REQUISITOS E REQUISITOS */}

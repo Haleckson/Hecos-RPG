@@ -91,6 +91,8 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
 
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState('');
+  type SortOption = 'alpha_asc' | 'alpha_desc' | 'type' | 'newest' | 'oldest';
+  const [sortBy, setSortBy] = useState<SortOption>('alpha_asc');
   const [selectedFolder, setSelectedFolder] = useState<string | null>(() => {
     if (initialSubcategory && initialSubcategory.toLowerCase() !== meta.name.toLowerCase() && initialSubcategory.toLowerCase() !== categoryKey.toLowerCase()) {
       return initialSubcategory;
@@ -364,6 +366,39 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
     categoryKey,
   ]);
 
+  // Sorted entities according to selected sort order
+  const sortedEntities = useMemo(() => {
+    const list = [...filteredEntities];
+    return list.sort((a, b) => {
+      switch (sortBy) {
+        case 'alpha_asc':
+          return (a.title || '').localeCompare(b.title || '', 'pt-BR');
+        case 'alpha_desc':
+          return (b.title || '').localeCompare(a.title || '', 'pt-BR');
+        case 'type': {
+          const isHeritageA = Boolean(a.ancestryData?.isVersatileHeritage);
+          const isHeritageB = Boolean(b.ancestryData?.isVersatileHeritage);
+          if (isHeritageA !== isHeritageB) {
+            return isHeritageA ? 1 : -1;
+          }
+          return (a.title || '').localeCompare(b.title || '', 'pt-BR');
+        }
+        case 'newest': {
+          const dateA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+          const dateB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+          return dateB - dateA;
+        }
+        case 'oldest': {
+          const dateA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+          const dateB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+          return dateA - dateB;
+        }
+        default:
+          return 0;
+      }
+    });
+  }, [filteredEntities, sortBy]);
+
   // Color & Theme setup
   const themeClasses = useMemo(() => {
     if (scope === 'peril' || scope === 'organization') {
@@ -517,15 +552,17 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
           <div className="flex items-center gap-2.5 shrink-0 w-full md:w-auto justify-end">
             {isActualGm && (
               <>
-                <button
-                  type="button"
-                  onClick={() => setIsFolderManagerOpen(true)}
-                  className="px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-300 hover:text-cyan-300 text-xs font-semibold transition-all flex items-center gap-2 shadow-sm cursor-pointer"
-                  title="Gerenciar estrutura de pastas e subcategorias"
-                >
-                  <Settings className={`w-3.5 h-3.5 ${themeClasses.textAccent}`} />
-                  <span>Gerenciar Pastas</span>
-                </button>
+                {categoryKey !== 'ancestry' && (
+                  <button
+                    type="button"
+                    onClick={() => setIsFolderManagerOpen(true)}
+                    className="px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-300 hover:text-cyan-300 text-xs font-semibold transition-all flex items-center gap-2 shadow-sm cursor-pointer"
+                    title="Gerenciar estrutura de pastas e subcategorias"
+                  >
+                    <Settings className={`w-3.5 h-3.5 ${themeClasses.textAccent}`} />
+                    <span>Gerenciar Pastas</span>
+                  </button>
+                )}
 
                 <button
                   type="button"
@@ -604,7 +641,22 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
               )}
             </div>
 
-            {/* Folder Dropdown Selector */}
+            {/* Folder Dropdown Selector OR Sort Selector for Ancestry */}
+            {categoryKey === 'ancestry' ? (
+              <div className="relative min-w-[200px] sm:w-64">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="w-full bg-zinc-900/90 border border-zinc-800 focus:border-cyan-500 rounded-xl px-3 py-2 text-xs text-zinc-200 font-semibold outline-none transition-all cursor-pointer"
+                >
+                  <option value="alpha_asc">Alfabética (A-Z)</option>
+                  <option value="alpha_desc">Alfabética (Z-A)</option>
+                  <option value="type">Por Tipo (Ancestralidade / Herança)</option>
+                  <option value="newest">Mais Recente para Mais Antigo</option>
+                  <option value="oldest">Mais Antigo para Mais Recente</option>
+                </select>
+              </div>
+            ) : (
             <div className="relative min-w-[200px] sm:w-60">
               <button
                 type="button"
@@ -762,6 +814,7 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
                 </>
               )}
             </div>
+            )}
 
             {/* Tag Filter Badge (if selected) */}
             {selectedTagFilter && (
@@ -821,18 +874,20 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
               >
                 <List className="w-4 h-4" />
               </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('folders')}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                  viewMode === 'folders'
-                    ? 'bg-zinc-800 text-cyan-300 shadow-sm'
-                    : 'text-zinc-500 hover:text-zinc-300'
-                }`}
-                title="Visualização em Árvore de Pastas"
-              >
-                <FolderTree className="w-4 h-4" />
-              </button>
+              {categoryKey !== 'ancestry' && (
+                <button
+                  type="button"
+                  onClick={() => setViewMode('folders')}
+                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                    viewMode === 'folders'
+                      ? 'bg-zinc-800 text-cyan-300 shadow-sm'
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                  title="Visualização em Árvore de Pastas"
+                >
+                  <FolderTree className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -873,7 +928,7 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/60">
-                {filteredEntities.map((item) => {
+                {sortedEntities.map((item) => {
                   const itemFolders = getEntityFolders(item);
 
                   return (
@@ -1064,7 +1119,7 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
       ) : (
         /* STANDARD CARDS GRID VIEW */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 min-[1800px]:grid-cols-5 2xl:grid-cols-5 gap-3 sm:gap-3.5 items-stretch">
-          {filteredEntities.map((item) => {
+          {sortedEntities.map((item) => {
             if (item.category === 'ancestry') {
               return (
                 <AncestryCard
@@ -1092,18 +1147,20 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
       )}
 
       {/* 5. UNIVERSAL FOLDER MANAGER MODAL */}
-      <FolderManagerModal
-        isOpen={isFolderManagerOpen}
-        onClose={() => setIsFolderManagerOpen(false)}
-        scope={scope}
-        categories={modalCategoryOptions}
-        entities={entities}
-        themeColor={themeClasses.accent as any}
-        onRefresh={() => {
-          refreshConfig();
-          setEntities(HecosStorage.getEntities());
-        }}
-      />
+      {isFolderManagerOpen && (
+        <FolderManagerModal
+          isOpen={isFolderManagerOpen}
+          onClose={() => setIsFolderManagerOpen(false)}
+          scope={scope}
+          categories={modalCategoryOptions}
+          entities={entities}
+          themeColor={themeClasses.accent as any}
+          onRefresh={() => {
+            refreshConfig();
+            setEntities(HecosStorage.getEntities());
+          }}
+        />
+      )}
     </div>
   );
 };

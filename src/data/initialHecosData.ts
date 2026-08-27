@@ -188,17 +188,17 @@ Consulte as regras de ação em @regras-combate-pf2e e os venenos em @flora-liri
     id: 'feitico-onda-penumbra',
     slug: 'onda-de-penumbra-ciana',
     title: 'Onda de Penumbra Ciana',
-    subtitle: 'Feitiço 2 • Oculto / Primal • Manipulação e Luz Fria',
+    subtitle: 'Feitiço 2 • Etérea / Biológica • Manipulação e Luz Fria',
     category: 'spell',
     subcategory: 'Feitiços',
-    tags: ['Feitiço', 'Rank 2', 'Oculto', 'Primal', 'Ciano', 'Controle'],
+    tags: ['Feitiço', 'Rank 2', 'Etérea', 'Biológica', 'Ciano', 'Controle'],
     summary: 'Uma maré de partículas azuis-cianadas e malva que arrasta inimigos e cega temporariamente os que olham diretamente.',
     icon: 'Sparkles',
     createdAt: '2026-08-12T14:00:00Z',
     updatedAt: '2026-08-15T15:00:00Z',
     content: `# Onda de Penumbra Ciana (Feitiço 2)
 
-**Tradições:** Oculta, Primal  
+**Tradições:** Etérea, Biológica  
 **Conjuração:** 2 ações (Gesticular, Verbalizar)  
 **Alcance:** Cone de 30 pés  
 **Teste de Resistência:** Reflexos básico e Fortitude contra Ofuscação  
@@ -215,7 +215,7 @@ Você estende as mãos invocando a luz fria do subsolo de @local-lago-carmim. Um
 `,
     spellData: {
       rank: 2,
-      traditions: ['Oculta', 'Primal'],
+      traditions: ['Etérea', 'Biológica'],
       castTime: '2 ações',
       range: 'Cone de 30 pés',
       savingThrow: 'Reflexos Básico / Fortitude',

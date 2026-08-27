@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   HecosEntity,
   PF2eItemAttributes,
   ItemCategoryType,
   ItemVisibility,
 } from '../types';
-import { getEmptyItemData, serializeItemToHTML } from '../utils/itemSerializer';
+import { getEmptyItemData, serializeItemToHTML, parseItemFromContent } from '../utils/itemSerializer';
 import { HecosStorage } from '../services/storage';
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
@@ -46,6 +46,8 @@ interface ItemCreateModalProps {
   presetCategory?: ItemCategoryType;
   initialSubcategory?: string;
   presetSubcategory?: string;
+  entityToEdit?: HecosEntity | null;
+  itemToEdit?: HecosEntity | null;
   onClose: () => void;
   onSaveItem?: (newEntity: HecosEntity) => void;
   onSave?: (newEntity: HecosEntity) => void;
@@ -210,10 +212,15 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
   presetCategory,
   initialSubcategory,
   presetSubcategory,
+  entityToEdit,
+  itemToEdit,
   onClose,
   onSaveItem,
   onSave,
 }) => {
+  const targetEditEntity = entityToEdit || itemToEdit;
+  const isEditing = Boolean(targetEditEntity);
+
   const effectiveCategory = presetCategory || initialCategory;
   const effectiveSubcategory = presetSubcategory || initialSubcategory;
 
@@ -245,6 +252,43 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
 
   // Traits management
   const [traitInput, setTraitInput] = useState('');
+
+  // Reset or Populate fields on Open / entityToEdit change
+  React.useEffect(() => {
+    if (!isOpen) return;
+
+    if (targetEditEntity) {
+      const parsedData = parseItemFromContent(
+        targetEditEntity.content || '',
+        targetEditEntity.itemData
+      );
+      setTitle(targetEditEntity.title || '');
+      setSummary(targetEditEntity.summary || '');
+      setItemData(parsedData);
+      setSelectedSubcategories(
+        targetEditEntity.subcategories && targetEditEntity.subcategories.length > 0
+          ? targetEditEntity.subcategories
+          : parsedData.subcategories || []
+      );
+      const perm = HecosStorage.getEntityPermission(targetEditEntity.id);
+      setVisibility((perm.visibility as ItemVisibility) || targetEditEntity.visibility || 'all');
+      setAllowedUserIds(perm.allowedUserIds || targetEditEntity.allowedUserIds || []);
+    } else {
+      const empty = getEmptyItemData();
+      if (effectiveCategory && effectiveCategory !== 'all') {
+        empty.itemType = effectiveCategory;
+      }
+      if (effectiveSubcategory) {
+        empty.subcategories = [effectiveSubcategory];
+      }
+      setTitle('');
+      setSummary('');
+      setItemData(empty);
+      setSelectedSubcategories(effectiveSubcategory ? [effectiveSubcategory] : []);
+      setVisibility('all');
+      setAllowedUserIds([]);
+    }
+  }, [isOpen, targetEditEntity, effectiveCategory, effectiveSubcategory]);
 
   // Available item folders from storage
   const itemConfig = useMemo(() => HecosStorage.getAllItemSubcategoriesConfig(), []);
@@ -313,28 +357,50 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
       .replace(/[\s_-]+/g, '-')
       .replace(/^-+|-+$/g, '');
 
-    const newEntity: HecosEntity = {
-      id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      slug: slug || `item-${Date.now()}`,
-      title: title.trim(),
-      category: 'item',
-      subcategory: selectedSubcategories[0] || 'Geral',
-      subcategories: selectedSubcategories,
-      tags: [...finalItemData.traits, finalItemData.rarity || 'Comum', `Nível ${finalItemData.level}`],
-      summary: summary.trim() || `${finalItemData.rarity || 'Comum'} Item ${finalItemData.level}`,
-      content: htmlContent,
-      itemData: finalItemData,
-      visibility,
-      allowedUserIds: visibility === 'custom' ? allowedUserIds : undefined,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    let savedEntity: HecosEntity;
 
-    HecosStorage.saveEntity(newEntity);
+    if (targetEditEntity) {
+      savedEntity = {
+        ...targetEditEntity,
+        title: title.trim(),
+        slug: targetEditEntity.slug || slug || `item-${Date.now()}`,
+        category: 'item',
+        subcategory: (selectedSubcategories && selectedSubcategories[0]) || 'Geral',
+        subcategories: selectedSubcategories || [],
+        tags: [...finalItemData.traits, finalItemData.rarity || 'Comum', `Nível ${finalItemData.level}`],
+        summary: summary.trim() || `${finalItemData.rarity || 'Comum'} Item ${finalItemData.level}`,
+        content: htmlContent,
+        itemData: finalItemData,
+        visibility,
+        allowedUserIds: visibility === 'custom' ? allowedUserIds : undefined,
+        updatedAt: new Date().toISOString(),
+      };
+    } else {
+      savedEntity = {
+        id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        slug: slug || `item-${Date.now()}`,
+        title: title.trim(),
+        category: 'item',
+        subcategory: (selectedSubcategories && selectedSubcategories[0]) || 'Geral',
+        subcategories: selectedSubcategories,
+        tags: [...finalItemData.traits, finalItemData.rarity || 'Comum', `Nível ${finalItemData.level}`],
+        summary: summary.trim() || `${finalItemData.rarity || 'Comum'} Item ${finalItemData.level}`,
+        content: htmlContent,
+        itemData: finalItemData,
+        visibility,
+        allowedUserIds: visibility === 'custom' ? allowedUserIds : undefined,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    HecosStorage.saveEntity(savedEntity);
+    HecosStorage.setEntityPermission(savedEntity.id, visibility, allowedUserIds);
+
     if (onSave) {
-      onSave(newEntity);
+      onSave(savedEntity);
     } else if (onSaveItem) {
-      onSaveItem(newEntity);
+      onSaveItem(savedEntity);
     }
     onClose();
   };
@@ -350,13 +416,15 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
             </div>
             <div>
               <h2 className="text-lg font-black text-zinc-100 flex items-center gap-2">
-                <span>Criar Novo Item & Equipamento PF2e</span>
+                <span>{isEditing ? `Editar Item: ${targetEditEntity?.title}` : 'Criar Novo Item & Equipamento PF2e'}</span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-950/80 text-amber-300 border border-amber-700/60 font-mono uppercase">
                   Arsenal de Hecos
                 </span>
               </h2>
               <p className="text-xs text-zinc-400">
-                Configure estatísticas de combate, bônus de armadura, custos de ativação, fórmulas de manufatura e segredos.
+                {isEditing
+                  ? 'Modifique estatísticas de combate, bônus de armadura, custos de ativação e lore deste item.'
+                  : 'Configure estatísticas de combate, bônus de armadura, custos de ativação, fórmulas de manufatura e segredos.'}
               </p>
             </div>
           </div>

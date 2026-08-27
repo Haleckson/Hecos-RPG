@@ -25,8 +25,8 @@ interface MusicJukeboxProps {
 }
 
 export const MusicJukebox: React.FC<MusicJukeboxProps> = ({ isOpen, onClose }) => {
-  const [tracks, setTracks] = useState<YouTubeAmbianceTrack[]>(HecosStorage.getTracks());
-  const [activeTrack, setActiveTrack] = useState<YouTubeAmbianceTrack | null>(tracks[0] || null);
+  const [tracks, setTracks] = useState<YouTubeAmbianceTrack[]>(() => HecosStorage.getTracks() || []);
+  const [activeTrack, setActiveTrack] = useState<YouTubeAmbianceTrack | null>(() => (tracks && tracks.length > 0 ? tracks[0] : null));
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [trackToDelete, setTrackToDelete] = useState<YouTubeAmbianceTrack | null>(null);
@@ -46,10 +46,10 @@ export const MusicJukebox: React.FC<MusicJukeboxProps> = ({ isOpen, onClose }) =
     if (!trackToDelete) return;
     const track = trackToDelete;
     HecosStorage.deleteTrack(track.id);
-    const updated = tracks.filter((t) => t.id !== track.id);
+    const updated = (tracks || []).filter((t) => t.id !== track.id);
     setTracks(updated);
     if (activeTrack?.id === track.id) {
-      setActiveTrack(updated[0] || null);
+      setActiveTrack(updated && updated.length > 0 ? updated[0] : null);
       if (updated.length === 0) setIsPlaying(false);
     }
     setTrackToDelete(null);

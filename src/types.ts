@@ -31,11 +31,15 @@ export interface PF2eAction {
 }
 
 export type SpellTradition =
+  | 'Cinética'
+  | 'Etérea'
+  | 'Biológica'
+  | 'Abiótica'
+  | 'Omni'
   | 'E. Física'
   | 'E. Meta'
   | 'M. Orgânica'
   | 'M. Inorgânica'
-  | 'Omni'
   | 'arcano'
   | 'divino'
   | 'oculto'
@@ -46,11 +50,15 @@ export type SpellTraditionType = SpellTradition;
 
 export type SpellCategoryType =
   | 'all'
+  | 'cinetica'
+  | 'eterea'
+  | 'biologica'
+  | 'abiotica'
+  | 'omni'
   | 'e_fisica'
   | 'e_meta'
   | 'm_organica'
   | 'm_inorganica'
-  | 'omni'
   | 'arcane'
   | 'divine'
   | 'occult'
@@ -286,6 +294,8 @@ export interface PF2eFeatAttributes {
   frequency?: string;
   trigger?: string;
   requirements?: string;
+  cost?: string;
+  access?: string;
   description: string;
   criticalSuccess?: string;
   success?: string;
@@ -322,6 +332,7 @@ export interface AncestryAttributes {
   album?: AncestryAlbumImage[];
 
   // Cabeçalho
+  rarity?: string;
   hp: string;
   size: string;
   speed: string;

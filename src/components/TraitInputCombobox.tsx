@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { HecosStorage } from '../services/storage';
 import { TraitBadge } from './TraitBadge';
 import { Search, Plus, X, Award, Check, Sparkles } from 'lucide-react';
+import { CANONICAL_TRADITIONS, DEFAULT_TRAIT_DESCRIPTIONS, getTraitHierarchyTier, sortTraitsHierarchically } from '../utils/traitUtils';
 
 interface TraitInputComboboxProps {
   selectedTraits: string[];
@@ -46,7 +47,19 @@ export const TraitInputCombobox: React.FC<TraitInputComboboxProps> = ({
   const allKnownTraits = useMemo(() => {
     const map = new Map<string, { name: string; category?: string; color?: string; description?: string }>();
 
-    // 1. Custom traits from HecosStorage
+    // 1. Preload Canonical Traditions
+    CANONICAL_TRADITIONS.forEach((trad) => {
+      const low = trad.toLowerCase();
+      const def = DEFAULT_TRAIT_DESCRIPTIONS[low];
+      map.set(low, {
+        name: trad,
+        category: def?.category || 'Tradições de Hecos',
+        color: def?.color,
+        description: def?.description,
+      });
+    });
+
+    // 2. Custom traits from HecosStorage
     const custom = HecosStorage.getCustomTraits();
     Object.entries(custom).forEach(([key, val]) => {
       // Find proper casing or capitalise key
@@ -59,7 +72,7 @@ export const TraitInputCombobox: React.FC<TraitInputComboboxProps> = ({
       });
     });
 
-    // 2. Extract traits from all entities in storage to guarantee complete list
+    // 3. Extract traits from all entities in storage to guarantee complete list
     const entities = HecosStorage.getEntities();
     entities.forEach((ent) => {
       const checkAndAdd = (val: unknown) => {
@@ -90,13 +103,20 @@ export const TraitInputCombobox: React.FC<TraitInputComboboxProps> = ({
       checkAndAdd(ent.traits);
       checkAndAdd(ent.statblock?.traits);
       checkAndAdd(ent.spellData?.traits);
+      checkAndAdd(ent.spellData?.traditions);
       checkAndAdd(ent.featData?.traits);
       checkAndAdd(ent.itemData?.traits);
       checkAndAdd(ent.ancestryData?.traits);
       checkAndAdd(ent.perilData?.traits);
+      checkAndAdd(ent.classData?.traits);
     });
 
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    return Array.from(map.values()).sort((a, b) => {
+      const tierA = getTraitHierarchyTier(a.name);
+      const tierB = getTraitHierarchyTier(b.name);
+      if (tierA !== tierB) return tierA - tierB;
+      return a.name.localeCompare(b.name, 'pt-BR');
+    });
   }, []);
 
   // Filtered traits based on query
@@ -171,7 +191,7 @@ export const TraitInputCombobox: React.FC<TraitInputComboboxProps> = ({
             Nenhum traço selecionado. Digite ou busque na lista abaixo.
           </span>
         ) : (
-          selectedTraits.map((trait) => (
+          sortTraitsHierarchically(selectedTraits).map((trait) => (
             <div
               key={trait}
               className="inline-flex items-center gap-1 pl-1 pr-1.5 py-0.5 rounded-lg bg-zinc-900 border border-zinc-700/80 text-zinc-200 shadow-sm"
@@ -207,7 +227,7 @@ export const TraitInputCombobox: React.FC<TraitInputComboboxProps> = ({
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
-                  if (filteredTraits.length > 0 && query.trim()) {
+                  if (filteredTraits && filteredTraits.length > 0 && query.trim() && filteredTraits[0]) {
                     handleSelectTrait(filteredTraits[0].name);
                   } else if (allowCreate && query.trim() && !exactMatchExists) {
                     handleCreateAndSelect();

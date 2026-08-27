@@ -17,13 +17,23 @@ export const TagModal: React.FC<TagModalProps> = ({
   onSuccess,
 }) => {
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('Campanha e Narrativa');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (tagName) {
-      setName(tagName);
+      const clean = tagName.replace(/^#/, '').trim();
+      setName(clean);
+      const customTags = HecosStorage.getCustomTags();
+      const norm = clean.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const existing = customTags[norm] || customTags[clean.toLowerCase()];
+      setDescription(existing?.description || '');
+      setCategory(existing?.category || 'Campanha e Narrativa');
     } else {
       setName('');
+      setDescription('');
+      setCategory('Campanha e Narrativa');
     }
     setShowDeleteConfirm(false);
   }, [tagName, isOpen]);
@@ -34,16 +44,27 @@ export const TagModal: React.FC<TagModalProps> = ({
     e.preventDefault();
     if (!name.trim()) return;
 
-    if (tagName.toLowerCase() !== name.trim().toLowerCase()) {
-      HecosStorage.renameTagGlobally(tagName, name.trim());
+    const cleanNew = name.trim().replace(/^#/, '');
+    const cleanOld = tagName.trim().replace(/^#/, '');
+
+    if (cleanOld.toLowerCase() !== cleanNew.toLowerCase()) {
+      HecosStorage.renameTagGlobally(cleanOld, cleanNew);
+      HecosStorage.deleteCustomTag(cleanOld);
     }
+
+    HecosStorage.saveCustomTag(cleanNew, {
+      description: description.trim(),
+      category: category.trim(),
+    });
 
     onSuccess?.();
     onClose();
   };
 
   const handleDelete = () => {
-    HecosStorage.deleteTagGlobally(tagName);
+    const cleanOld = tagName.trim().replace(/^#/, '');
+    HecosStorage.deleteTagGlobally(cleanOld);
+    HecosStorage.deleteCustomTag(cleanOld);
     onSuccess?.();
     onClose();
   };
@@ -128,6 +149,32 @@ export const TagModal: React.FC<TagModalProps> = ({
                     className="w-full pl-7 pr-3.5 py-2 rounded-xl bg-black/60 border border-zinc-700 focus:border-cyan-400 text-sm text-cyan-200 font-semibold outline-none"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-300 mb-1">
+                  Categoria / Grupo da Tag
+                </label>
+                <input
+                  type="text"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  placeholder="Ex: Campanha, Factions, Locais, NPCs..."
+                  className="w-full px-3.5 py-2 rounded-xl bg-black/60 border border-zinc-700 focus:border-cyan-400 text-xs text-zinc-200 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-300 mb-1">
+                  Descrição ou Anotação da Tag
+                </label>
+                <textarea
+                  rows={3}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Contexto narrativo desta tag no mundo de Hecos..."
+                  className="w-full px-3.5 py-2 rounded-xl bg-black/60 border border-zinc-700 focus:border-cyan-400 text-xs text-zinc-200 leading-relaxed outline-none"
+                />
               </div>
 
               <div className="flex items-center justify-between pt-2 border-t border-zinc-800">

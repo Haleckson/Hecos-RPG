@@ -9,8 +9,11 @@ import { FeatView } from './FeatView';
 import { PerilView } from './PerilView';
 import { ClassView } from './ClassView';
 import { SpellView } from './SpellView';
+import { ItemView } from './ItemView';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { AdjustableImage } from './AdjustableImage';
+import { TraitBadge } from './TraitBadge';
+import { sortTraitsHierarchically } from '../utils/traitUtils';
 import {
   Edit3,
   Trash2,
@@ -30,7 +33,6 @@ import {
   Printer
 } from 'lucide-react';
 
-import { TraitBadge } from './TraitBadge';
 import { EntityIcon } from './EntityIcon';
 
 interface EntityViewProps {
@@ -116,6 +118,18 @@ export const EntityView: React.FC<EntityViewProps> = ({
   if (entity.category === 'spell' || entity.spellData) {
     return (
       <SpellView
+        entity={entity}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onNavigate={onNavigate}
+        onTagClick={onTagClick}
+      />
+    );
+  }
+
+  if (entity.category === 'item' || entity.itemData) {
+    return (
+      <ItemView
         entity={entity}
         onEdit={onEdit}
         onDelete={onDelete}
@@ -253,7 +267,10 @@ export const EntityView: React.FC<EntityViewProps> = ({
         <div className="flex flex-wrap items-center gap-1.5">
           {entity.traits && entity.traits.length > 0 && (
             <div className="flex flex-wrap items-center gap-1 mr-2">
-              {entity.traits.map((tr) => (
+              {sortTraitsHierarchically(entity.traits, {
+                rarity: entity.statblock?.rarity,
+                size: entity.statblock?.size,
+              }).map((tr) => (
                 <TraitBadge key={tr} trait={tr} />
               ))}
             </div>

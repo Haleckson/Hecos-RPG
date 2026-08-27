@@ -231,7 +231,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                             : 'bg-cyan-950/60 text-cyan-300 border-cyan-500/50'
                         }`}
                       >
-                        {user.name ? user.name[0].toUpperCase() : 'U'}
+                        {user?.name && user.name[0] ? user.name[0].toUpperCase() : 'U'}
                       </div>
                       <div>
                         <div className="font-bold text-sm text-zinc-100 flex items-center gap-2">

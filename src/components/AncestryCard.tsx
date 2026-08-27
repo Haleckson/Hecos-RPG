@@ -6,6 +6,7 @@ import { AdjustableImage } from './AdjustableImage';
 import { TraitBadge } from './TraitBadge';
 import { HecosStorage } from '../services/storage';
 import { getCardVisibilityClasses } from '../utils/cardVisibility';
+import { sortTraitsHierarchically } from '../utils/traitUtils';
 import {
   Heart,
   Maximize2,
@@ -279,7 +280,10 @@ export const AncestryCard: React.FC<AncestryCardProps> = ({
         <div className="pt-2.5 border-t border-zinc-800/60 flex flex-col gap-1.5">
           {/* Traços com TraitBadge */}
           <div className="flex items-center gap-1 flex-wrap">
-            {traits.map((trait, idx) => (
+            {sortTraitsHierarchically(traits, {
+              rarity: data.rarity || 'Comum',
+              size: data.size || size || 'Médio',
+            }).map((trait, idx) => (
               <TraitBadge key={`${trait}-${idx}`} trait={trait} />
             ))}
           </div>

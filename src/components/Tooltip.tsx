@@ -47,6 +47,9 @@ export const Tooltip: React.FC<TooltipProps> = ({
     const triggerRect = triggerRef.current.getBoundingClientRect();
     const tooltipEl = tooltipRef.current;
 
+    const viewportW = window.innerWidth;
+    const viewportH = window.innerHeight;
+
     // Measured exact size with fallback
     const tooltipWidth = tooltipEl ? tooltipEl.offsetWidth : 360;
     const tooltipHeight = tooltipEl ? tooltipEl.offsetHeight : 160;
@@ -72,23 +75,32 @@ export const Tooltip: React.FC<TooltipProps> = ({
       rawTop = triggerRect.top + (triggerRect.height - tooltipHeight) / 2;
     }
 
-    // Flip vertically if overflowing viewport
+    // Flip vertically if overflowing viewport and there's more room on opposite side
     if (side === 'top' && rawTop < 12) {
-      rawTop = triggerRect.bottom + 8;
-    } else if (side === 'bottom' && rawTop + tooltipHeight > window.innerHeight - 12) {
-      rawTop = triggerRect.top - tooltipHeight - 8;
+      const spaceBelow = viewportH - triggerRect.bottom - 12;
+      const spaceAbove = triggerRect.top - 12;
+      if (spaceBelow > spaceAbove) {
+        rawTop = triggerRect.bottom + 8;
+      }
+    } else if (side === 'bottom' && rawTop + tooltipHeight > viewportH - 12) {
+      const spaceAbove = triggerRect.top - 12;
+      const spaceBelow = viewportH - triggerRect.bottom - 12;
+      if (spaceAbove > spaceBelow) {
+        rawTop = triggerRect.top - tooltipHeight - 8;
+      }
     }
 
     // Flip horizontally if overflowing viewport
     if (side === 'left' && rawLeft < 12) {
       rawLeft = triggerRect.right + 8;
-    } else if (side === 'right' && rawLeft + tooltipWidth > window.innerWidth - 12) {
+    } else if (side === 'right' && rawLeft + tooltipWidth > viewportW - 12) {
       rawLeft = triggerRect.left - tooltipWidth - 8;
     }
 
-    // Strict pixel-bound clamping within screen
-    const clampedLeft = Math.max(12, Math.min(window.innerWidth - tooltipWidth - 12, rawLeft));
-    const clampedTop = Math.max(12, Math.min(window.innerHeight - tooltipHeight - 12, rawTop));
+    // Strict pixel-bound clamping within screen, respecting maximum viewport boundaries
+    const maxAllowedTop = Math.max(12, viewportH - tooltipHeight - 12);
+    const clampedLeft = Math.max(12, Math.min(viewportW - tooltipWidth - 12, rawLeft));
+    const clampedTop = Math.max(12, Math.min(maxAllowedTop, rawTop));
 
     // Force strictly integer coordinates to avoid subpixel text anti-aliasing blur
     setCoords({
@@ -141,6 +153,10 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const tooltipElement = isVisible && coords && (
     <div
       ref={tooltipRef}
+      onMouseEnter={() => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+      }}
+      onMouseLeave={hideTooltip}
       style={{
         position: 'fixed',
         top: `${coords.top}px`,
@@ -152,11 +168,13 @@ export const Tooltip: React.FC<TooltipProps> = ({
         transform: 'translate3d(0, 0, 0)',
         backfaceVisibility: 'hidden',
         willChange: 'transform, opacity',
+        maxHeight: 'calc(100vh - 24px)',
+        maxWidth: 'calc(100vw - 24px)',
       }}
-      className={`pointer-events-none transition-opacity duration-150 ease-out text-left ${
+      className={`pointer-events-auto overflow-y-auto overscroll-contain custom-scrollbar transition-opacity duration-150 ease-out text-left ${
         isCustomContentOnly
-          ? 'w-auto max-w-[calc(100vw-24px)]'
-          : 'max-w-xs sm:max-w-sm rounded-xl p-3.5 bg-[#0d0a17] border border-zinc-700/90 shadow-[0_16px_40px_rgba(0,0,0,0.95)] ring-1 ring-white/10'
+          ? 'w-auto'
+          : 'max-w-xs sm:max-w-md rounded-xl p-3.5 bg-[#0d0a17] border border-zinc-700/90 shadow-[0_16px_40px_rgba(0,0,0,0.95)] ring-1 ring-white/10'
       }`}
     >
       {/* Header with Title and English/Badge */}

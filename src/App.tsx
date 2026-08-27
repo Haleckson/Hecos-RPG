@@ -34,6 +34,9 @@ import { PerilCreateModal } from './components/PerilCreateModal';
 import { ClassCreateModal } from './components/ClassCreateModal';
 import { TraitDrawer } from './components/TraitDrawer';
 import { TagDrawer } from './components/TagDrawer';
+import { EntityDrawer } from './components/EntityDrawer';
+import { FeatDrawer } from './components/FeatDrawer';
+import { ItemDrawer } from './components/ItemDrawer';
 import { FeatCategoryType, SpellCategoryType, ItemCategoryType } from './types';
 import { HomePage } from './components/HomePage';
 import { setupGlobalTextFormattingShortcuts } from './utils/keyboardShortcuts';
@@ -187,6 +190,7 @@ export function App() {
   const [spellModalPresetSubcategory, setSpellModalPresetSubcategory] = useState<string | undefined>(undefined);
 
   const [isItemCreateModalOpen, setIsItemCreateModalOpen] = useState(false);
+  const [editingItemEntity, setEditingItemEntity] = useState<HecosEntity | null>(null);
   const [itemModalPresetCategory, setItemModalPresetCategory] = useState<ItemCategoryType | undefined>(undefined);
   const [itemModalPresetSubcategory, setItemModalPresetSubcategory] = useState<string | undefined>(undefined);
 
@@ -201,6 +205,18 @@ export function App() {
   // Tag Drawer state
   const [selectedDrawerTag, setSelectedDrawerTag] = useState<string | null>(null);
   const [isTagDrawerOpen, setIsTagDrawerOpen] = useState(false);
+
+  // Feat Drawer state (for direct feat drawer viewing)
+  const [selectedDrawerFeatId, setSelectedDrawerFeatId] = useState<string | null>(null);
+  const [isFeatDrawerOpen, setIsFeatDrawerOpen] = useState(false);
+
+  // Item Drawer state (for direct item drawer viewing)
+  const [selectedDrawerItemId, setSelectedDrawerItemId] = useState<string | null>(null);
+  const [isItemDrawerOpen, setIsItemDrawerOpen] = useState(false);
+
+  // Entity Drawer state (for all @mentions and entity shortcut links)
+  const [selectedDrawerEntityId, setSelectedDrawerEntityId] = useState<string | null>(null);
+  const [isEntityDrawerOpen, setIsEntityDrawerOpen] = useState(false);
 
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
@@ -252,6 +268,48 @@ export function App() {
     };
     window.addEventListener('hecos:open-tag-drawer', handleOpenTagDrawer);
     return () => window.removeEventListener('hecos:open-tag-drawer', handleOpenTagDrawer);
+  }, []);
+
+  // Feat Drawer Event Listener (hecos:open-feat-drawer)
+  useEffect(() => {
+    const handleOpenFeatDrawer = (e: Event) => {
+      const customEvent = e as CustomEvent<{ featId?: string; id?: string }>;
+      const targetId = customEvent.detail?.featId || customEvent.detail?.id;
+      if (targetId) {
+        setSelectedDrawerFeatId(targetId);
+        setIsFeatDrawerOpen(true);
+      }
+    };
+    window.addEventListener('hecos:open-feat-drawer', handleOpenFeatDrawer);
+    return () => window.removeEventListener('hecos:open-feat-drawer', handleOpenFeatDrawer);
+  }, []);
+
+  // Item Drawer Event Listener (hecos:open-item-drawer)
+  useEffect(() => {
+    const handleOpenItemDrawer = (e: Event) => {
+      const customEvent = e as CustomEvent<{ itemId?: string; id?: string }>;
+      const targetId = customEvent.detail?.itemId || customEvent.detail?.id;
+      if (targetId) {
+        setSelectedDrawerItemId(targetId);
+        setIsItemDrawerOpen(true);
+      }
+    };
+    window.addEventListener('hecos:open-item-drawer', handleOpenItemDrawer);
+    return () => window.removeEventListener('hecos:open-item-drawer', handleOpenItemDrawer);
+  }, []);
+
+  // Entity Drawer Event Listener (hecos:open-entity-drawer)
+  useEffect(() => {
+    const handleOpenEntityDrawer = (e: Event) => {
+      const customEvent = e as CustomEvent<{ entityId?: string; slug?: string; id?: string }>;
+      const targetId = customEvent.detail?.entityId || customEvent.detail?.slug || customEvent.detail?.id;
+      if (targetId) {
+        setSelectedDrawerEntityId(targetId);
+        setIsEntityDrawerOpen(true);
+      }
+    };
+    window.addEventListener('hecos:open-entity-drawer', handleOpenEntityDrawer);
+    return () => window.removeEventListener('hecos:open-entity-drawer', handleOpenEntityDrawer);
   }, []);
 
   // Real-time subscriptions and Initial load
@@ -456,6 +514,7 @@ export function App() {
   };
 
   const handleCreateItemDirectly = (presetCategory?: ItemCategoryType, presetSubcategory?: string) => {
+    setEditingItemEntity(null);
     setItemModalPresetCategory(presetCategory);
     setItemModalPresetSubcategory(presetSubcategory);
     setIsItemCreateModalOpen(true);
@@ -504,6 +563,22 @@ export function App() {
     setEditingEntity(null);
     setSyncStatus('synced');
     setTimeout(() => setSyncStatus('idle'), 3000);
+  };
+
+  const handleEditEntity = (id: string) => {
+    const ent = entities.find((e) => e.id === id || e.slug === id) || HecosStorage.getEntityById(id);
+    if (!ent) return;
+    if (ent.category === 'spell' || ent.spellData) {
+      setEditingSpellEntity(ent);
+      setIsSpellCreateModalOpen(true);
+    } else if (ent.category === 'item' || ent.itemData) {
+      setEditingItemEntity(ent);
+      setIsItemCreateModalOpen(true);
+    } else {
+      setSelectedEntityId(ent.id);
+      setEditingEntity(ent);
+      setActiveView('edit');
+    }
   };
 
   const handleDeleteEntity = (id: string) => {
@@ -1731,16 +1806,27 @@ export function App() {
         }}
       />
 
-      {/* Robust PF2e Item Creation Modal */}
+      {/* Robust PF2e Item Creation & Editing Modal */}
       <ItemCreateModal
         isOpen={isItemCreateModalOpen}
-        onClose={() => setIsItemCreateModalOpen(false)}
+        onClose={() => {
+          setIsItemCreateModalOpen(false);
+          setEditingItemEntity(null);
+        }}
+        entityToEdit={editingItemEntity || undefined}
         presetCategory={itemModalPresetCategory}
         presetSubcategory={itemModalPresetSubcategory}
         onSave={(newItemEntity) => {
           refreshEntities();
-          handleNavigateEntity(newItemEntity.id);
+          if (activeView === 'entities') {
+            window.dispatchEvent(
+              new CustomEvent('hecos:open-item-drawer', { detail: { itemId: newItemEntity.id } })
+            );
+          } else {
+            handleNavigateEntity(newItemEntity.id);
+          }
           setIsItemCreateModalOpen(false);
+          setEditingItemEntity(null);
         }}
       />
 
@@ -1809,6 +1895,80 @@ export function App() {
         onNavigate={handleNavigateEntity}
         isGmMode={isGmMode}
         onTagUpdated={refreshEntities}
+      />
+
+      {/* Hecos Codex Full Entity Article Drawer */}
+      <EntityDrawer
+        entityId={selectedDrawerEntityId}
+        isOpen={isEntityDrawerOpen}
+        onClose={() => setIsEntityDrawerOpen(false)}
+        onNavigateToPage={(id) => {
+          setIsEntityDrawerOpen(false);
+          handleNavigateEntity(id);
+        }}
+        onEditEntity={(id) => {
+          setIsEntityDrawerOpen(false);
+          handleEditEntity(id);
+        }}
+        isGmMode={isGmMode}
+      />
+
+      {/* Hecos PF2e Feat Drawer */}
+      <FeatDrawer
+        featId={selectedDrawerFeatId}
+        entities={entities}
+        isOpen={isFeatDrawerOpen}
+        onClose={() => {
+          setIsFeatDrawerOpen(false);
+          setSelectedDrawerFeatId(null);
+        }}
+        onNavigateFullPage={(id) => {
+          setIsFeatDrawerOpen(false);
+          setSelectedDrawerFeatId(null);
+          handleNavigateEntity(id);
+        }}
+        onEditFeat={(feat) => {
+          setIsFeatDrawerOpen(false);
+          handleEditEntity(feat.id);
+        }}
+        onDeleteFeat={(id) => {
+          setIsFeatDrawerOpen(false);
+          handleDeleteEntity(id);
+        }}
+        onTagClick={(tag) => {
+          setSelectedDrawerTag(tag);
+          setIsTagDrawerOpen(true);
+        }}
+        isGmMode={isGmMode}
+      />
+
+      {/* Hecos PF2e Item Drawer */}
+      <ItemDrawer
+        itemId={selectedDrawerItemId}
+        entities={entities}
+        isOpen={isItemDrawerOpen}
+        onClose={() => {
+          setIsItemDrawerOpen(false);
+          setSelectedDrawerItemId(null);
+        }}
+        onNavigateFullPage={(id) => {
+          setIsItemDrawerOpen(false);
+          setSelectedDrawerItemId(null);
+          handleNavigateEntity(id);
+        }}
+        onEditItem={(item) => {
+          setIsItemDrawerOpen(false);
+          handleEditEntity(item.id);
+        }}
+        onDeleteItem={(id) => {
+          setIsItemDrawerOpen(false);
+          handleDeleteEntity(id);
+        }}
+        onTagClick={(tag) => {
+          setSelectedDrawerTag(tag);
+          setIsTagDrawerOpen(true);
+        }}
+        isGmMode={isGmMode}
       />
 
       {/* Global Tooltip that overlays all windows with highest z-index */}

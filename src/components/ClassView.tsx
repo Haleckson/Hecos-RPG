@@ -4,6 +4,7 @@ import { HecosStorage } from '../services/storage';
 import { RichContentRenderer } from './RichContentRenderer';
 import { AdjustableImage } from './AdjustableImage';
 import { TraitBadge } from './TraitBadge';
+import { sortTraitsHierarchically } from '../utils/traitUtils';
 import {
   Swords,
   Layers,
@@ -62,15 +63,21 @@ export const ClassView: React.FC<ClassViewProps> = ({
 
         <div className="p-6 space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="px-3 py-1 rounded-xl bg-purple-950 text-purple-300 border border-purple-800 font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
                 {isClass ? <Swords className="w-3.5 h-3.5 text-purple-400" /> : <Layers className="w-3.5 h-3.5 text-cyan-400" />}
                 {isClass ? 'Classe de Personagem' : 'Vocação (Arquétipo)'}
               </span>
 
-              {classData?.rarity && (
-                <TraitBadge trait={classData.rarity} />
-              )}
+              {sortTraitsHierarchically(
+                [
+                  ...(classData?.traits || []),
+                  ...(entity.traits || []),
+                ],
+                { rarity: classData?.rarity || 'Comum' }
+              ).map((trait) => (
+                <TraitBadge key={trait} trait={trait} />
+              ))}
             </div>
 
             {onEdit && isActualGm && (

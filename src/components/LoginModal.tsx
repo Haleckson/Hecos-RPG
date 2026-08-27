@@ -109,7 +109,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                       ? 'bg-amber-950/80 text-amber-300 border-amber-500/50'
                       : 'bg-cyan-950/80 text-cyan-300 border-cyan-500/50'
                   }`}>
-                    {currentUser.name ? currentUser.name[0].toUpperCase() : 'U'}
+                    {currentUser?.name && currentUser.name[0] ? currentUser.name[0].toUpperCase() : 'U'}
                   </div>
                   <div>
                     <div className="font-bold text-sm text-zinc-100 flex items-center gap-2">

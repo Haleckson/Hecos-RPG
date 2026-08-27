@@ -179,7 +179,7 @@ export const DiceRollerModal: React.FC<DiceRollerModalProps> = ({ isOpen, onClos
                     <p className="text-xs text-zinc-500 text-center py-4">Clique nos dados acima para rolar.</p>
                   ) : (
                     logs.map((log) => {
-                      const degree = log.dice.length === 1 && log.expression.startsWith('1d20')
+                      const degree = log.dice && log.dice.length === 1 && log.expression.startsWith('1d20')
                         ? getDegreeOfSuccess(log.total, log.dice[0])
                         : null;
 
@@ -190,7 +190,7 @@ export const DiceRollerModal: React.FC<DiceRollerModalProps> = ({ isOpen, onClos
                         >
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-zinc-400">{log.expression}</span>
-                            <span className="text-[11px] text-zinc-500">[{log.dice.join(', ')}]</span>
+                            <span className="text-[11px] text-zinc-500">[{(log.dice || []).join(', ')}]</span>
                           </div>
 
                           <div className="flex items-center gap-2">

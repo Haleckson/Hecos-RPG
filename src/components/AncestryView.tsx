@@ -12,6 +12,7 @@ import { TraitBadge } from './TraitBadge';
 import { ImageUploadInput } from './ImageUploadInput';
 import { MultiImageAlbumUploader } from './MultiImageAlbumUploader';
 import { FeatCard } from './FeatCard';
+import { sortTraitsHierarchically } from '../utils/traitUtils';
 import {
   Swords,
   Dna,
@@ -568,7 +569,15 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                     Traços de Ancestralidade
                   </span>
                   <div className="flex flex-wrap gap-1.5">
-                    {(Array.isArray(data.traits) ? data.traits : (typeof data.traits === 'string' ? data.traits.split(',') : ['Humanoide'])).map((t, idx) => (
+                    {sortTraitsHierarchically(
+                      Array.isArray(data.traits)
+                        ? data.traits
+                        : (typeof data.traits === 'string' ? data.traits.split(',') : ['Humanoide']),
+                      {
+                        rarity: data.rarity || 'Comum',
+                        size: data.size || 'Médio',
+                      }
+                    ).map((t, idx) => (
                       <TraitBadge
                         key={idx}
                         trait={typeof t === 'string' ? t.trim() : String(t)}
@@ -792,7 +801,14 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                               description={feat.description}
                               visibility={feat.visibility}
                               allowedUserIds={feat.allowedUserIds}
-                              onSelectEntity={onNavigate}
+                              onSelectEntity={(targetId) => {
+                                const idToOpen = targetId || feat.featEntityId || feat.id || feat.name;
+                                window.dispatchEvent(
+                                  new CustomEvent('hecos:open-feat-drawer', {
+                                    detail: { featId: idToOpen, id: idToOpen }
+                                  })
+                                );
+                              }}
                               isGmMode={isActualGm}
                             />
                           );

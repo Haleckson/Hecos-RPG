@@ -264,9 +264,9 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
       skills: skills
         ? skills.split(',').reduce((acc, curr) => {
             const parts = curr.split('+');
-            if (parts.length === 2) {
-              acc[parts[0].trim()] = parseInt(parts[1].trim(), 10);
-            } else {
+            if (parts && parts.length === 2 && parts[0] && parts[1]) {
+              acc[parts[0].trim()] = parseInt(parts[1].trim(), 10) || 0;
+            } else if (curr) {
               acc[curr.trim()] = 0;
             }
             return acc;

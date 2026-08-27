@@ -7,6 +7,7 @@ import {
   ItemVisibility,
 } from '../types';
 import { serializeSpellToHTML, parseSpellFromContent } from '../utils/spellSerializer';
+import { getCanonicalTradition, isTraditionTrait } from '../utils/spellMigration';
 import { HecosStorage } from '../services/storage';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
@@ -51,9 +52,9 @@ interface SpellCreateModalProps {
 
 export const HECOS_SPELL_TRADITIONS = [
   {
-    id: 'E. Física',
-    label: 'E. Física',
-    fullName: 'Energia Física',
+    id: 'Cinética',
+    label: 'Cinética',
+    fullName: 'Cinética',
     icon: Zap,
     color: 'text-cyan-300',
     border: 'border-cyan-500/50',
@@ -62,37 +63,37 @@ export const HECOS_SPELL_TRADITIONS = [
     desc: 'Manipulação de energia térmica, cinética, gravidade, eletricidade e forças físicas materiais.',
   },
   {
-    id: 'E. Meta',
-    label: 'E. Meta',
-    fullName: 'Energia Metafísica',
+    id: 'Etérea',
+    label: 'Etérea',
+    fullName: 'Etérea',
     icon: Moon,
     color: 'text-purple-300',
     border: 'border-purple-500/50',
     bg: 'bg-purple-950/80',
     activeBg: 'bg-purple-500 text-zinc-950 shadow-[0_0_15px_rgba(168,85,247,0.4)]',
-    desc: 'Manipulação de tempo, espaço, alma, ilusões e forças transcendentais.',
+    desc: 'Manipulação do tempo, espaço, alma, ilusões e forças transcendentais.',
   },
   {
-    id: 'M. Orgânica',
-    label: 'M. Orgânica',
-    fullName: 'Matéria Orgânica',
+    id: 'Biológica',
+    label: 'Biológica',
+    fullName: 'Biológica',
     icon: Flame,
     color: 'text-emerald-300',
     border: 'border-emerald-500/50',
     bg: 'bg-emerald-950/80',
     activeBg: 'bg-emerald-500 text-zinc-950 shadow-[0_0_15px_rgba(16,185,129,0.4)]',
-    desc: 'Manipulação e transmutação de carne, sangue, biomassa, flora, cura e organismos vivos.',
+    desc: 'Manipulação e transmutação da carne, sangue, biomassa, flora, cura e organismos vivos.',
   },
   {
-    id: 'M. Inorgânica',
-    label: 'M. Inorgânica',
-    fullName: 'Matéria Inorgânica',
+    id: 'Abiótica',
+    label: 'Abiótica',
+    fullName: 'Abiótica',
     icon: Shield,
     color: 'text-amber-300',
     border: 'border-amber-500/50',
     bg: 'bg-amber-950/80',
     activeBg: 'bg-amber-500 text-zinc-950 shadow-[0_0_15px_rgba(245,158,11,0.4)]',
-    desc: 'Manipulação de metais, cristais, pedra, terra, minerais telúricos e matéria inanimada.',
+    desc: 'Manipulação de metais, cristais, pedra, terra, minerais telúricos, matéria inanimada.',
   },
   {
     id: 'Omni',
@@ -103,7 +104,7 @@ export const HECOS_SPELL_TRADITIONS = [
     border: 'border-rose-500/50',
     bg: 'bg-rose-950/80',
     activeBg: 'bg-rose-500 text-zinc-950 shadow-[0_0_15px_rgba(244,63,94,0.4)]',
-    desc: 'Tradição mágica universal que unifica todas as vertentes da energia e matéria de Hecos.',
+    desc: 'Tradição magica universal que unifica todas as vertentes da energia e matéria de Hecos.',
   },
 ];
 
@@ -206,6 +207,21 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
         setAllowedUserIds(entityToEdit.allowedUserIds || []);
 
         const parsed = parseSpellFromContent(entityToEdit.content || '', entityToEdit.spellData);
+        
+        // Canonical traditions and clean traits
+        const canonTraditions: string[] = Array.from(
+          new Set(
+            (parsed.traditions || [])
+              .map((t) => getCanonicalTradition(t))
+              .filter(Boolean) as string[]
+          )
+        );
+        const canonTraits: string[] = (parsed.traits || []).filter(
+          (t) => !isTraditionTrait(t) && !canonTraditions.some((ct) => ct.toLowerCase().trim() === t.toLowerCase().trim())
+        );
+
+        parsed.traditions = canonTraditions.length > 0 ? canonTraditions : ['Cinética'];
+        parsed.traits = canonTraits;
         setSpellData(parsed);
 
         const subcats = Array.from(
@@ -428,14 +444,28 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
       new Set(tagsList.map((t) => t.trim().replace(/^#/, '')).filter(Boolean))
     );
 
+    // Ensure traditions are canonical and traits do not contain traditions
+    const canonTraditions: string[] = Array.from(
+      new Set(
+        (spellData.traditions || [])
+          .map((t) => getCanonicalTradition(t))
+          .filter(Boolean) as string[]
+      )
+    );
+    const canonTraits: string[] = (spellData.traits || []).filter(
+      (t) => !isTraditionTrait(t) && !canonTraditions.some((ct) => ct.toLowerCase().trim() === t.toLowerCase().trim())
+    );
+
     const finalSpellData: PF2eSpellAttributes = {
       ...spellData,
+      traditions: canonTraditions.length > 0 ? canonTraditions : ['Cinética'],
+      traits: canonTraits,
       subcategories: selectedSubcategories,
       tags: distinctTags,
     };
 
     const targetId = entityToEdit ? entityToEdit.id : 'entity-spell-' + Date.now();
-    const primarySub = selectedSubcategories[0] || '';
+    const primarySub = (selectedSubcategories && selectedSubcategories[0]) || '';
 
     const savedEntity: HecosEntity = {
       id: targetId,

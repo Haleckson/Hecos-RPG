@@ -205,7 +205,7 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
 
     // 1. Check for @mention
     const atMatch = textBeforeCursor.match(/@([a-zA-Z0-9_-]*)$/);
-    if (atMatch) {
+    if (atMatch && atMatch[1] !== undefined) {
       setMentionQuery(atMatch[1]);
       setShowMentionMenu(true);
       setShowSlashMenu(false);
@@ -216,8 +216,7 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
 
     // 2. Check for /slash command
     const slashMatch = textBeforeCursor.match(/(?:^|\n|\s)\/([a-zA-Z0-9_-]*)$/);
-    if (slashMatch) {
-      const matchText = slashMatch[0];
+    if (slashMatch && slashMatch[0] !== undefined && slashMatch[1] !== undefined) {
       const slashIdx = textBeforeCursor.lastIndexOf('/');
       setSlashStartPosition(slashIdx);
       setSlashQuery(slashMatch[1]);
@@ -481,7 +480,7 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
     const files = e.dataTransfer.files;
     if (!files || files.length === 0) return;
 
-    const file = files[0];
+    const file = files && files.length > 0 ? files[0] : null;
     if (file && file.type.startsWith('image/')) {
       e.preventDefault();
       setIsUploading(true);

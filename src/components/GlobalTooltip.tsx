@@ -101,7 +101,7 @@ export const GlobalTooltip: React.FC = () => {
       let text = tooltipRaw;
       let shortcut: string | undefined;
       const shortcutMatch = text.match(/\((Ctrl\+[^)]+|Alt\+[^)]+|Shift\+[^)]+|Cmd\+[^)]+|⌘[^)]+)\)/i);
-      if (shortcutMatch) {
+      if (shortcutMatch && shortcutMatch[0] && shortcutMatch[1]) {
         shortcut = shortcutMatch[1];
         text = text.replace(shortcutMatch[0], '').trim();
       }

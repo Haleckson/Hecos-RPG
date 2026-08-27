@@ -22,13 +22,15 @@ import {
   List,
   ChevronDown,
   X,
-  Layers
+  Layers,
+  Wand2
 } from 'lucide-react';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { TraitBadge } from './TraitBadge';
 import { TraitModal } from './TraitModal';
 import { TagModal } from './TagModal';
 import { FolderManagerModal } from './FolderManagerModal';
+import { getTraitInfo, CANONICAL_TRADITIONS, extractEntityAllTraits, getTraitHierarchyTier } from '../utils/traitUtils';
 
 interface TagExplorerProps {
   onNavigateEntity: (id: string) => void;
@@ -36,56 +38,67 @@ interface TagExplorerProps {
   isGmMode?: boolean;
 }
 
-// Helper function to safely extract traits regardless of whether they are arrays or comma-separated strings
-function extractEntityTraits(ent: HecosEntity): string[] {
-  const result = new Set<string>();
-
-  const add = (val: unknown) => {
-    if (!val) return;
-    if (Array.isArray(val)) {
-      val.forEach((item) => {
-        if (typeof item === 'string' && item.trim()) {
-          result.add(item.trim());
-        }
-      });
-    } else if (typeof val === 'string') {
-      val.split(',').forEach((item) => {
-        const trimmed = item.trim();
-        if (trimmed) result.add(trimmed);
-      });
-    }
-  };
-
-  add(ent.traits);
-  add(ent.statblock?.traits);
-  add(ent.spellData?.traits);
-  add(ent.featData?.traits);
-  if (ent.ancestryData?.traits) add(ent.ancestryData.traits);
-  if (ent.itemData?.traits) add(ent.itemData.traits);
-  if (ent.perilData?.traits) add(ent.perilData.traits);
-
-  // Raridade tratada globalmente como Traço PF2e
-  if (ent.featData?.rarity) add(ent.featData.rarity);
-  if (ent.spellData?.rarity) add(ent.spellData.rarity);
-  if (ent.itemData?.rarity) add(ent.itemData.rarity);
-  if (ent.perilData?.rarity) add(ent.perilData.rarity);
-  if (ent.classData?.rarity) add(ent.classData.rarity);
-
-  return Array.from(result);
-}
-
 export const TagExplorer: React.FC<TagExplorerProps> = ({
   onNavigateEntity,
   initialSelectedTag,
   isGmMode,
 }) => {
-  const [activeTab, setActiveTab] = useState<'tags' | 'traits'>('tags');
+  const [activeTab, setActiveTab] = useState<'tags' | 'traits'>(() => {
+    if (initialSelectedTag) return 'tags';
+    try {
+      const saved = localStorage.getItem('hecos_tag_explorer_active_tab');
+      return saved === 'tags' ? 'tags' : 'traits';
+    } catch {
+      return 'traits';
+    }
+  });
+
   const [selectedTag, setSelectedTag] = useState<string | null>(initialSelectedTag || null);
   const [selectedTrait, setSelectedTrait] = useState<string | null>(null);
 
-  // Filtering & Sorting State
+  // Filtering & Sorting State with persistence
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<'count-desc' | 'count-asc' | 'alpha-asc' | 'alpha-desc'>('count-desc');
+  const [sortBy, setSortBy] = useState<'count-desc' | 'count-asc' | 'alpha-asc' | 'alpha-desc'>(() => {
+    try {
+      const saved = localStorage.getItem('hecos_tag_explorer_sort_by');
+      if (saved === 'count-desc' || saved === 'count-asc' || saved === 'alpha-asc' || saved === 'alpha-desc') {
+        return saved;
+      }
+    } catch {}
+    return 'count-desc';
+  });
+
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
+    try {
+      const saved = localStorage.getItem('hecos_tag_explorer_view_mode');
+      return saved === 'list' ? 'list' : 'grid';
+    } catch {}
+    return 'grid';
+  });
+
+  // Persist sorting and view mode changes
+  const handleSortChange = (newSort: 'count-desc' | 'count-asc' | 'alpha-asc' | 'alpha-desc') => {
+    setSortBy(newSort);
+    try {
+      localStorage.setItem('hecos_tag_explorer_sort_by', newSort);
+    } catch {}
+  };
+
+  const handleTabChange = (newTab: 'tags' | 'traits') => {
+    setActiveTab(newTab);
+    if (newTab === 'tags') setSelectedTrait(null);
+    else setSelectedTag(null);
+    try {
+      localStorage.setItem('hecos_tag_explorer_active_tab', newTab);
+    } catch {}
+  };
+
+  const handleViewModeChange = (newMode: 'grid' | 'list') => {
+    setViewMode(newMode);
+    try {
+      localStorage.setItem('hecos_tag_explorer_view_mode', newMode);
+    } catch {}
+  };
 
   // Modals state
   const [traitModalOpen, setTraitModalOpen] = useState(false);
@@ -115,8 +128,7 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
           const existing = map.get(lower);
           if (existing) {
             existing.count += 1;
-            // Prefer capitalized or longer casing if existing was all lowercase
-            if (clean[0] === clean[0].toUpperCase() && existing.displayName[0] === existing.displayName[0].toLowerCase()) {
+            if (clean?.[0] && clean[0] === clean[0].toUpperCase() && existing?.displayName?.[0] && existing.displayName[0] === existing.displayName[0].toLowerCase()) {
               existing.displayName = clean;
             }
           } else {
@@ -152,24 +164,32 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
     return list;
   }, [accessibleEntities, searchTerm, sortBy]);
 
-  // Compute dynamic traits with case-insensitive deduplication & storage union
+  // Compute dynamic traits with traditions integration, case-insensitive deduplication & storage union
   const traits: TagInfo[] = useMemo(() => {
     const map = new Map<string, { displayName: string; count: number }>();
 
-    // 1. Add all registered custom traits from HecosStorage
+    // 1. Preload Canonical Traditions so they are ALWAYS available in Traits page
+    CANONICAL_TRADITIONS.forEach((trad) => {
+      const lower = trad.toLowerCase();
+      map.set(lower, { displayName: trad, count: 0 });
+    });
+
+    // 2. Add all registered custom traits from HecosStorage
     const custom = HecosStorage.getCustomTraits();
     Object.keys(custom).forEach((k) => {
       const clean = k.trim();
       if (clean) {
         const lower = clean.toLowerCase();
         const display = clean.charAt(0).toUpperCase() + clean.slice(1);
-        map.set(lower, { displayName: display, count: 0 });
+        if (!map.has(lower)) {
+          map.set(lower, { displayName: display, count: 0 });
+        }
       }
     });
 
-    // 2. Count occurrences from all entities
+    // 3. Count occurrences from all entities (including spell traditions)
     accessibleEntities.forEach((ent) => {
-      const entTraits = extractEntityTraits(ent);
+      const entTraits = extractEntityAllTraits(ent);
       entTraits.forEach((tr) => {
         const clean = typeof tr === 'string' ? tr.trim() : '';
         if (clean) {
@@ -177,7 +197,7 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
           const existing = map.get(lower);
           if (existing) {
             existing.count += 1;
-            if (clean[0] === clean[0].toUpperCase() && existing.displayName[0] === existing.displayName[0].toLowerCase()) {
+            if (clean?.[0] && clean[0] === clean[0].toUpperCase() && existing?.displayName?.[0] && existing.displayName[0] === existing.displayName[0].toLowerCase()) {
               existing.displayName = clean;
             }
           } else {
@@ -192,12 +212,25 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
     // Filter by search query
     if (searchTerm.trim()) {
       const q = searchTerm.trim().toLowerCase();
-      list = list.filter((t) => t.name.toLowerCase().includes(q));
+      list = list.filter((t) => {
+        const info = getTraitInfo(t.name);
+        return (
+          t.name.toLowerCase().includes(q) ||
+          info.category.toLowerCase().includes(q) ||
+          info.description.toLowerCase().includes(q)
+        );
+      });
     }
 
     // Sort list
     list.sort((a, b) => {
       switch (sortBy) {
+        case 'hierarchy': {
+          const tierA = getTraitHierarchyTier(a.name);
+          const tierB = getTraitHierarchyTier(b.name);
+          if (tierA !== tierB) return tierA - tierB;
+          return a.name.localeCompare(b.name, 'pt-BR');
+        }
         case 'count-asc':
           return a.count - b.count || a.name.localeCompare(b.name, 'pt-BR');
         case 'alpha-asc':
@@ -224,14 +257,13 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
         : []
       : selectedTrait
       ? accessibleEntities.filter((e) => {
-          const list = extractEntityTraits(e);
+          const list = extractEntityAllTraits(e);
           return list.some((tr) => tr.toLowerCase() === selectedTrait.toLowerCase());
         })
       : [];
 
   const [isFolderManagerOpen, setIsFolderManagerOpen] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const tagCategoriesConfig = HecosStorage.getScopeSubcategoriesConfig('tag');
   const tagFolderOptions = useMemo(() => {
@@ -239,6 +271,7 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
       { id: 'all', name: 'Todas as Pastas' },
       { id: 'tags', name: 'Tags de Campanha & Lore' },
       { id: 'traits', name: 'Traços Oficiais PF2e' },
+      { id: 'traditions', name: 'Tradições de Hecos' },
       { id: 'homebrew', name: 'Traços Homebrew' },
     ];
   }, []);
@@ -272,7 +305,7 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
               )}
             </div>
             <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-              Navegue por tópicos de narrativa (Tags) e palavras-chave de regras oficiais PF2e (Traços).
+              Navegue por tópicos de narrativa (Tags), Tradições Mágicas de Hecos e palavras-chave de regras oficiais PF2e (Traços).
             </p>
           </div>
         </div>
@@ -321,14 +354,23 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
         </div>
       </div>
 
-      {/* 2. SUB-CATEGORY TABS (Tags vs Traits) */}
+      {/* 2. SUB-CATEGORY TABS (Traits vs Tags) */}
       <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#120e1e] border border-zinc-800 w-fit">
         <button
           type="button"
-          onClick={() => {
-            setActiveTab('tags');
-            setSelectedTrait(null);
-          }}
+          onClick={() => handleTabChange('traits')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'traits'
+              ? 'bg-amber-500 text-zinc-950 shadow-[0_0_12px_rgba(245,158,11,0.4)]'
+              : 'text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          <Award className="w-3.5 h-3.5" />
+          <span>Traços & Tradições ({traits.length})</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => handleTabChange('tags')}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
             activeTab === 'tags'
               ? 'bg-cyan-500 text-zinc-950 shadow-[0_0_12px_rgba(6,182,212,0.4)]'
@@ -337,21 +379,6 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
         >
           <TagIcon className="w-3.5 h-3.5" />
           <span>Tags de Campanha ({tags.length})</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setActiveTab('traits');
-            setSelectedTag(null);
-          }}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'traits'
-              ? 'bg-amber-500 text-zinc-950 shadow-[0_0_12px_rgba(245,158,11,0.4)]'
-              : 'text-zinc-400 hover:text-zinc-200'
-          }`}
-        >
-          <Award className="w-3.5 h-3.5" />
-          <span>Traços PF2e ({traits.length})</span>
         </button>
       </div>
 
@@ -363,13 +390,13 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder={`Filtrar ${activeTab === 'tags' ? 'tags' : 'traços'} por nome ou descrição...`}
+            placeholder={`Filtrar ${activeTab === 'tags' ? 'tags' : 'traços e tradições'} por nome ou categoria...`}
             className="w-full pl-9 pr-8 py-2 text-xs rounded-xl bg-zinc-900/90 border border-zinc-700/70 text-zinc-200 placeholder-zinc-500 outline-none focus:border-cyan-400"
           />
           {searchTerm && (
             <button
               onClick={() => setSearchTerm('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -381,9 +408,12 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
             <ArrowUpDown className="w-3.5 h-3.5 text-zinc-500" />
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="px-3 py-1.5 text-xs rounded-xl bg-zinc-900 border border-zinc-700 text-zinc-200 outline-none focus:border-cyan-400 cursor-pointer"
+              onChange={(e) => handleSortChange(e.target.value as any)}
+              className="px-3 py-1.5 text-xs rounded-xl bg-zinc-900 border border-zinc-700 text-zinc-200 outline-none focus:border-cyan-400 cursor-pointer font-medium"
             >
+              {activeTab === 'traits' && (
+                <option value="hierarchy">Hierarquia Canônica ([Raridade] &gt; [Tradição] &gt; [Tamanho] &gt; [A-Z])</option>
+              )}
               <option value="count-desc">Mais usados primeiro</option>
               <option value="count-asc">Menos usados primeiro</option>
               <option value="alpha-asc">Ordem Alfabética (A-Z)</option>
@@ -395,25 +425,25 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
           <div className="flex items-center bg-black/60 border border-zinc-800 p-0.5 rounded-xl">
             <button
               type="button"
-              onClick={() => setViewMode('grid')}
+              onClick={() => handleViewModeChange('grid')}
               className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                 viewMode === 'grid'
                   ? 'bg-zinc-800 text-cyan-300 shadow-sm'
                   : 'text-zinc-500 hover:text-zinc-300'
               }`}
-              title="Visualização em Grade/Nuvem"
+              title="Visualização em Grade / Badges"
             >
               <LayoutGrid className="w-3.5 h-3.5" />
             </button>
             <button
               type="button"
-              onClick={() => setViewMode('list')}
+              onClick={() => handleViewModeChange('list')}
               className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                 viewMode === 'list'
                   ? 'bg-zinc-800 text-cyan-300 shadow-sm'
                   : 'text-zinc-500 hover:text-zinc-300'
               }`}
-              title="Visualização em Lista"
+              title="Visualização em Lista Detalhada"
             >
               <List className="w-3.5 h-3.5" />
             </button>
@@ -572,19 +602,21 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
         )
       ) : traits.length === 0 ? (
         <div className="p-8 text-center bg-[#110e19] rounded-xl border border-zinc-800 text-zinc-400 text-xs">
-          {searchTerm ? `Nenhum traço encontrado para "${searchTerm}".` : 'Nenhum traço de mecânica PF2e registrado nos artigos ainda.'}
+          {searchTerm ? `Nenhum traço encontrado para "${searchTerm}".` : 'Nenhum traço ou tradição registrado nos artigos ainda.'}
         </div>
       ) : viewMode === 'list' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
           {traits.map((tr) => {
             const isSelected = selectedTrait?.toLowerCase() === tr.name.toLowerCase();
+            const traitInfo = getTraitInfo(tr.name);
+
             return (
               <div
                 key={tr.name}
                 className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
                   isSelected
-                    ? 'bg-amber-950/60 border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]'
-                    : 'bg-[#161122] hover:bg-[#1f1730] border-amber-900/60 hover:border-amber-500/50'
+                    ? `${traitInfo.color} ring-2 ring-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.4)]`
+                    : `${traitInfo.color} bg-opacity-40 hover:bg-opacity-70 hover:brightness-110`
                 }`}
               >
                 <button
@@ -598,17 +630,24 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
                       })
                     );
                   }}
-                  className="flex items-center gap-2 min-w-0 flex-1 text-left cursor-pointer group"
+                  className="flex items-center gap-2.5 min-w-0 flex-1 text-left cursor-pointer group"
                 >
-                  <div className="p-1.5 rounded-lg bg-amber-950/80 border border-amber-800/60 text-amber-300 group-hover:text-amber-200">
-                    <Layers className="w-3.5 h-3.5" />
+                  <div className="p-1.5 rounded-lg bg-black/40 border border-current/30 text-inherit">
+                    {traitInfo.isTradition ? <Wand2 className="w-3.5 h-3.5" /> : <Layers className="w-3.5 h-3.5" />}
                   </div>
                   <div className="min-w-0">
-                    <h4 className="text-xs font-mono font-bold tracking-wide uppercase text-amber-200 group-hover:text-amber-100 truncate">
-                      {tr.name}
-                    </h4>
-                    <p className="text-[10px] text-zinc-400 font-mono">
-                      {tr.count} artigo{tr.count !== 1 ? 's' : ''}
+                    <div className="flex items-center gap-1.5">
+                      <h4 className="text-xs font-mono font-bold tracking-wide uppercase text-inherit truncate">
+                        {tr.name}
+                      </h4>
+                      {traitInfo.isTradition && (
+                        <span className="text-[9px] px-1 py-0.2 rounded bg-black/50 border border-current/30 text-inherit font-mono uppercase">
+                          Tradição
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] opacity-80 truncate font-mono">
+                      {tr.count} artigo{tr.count !== 1 ? 's' : ''} • {traitInfo.category}
                     </p>
                   </div>
                 </button>
@@ -624,7 +663,7 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
                         })
                       );
                     }}
-                    className="px-2 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-amber-400 hover:text-amber-300 text-[11px] font-semibold transition-colors cursor-pointer"
+                    className="px-2 py-1 rounded-lg bg-black/50 hover:bg-black/80 border border-current/40 text-inherit text-[11px] font-semibold transition-colors cursor-pointer"
                     title="Abrir Gaveta Lateral"
                   >
                     Painel
@@ -638,8 +677,8 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
                         setEditingTraitName(tr.name);
                         setTraitModalOpen(true);
                       }}
-                      className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-amber-400/80 hover:text-amber-200 transition-colors cursor-pointer"
-                      title="Editar ou Excluir Traço"
+                      className="p-1.5 rounded-lg bg-black/50 hover:bg-black/80 border border-current/40 text-inherit opacity-80 hover:opacity-100 transition-opacity cursor-pointer"
+                      title="Editar ou Configurar Traço / Cor"
                     >
                       <Edit2 className="w-3 h-3" />
                     </button>
@@ -653,13 +692,15 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
         <div className="flex flex-wrap gap-2">
           {traits.map((tr) => {
             const isSelected = selectedTrait?.toLowerCase() === tr.name.toLowerCase();
+            const traitInfo = getTraitInfo(tr.name);
+
             return (
               <div
                 key={tr.name}
-                className={`inline-flex items-center rounded-xl transition-all border ${
+                className={`inline-flex items-center rounded-xl transition-all border shadow-sm ${traitInfo.color} ${
                   isSelected
-                    ? 'bg-amber-500 text-zinc-950 border-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.4)] scale-105'
-                    : 'bg-[#161122] hover:bg-amber-950/40 text-amber-200 hover:text-amber-100 border-amber-900/60'
+                    ? 'ring-2 ring-amber-400 scale-105 brightness-125 shadow-[0_0_15px_rgba(245,158,11,0.4)]'
+                    : 'hover:brightness-125'
                 }`}
               >
                 <button
@@ -678,28 +719,26 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-bold tracking-wide uppercase cursor-pointer"
                 >
                   <span>{tr.name}</span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                      isSelected ? 'bg-zinc-900 text-amber-300' : 'bg-black/60 text-amber-400/70'
-                    }`}
-                  >
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/60 text-inherit font-bold">
                     {tr.count}
                   </span>
                 </button>
 
-                {/* Edit / Delete Trait button */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setEditingTraitName(tr.name);
-                    setTraitModalOpen(true);
-                  }}
-                  className="pr-2 pl-1 py-1 text-amber-400/70 hover:text-amber-100 transition-colors cursor-pointer"
-                  title="Editar ou Excluir Traço"
-                >
-                  <Edit2 className="w-3 h-3" />
-                </button>
+                {/* Edit / Configure Trait button */}
+                {isActualGm && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingTraitName(tr.name);
+                      setTraitModalOpen(true);
+                    }}
+                    className="pr-2 pl-1 py-1 text-inherit opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
+                    title="Editar ou Configurar Traço / Cor"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                  </button>
+                )}
               </div>
             );
           })}
@@ -712,9 +751,11 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-zinc-300 flex items-center gap-2">
               <span>Artigos correspondentes a</span>
-              <span className={`font-mono ${activeTab === 'tags' ? 'text-cyan-400' : 'text-amber-400'}`}>
-                {activeTab === 'tags' ? `#${selectedTag}` : `[tr:${selectedTrait}]`}
-              </span>
+              {activeTab === 'tags' ? (
+                <span className="font-mono text-cyan-400">#{selectedTag}</span>
+              ) : (
+                <TraitBadge trait={selectedTrait || ''} size="sm" interactive={false} />
+              )}
               <span className="text-xs text-zinc-500">({matchingEntities.length} encontrados)</span>
             </h3>
 
@@ -761,7 +802,7 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
                   className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 underline cursor-pointer"
                 >
                   <Edit2 className="w-3.5 h-3.5" />
-                  <span>Editar/Excluir este Traço</span>
+                  <span>Editar/Configurar este Traço</span>
                 </button>
               )}
               <button
@@ -803,15 +844,17 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
       )}
 
       {/* Universal Folder Management Modal */}
-      <FolderManagerModal
-        isOpen={isFolderManagerOpen}
-        onClose={() => setIsFolderManagerOpen(false)}
-        scope="tag"
-        categories={tagFolderOptions}
-        entities={accessibleEntities}
-        themeColor="cyan"
-        onRefresh={() => setRefreshKey((k) => k + 1)}
-      />
+      {isFolderManagerOpen && (
+        <FolderManagerModal
+          isOpen={isFolderManagerOpen}
+          onClose={() => setIsFolderManagerOpen(false)}
+          scope="tag"
+          categories={tagFolderOptions}
+          entities={accessibleEntities}
+          themeColor="cyan"
+          onRefresh={() => setRefreshKey((k) => k + 1)}
+        />
+      )}
 
       {/* Trait Management Modal */}
       <TraitModal

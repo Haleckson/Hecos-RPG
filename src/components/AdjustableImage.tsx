@@ -153,7 +153,7 @@ export const AdjustableImage: React.FC<AdjustableImageProps> = ({
 
   // Touch drag support
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (!isEditing || e.touches.length !== 1) return;
+    if (!isEditing || !e.touches || e.touches.length !== 1 || !e.touches[0]) return;
     const touch = e.touches[0];
     setIsDragging(true);
     dragStartRef.current = {
@@ -165,7 +165,7 @@ export const AdjustableImage: React.FC<AdjustableImageProps> = ({
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isEditing || !dragStartRef.current || !containerRef.current || e.touches.length !== 1) return;
+    if (!isEditing || !dragStartRef.current || !containerRef.current || !e.touches || e.touches.length !== 1 || !e.touches[0]) return;
     const touch = e.touches[0];
     const rect = containerRef.current.getBoundingClientRect();
     const width = rect.width || 300;

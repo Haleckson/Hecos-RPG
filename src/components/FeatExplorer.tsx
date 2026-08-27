@@ -11,9 +11,12 @@ import { HecosStorage, DEFAULT_FEAT_CATEGORIES_CONFIG } from '../services/storag
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { TraitBadge } from './TraitBadge';
+import { Tooltip } from './Tooltip';
 import { renderContentWithMentions } from './MentionBadge';
-import { FeatCard } from './FeatCard';
+import { FeatCard, FeatTooltipCard } from './FeatCard';
+import { FeatDrawer } from './FeatDrawer';
 import { FolderManagerModal } from './FolderManagerModal';
+import { sortTraitsHierarchically } from '../utils/traitUtils';
 import {
   Award,
   Search,
@@ -39,6 +42,9 @@ import {
   Scroll,
   Layers,
   ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  ArrowRight,
   MoreVertical,
   CheckSquare,
   Square,
@@ -191,6 +197,29 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
   const [inlineNewSubcategoryName, setInlineNewSubcategoryName] = useState('');
   const [showInlineNewSubcategory, setShowInlineNewSubcategory] = useState(false);
 
+  // Drawer State for Feat Slide-Over Panel
+  const [selectedDrawerFeatId, setSelectedDrawerFeatId] = useState<string | null>(null);
+  const [isFeatDrawerOpen, setIsFeatDrawerOpen] = useState(false);
+
+  // Global Event Listener for hecos:open-feat-drawer
+  useEffect(() => {
+    const handleOpenFeatDrawer = (e: Event) => {
+      const customEvent = e as CustomEvent<{ featId?: string; slug?: string; id?: string }>;
+      const targetId = customEvent.detail?.featId || customEvent.detail?.slug || customEvent.detail?.id;
+      if (targetId) {
+        setSelectedDrawerFeatId(targetId);
+        setIsFeatDrawerOpen(true);
+      }
+    };
+    window.addEventListener('hecos:open-feat-drawer', handleOpenFeatDrawer);
+    return () => window.removeEventListener('hecos:open-feat-drawer', handleOpenFeatDrawer);
+  }, []);
+
+  const handleOpenFeatInDrawer = (featId: string) => {
+    setSelectedDrawerFeatId(featId);
+    setIsFeatDrawerOpen(true);
+  };
+
   const refreshConfig = () => {
     setCategoriesConfig(HecosStorage.getAllFeatSubcategoriesConfig());
   };
@@ -202,10 +231,14 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
     });
   }, []);
 
-  // Filter all feat entities
+  // Filter all accessible feat entities
   const allFeatEntities = useMemo(() => {
-    return entities.filter((e) => e.category === 'feat' || e.featData);
-  }, [entities]);
+    return entities.filter((e) => {
+      const isFeat = e.category === 'feat' || Boolean(e.featData);
+      if (!isFeat) return false;
+      return isActualGm || HecosStorage.canUserAccessItem(e, currentUser);
+    });
+  }, [entities, isActualGm, currentUser]);
 
   // Extract all traits available across feats
   const allAvailableTraits = useMemo(() => {
@@ -258,14 +291,6 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
       const featData = parseFeatFromContent(ent.title, ent.content || '', ent.featData);
       const featType = getEntityFeatType(ent, featData);
       const entitySubcats = getEntitySubcategories(ent, featData);
-
-      // 0. Permission check:
-      if (!isActualGm) {
-        if (!HecosStorage.canUserAccessItem(ent, currentUser)) return false;
-        if (entitySubcats.length > 0 && entitySubcats.every((s) => HecosStorage.isFolderSecret(s))) {
-          return false;
-        }
-      }
 
       // 1. Filter by Main Category
       if (selectedMainCategory !== 'all') {
@@ -894,7 +919,7 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
             <FeatCard
               key={ent.id}
               entity={ent}
-              onSelectEntity={onSelectEntity}
+              onSelectEntity={handleOpenFeatInDrawer}
               onEditEntity={onEditEntity}
               onDeleteEntity={onDeleteEntity}
               onOpenFolderAssign={openAssignModal}
@@ -910,12 +935,55 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-[#140f21] border-b border-zinc-800 text-zinc-400 font-mono uppercase text-[10px]">
-                  <th className="py-3 px-4">Nível</th>
+                  <th className="py-3 px-4">
+                    <button
+                      type="button"
+                      onClick={() => setSortBy(sortBy === 'level-asc' ? 'level-desc' : 'level-asc')}
+                      className="flex items-center gap-1 hover:text-amber-300 font-bold uppercase transition-colors cursor-pointer"
+                    >
+                      <span>Nível</span>
+                      {sortBy === 'level-asc' ? (
+                        <ArrowUp className="w-3 h-3 text-amber-400" />
+                      ) : sortBy === 'level-desc' ? (
+                        <ArrowDown className="w-3 h-3 text-amber-400" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-zinc-600" />
+                      )}
+                    </button>
+                  </th>
                   <th className="py-3 px-4">Ação</th>
-                  <th className="py-3 px-4">Nome do Talento</th>
+                  <th className="py-3 px-4">
+                    <button
+                      type="button"
+                      onClick={() => setSortBy(sortBy === 'name-asc' ? 'name-desc' : 'name-asc')}
+                      className="flex items-center gap-1 hover:text-amber-300 font-bold uppercase transition-colors cursor-pointer"
+                    >
+                      <span>Nome do Talento</span>
+                      {sortBy === 'name-asc' ? (
+                        <ArrowUp className="w-3 h-3 text-amber-400" />
+                      ) : sortBy === 'name-desc' ? (
+                        <ArrowDown className="w-3 h-3 text-amber-400" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-zinc-600" />
+                      )}
+                    </button>
+                  </th>
                   <th className="py-3 px-4">Categoria</th>
                   <th className="py-3 px-4">Subcategorias / Pastas</th>
-                  <th className="py-3 px-4">Raridade</th>
+                  <th className="py-3 px-4">
+                    <button
+                      type="button"
+                      onClick={() => setSortBy(sortBy === 'rarity' ? 'level-asc' : 'rarity')}
+                      className="flex items-center gap-1 hover:text-amber-300 font-bold uppercase transition-colors cursor-pointer"
+                    >
+                      <span>Raridade</span>
+                      {sortBy === 'rarity' ? (
+                        <ArrowUp className="w-3 h-3 text-amber-400" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-zinc-600" />
+                      )}
+                    </button>
+                  </th>
                   <th className="py-3 px-4">Traços</th>
                   <th className="py-3 px-4 text-right">Ações</th>
                 </tr>
@@ -929,17 +997,18 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
                   return (
                     <tr
                       key={ent.id}
-                      className="hover:bg-[#151024] transition-colors group"
+                      className="hover:bg-[#151024] transition-colors group cursor-pointer"
+                      onClick={() => handleOpenFeatInDrawer(ent.id)}
                     >
                       {/* Level */}
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
                         <span className="px-2 py-0.5 rounded font-mono font-bold text-[11px] bg-amber-500/20 text-amber-300 border border-amber-500/30">
                           {feat.level}
                         </span>
                       </td>
 
                       {/* Action Glyph */}
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
                         {action.show ? (
                           <PF2eActionGlyph type={action.type} size="sm" />
                         ) : feat.actionCost === 'passive' ? (
@@ -949,66 +1018,92 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
                         )}
                       </td>
 
-                      {/* Title & Subtitle */}
-                      <td className="py-3 px-4 font-medium">
-                        <button
-                          type="button"
-                          onClick={() => onSelectEntity(ent.id)}
-                          className="text-left font-bold text-amber-200 group-hover:text-amber-300 hover:drop-shadow-[0_0_10px_rgba(245,158,11,0.8)] transition-all cursor-pointer focus:outline-none"
+                      {/* Title & Subtitle with Tooltip hover preview */}
+                      <td className="py-3 px-4 font-medium" onClick={(e) => e.stopPropagation()}>
+                        <Tooltip
+                          side="right"
+                          delay={200}
+                          content={<FeatTooltipCard feat={ent} onSelectEntity={handleOpenFeatInDrawer} />}
                         >
-                          <span className="hover:underline decoration-amber-400/80 decoration-2 underline-offset-2 text-sm">
-                            {ent.title}
-                          </span>
-                          {ent.subtitle && (
-                            <div className="text-[11px] text-zinc-400 italic font-normal break-words">{ent.subtitle}</div>
-                          )}
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenFeatInDrawer(ent.id)}
+                            className="text-left font-bold text-amber-200 group-hover:text-amber-300 hover:drop-shadow-[0_0_10px_rgba(245,158,11,0.8)] transition-all cursor-pointer focus:outline-none block"
+                          >
+                            <span className="hover:underline decoration-amber-400/80 decoration-2 underline-offset-2 text-sm">
+                              {ent.title}
+                            </span>
+                            {ent.subtitle && (
+                              <div className="text-[11px] text-zinc-400 italic font-normal break-words">{ent.subtitle}</div>
+                            )}
+                          </button>
+                        </Tooltip>
                       </td>
 
                       {/* Feat Category */}
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
                         <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-950/60 text-purple-300 border border-purple-800/40">
                           {getFeatTypeLabel(feat.featType)}
                         </span>
                       </td>
 
                       {/* Subcategories (Folders) */}
-                      <td className="py-3 px-4">
-                        <div className="flex flex-wrap items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex flex-wrap items-center gap-1">
                           {subcats.map((subcat) => (
                             <button
                               key={subcat}
                               type="button"
                               onClick={() => setSelectedSubcategory(subcat)}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-950/60 hover:bg-amber-900 text-amber-300 border border-amber-600/40"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-950/60 hover:bg-amber-900 text-amber-300 border border-amber-600/40 cursor-pointer transition-colors"
                             >
                               <Folder className="w-2.5 h-2.5 text-amber-400" />
                               <span>{subcat}</span>
                             </button>
                           ))}
-                          <button
-                            type="button"
-                            onClick={() => openAssignModal(ent)}
-                            className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-amber-300"
-                            title="Editar pastas deste talento"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </button>
+                          {isActualGm && (
+                            <button
+                              type="button"
+                              onClick={() => openAssignModal(ent)}
+                              className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-amber-300 cursor-pointer"
+                              title="Editar pastas deste talento"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                          )}
                         </div>
                       </td>
 
                       {/* Rarity Trait */}
-                      <td className="py-3 px-4">
-                        <TraitBadge trait={feat.rarity || 'Comum'} />
+                      <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
+                        <TraitBadge
+                          trait={feat.rarity || 'Comum'}
+                          onClick={() => {
+                            window.dispatchEvent(
+                              new CustomEvent('hecos:open-trait-drawer', {
+                                detail: { trait: feat.rarity || 'Comum' },
+                              })
+                            );
+                          }}
+                        />
                       </td>
 
-                      {/* Traits */}
-                      <td className="py-3 px-4">
+                      {/* Traits ([Tradição] + [Tamanho] + [Outros Traits em Ordem Alfabética]) */}
+                      <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
                         <div className="flex flex-wrap gap-1">
-                          {feat.traits?.map((trait) => (
+                          {sortTraitsHierarchically(
+                            (feat.traits || []).filter(
+                              (t) => t.toLowerCase() !== (feat.rarity || 'Comum').toLowerCase()
+                            )
+                          ).map((trait) => (
                             <TraitBadge
                               key={trait}
                               trait={trait}
+                              onClick={() => {
+                                window.dispatchEvent(
+                                  new CustomEvent('hecos:open-trait-drawer', { detail: { trait } })
+                                );
+                              }}
                             />
                           ))}
                         </div>
@@ -1029,7 +1124,7 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
                             <button
                               type="button"
                               onClick={() => openAssignModal(ent)}
-                              className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-amber-300"
+                              className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-amber-300 cursor-pointer"
                               title="Organizar Pastas"
                             >
                               <Folder className="w-3.5 h-3.5" />
@@ -1037,7 +1132,7 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
                             <button
                               type="button"
                               onClick={() => onEditEntity(ent.id)}
-                              className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-cyan-300"
+                              className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-cyan-300 cursor-pointer"
                               title="Editar Talento"
                             >
                               <Edit className="w-3.5 h-3.5" />
@@ -1045,14 +1140,21 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
                             <button
                               type="button"
                               onClick={() => onDeleteEntity(ent.id)}
-                              className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-rose-400"
+                              className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-rose-400 cursor-pointer"
                               title="Excluir Talento"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         ) : (
-                          <span className="text-[11px] text-zinc-500 font-mono">Leitura</span>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenFeatInDrawer(ent.id)}
+                            className="text-[11px] text-amber-400 hover:text-amber-300 font-bold hover:underline cursor-pointer inline-flex items-center gap-1"
+                          >
+                            <span>Ver</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </button>
                         )}
                       </td>
                     </tr>
@@ -1096,7 +1198,7 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
                     onClick={() => {
                       onCreateFeat(cat.id as FeatCategoryType);
                     }}
-                    className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-amber-300 text-xs font-bold transition-all flex items-center gap-1"
+                    className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-amber-300 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Novo em {cat.name}</span>
@@ -1129,7 +1231,7 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
                             <button
                               type="button"
                               onClick={() => openBulkAddModal(subcat)}
-                              className="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-amber-300 text-[11px] font-medium flex items-center gap-1"
+                              className="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-amber-300 text-[11px] font-medium flex items-center gap-1 cursor-pointer"
                             >
                               <Plus className="w-3 h-3" />
                               <span>Adicionar Talentos</span>
@@ -1147,16 +1249,21 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
                               return (
                                 <div
                                   key={ent.id}
-                                  onClick={() => onSelectEntity(ent.id)}
-                                  className="p-2.5 rounded-lg bg-[#120e1d] hover:bg-[#191428] border border-zinc-800 hover:border-amber-500/40 transition-colors cursor-pointer flex items-center justify-between gap-2"
+                                  onClick={() => handleOpenFeatInDrawer(ent.id)}
+                                  className="p-2.5 rounded-lg bg-[#120e1d] hover:bg-[#191428] border border-zinc-800 hover:border-amber-500/40 transition-colors cursor-pointer flex items-center justify-between gap-2 group/item"
                                 >
                                   <div className="flex items-center gap-2 min-w-0">
                                     <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500/20 text-amber-300 shrink-0">
                                       {feat.level}
                                     </span>
-                                    <span className="font-bold text-xs text-amber-200 truncate">{ent.title}</span>
+                                    <span className="font-bold text-xs text-amber-200 group-hover/item:text-amber-300 group-hover/item:underline truncate">
+                                      {ent.title}
+                                    </span>
                                   </div>
-                                  {action.show && <PF2eActionGlyph type={action.type} size="sm" />}
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {action.show && <PF2eActionGlyph type={action.type} size="sm" />}
+                                    <ArrowRight className="w-3 h-3 text-amber-400/0 group-hover/item:text-amber-400 transition-all -translate-x-1 group-hover/item:translate-x-0" />
+                                  </div>
                                 </div>
                               );
                             })}
@@ -1175,6 +1282,32 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
           })}
         </div>
       )}
+
+      {/* 6. Sliding Feat Drawer */}
+      <FeatDrawer
+        featId={selectedDrawerFeatId}
+        entities={allFeatEntities}
+        isOpen={isFeatDrawerOpen}
+        onClose={() => {
+          setIsFeatDrawerOpen(false);
+          setSelectedDrawerFeatId(null);
+        }}
+        onNavigateFullPage={(id) => {
+          setIsFeatDrawerOpen(false);
+          setSelectedDrawerFeatId(null);
+          onSelectEntity(id);
+        }}
+        onEditFeat={(feat) => {
+          setIsFeatDrawerOpen(false);
+          onEditEntity(feat.id);
+        }}
+        onDeleteFeat={(featId) => {
+          setIsFeatDrawerOpen(false);
+          onDeleteEntity(featId);
+        }}
+        onTagClick={onTagClick}
+        isGmMode={effectiveGmMode}
+      />
 
       {/* --- MODAL 1: GERENCIAR ESTRUTURA DE PASTAS E SUBCATEGORIAS --- */}
       {isManageSubcategoriesModalOpen && (

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { HecosEntity, PF2eSpellAttributes } from '../types';
 import { parseSpellFromContent } from '../utils/spellSerializer';
+import { isTraditionTrait } from '../utils/spellMigration';
+import { sortTraitsHierarchically } from '../utils/traitUtils';
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { RichContentRenderer } from './RichContentRenderer';
 import { TraitBadge } from './TraitBadge';
@@ -245,38 +247,27 @@ export const SpellView: React.FC<SpellViewProps> = ({
             </p>
           )}
 
-          {/* Traços PF2e (Iniciando pela Raridade, Tradições como Traits e outros Descritores) */}
+          {/* Traços PF2e ([Raridade] + [Tradição] + [Tamanho] + [Outros Traits em Ordem Alfabética]) */}
           <div className="space-y-2 mt-3 pt-3 border-t border-zinc-800/60">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-cyan-400/80 mr-1 shrink-0">
                 TRAÇOS:
               </span>
 
-              {/* Raridade */}
-              <TraitBadge trait={spellData.rarity || 'Comum'} />
-
-              {/* Tradições como Traits com Tooltip e Drawer */}
-              {(spellData.traditions || []).map((trad) => (
+              {sortTraitsHierarchically(spellData.traits || [], {
+                rarity: spellData.rarity || 'Comum',
+                traditions: spellData.traditions || [],
+              }).map((trait) => (
                 <TraitBadge
-                  key={`trad-${trad}`}
-                  trait={trad}
+                  key={`trait-${trait}`}
+                  trait={trait}
+                  onClick={() => {
+                    window.dispatchEvent(
+                      new CustomEvent('hecos:open-trait-drawer', { detail: { trait } })
+                    );
+                  }}
                 />
               ))}
-
-              {/* Outros Traços do Feitiço */}
-              {(spellData.traits || [])
-                .filter((t) => {
-                  const low = t.toLowerCase();
-                  const isRarity = low === (spellData.rarity || 'comum').toLowerCase();
-                  const isTrad = (spellData.traditions || []).some((trad) => trad.toLowerCase() === low);
-                  return !isRarity && !isTrad;
-                })
-                .map((trait) => (
-                  <TraitBadge
-                    key={`trait-${trait}`}
-                    trait={trait}
-                  />
-                ))}
             </div>
 
             {/* Tags Temáticas / Narrativas separadas de Traits */}

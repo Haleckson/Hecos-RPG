@@ -8,6 +8,7 @@ import { TraitBadge } from './TraitBadge';
 import { renderContentWithMentions } from './MentionBadge';
 import { HecosStorage } from '../services/storage';
 import { getCardVisibilityClasses } from '../utils/cardVisibility';
+import { sortTraitsHierarchically } from '../utils/traitUtils';
 import {
   Sparkles,
   ArrowRight,
@@ -158,7 +159,10 @@ export const EntityCard: React.FC<EntityCardProps> = ({
           {/* Mechanical Traits */}
           {entity.traits && entity.traits.length > 0 && (
             <div className="flex flex-wrap items-center gap-1 pt-1">
-              {entity.traits.map((tr) => (
+              {sortTraitsHierarchically(entity.traits, {
+                rarity: entity.statblock?.rarity,
+                size: entity.statblock?.size,
+              }).map((tr) => (
                 <TraitBadge key={tr} trait={tr} />
               ))}
             </div>

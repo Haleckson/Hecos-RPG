@@ -50,7 +50,7 @@ interface InteractiveMapProps {
 
 export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity, isGmMode }) => {
   const [maps, setMaps] = useState<InteractiveMapData[]>(() => HecosStorage.getMaps());
-  const [selectedMapId, setSelectedMapId] = useState<string>(() => maps[0]?.id || 'map-hecos-geral');
+  const [selectedMapId, setSelectedMapId] = useState<string>(() => (maps && maps.length > 0 ? maps[0]?.id : 'map-hecos-geral') || 'map-hecos-geral');
 
   const currentUser = HecosStorage.getCurrentUser();
   const isActualGm = Boolean(isGmMode || currentUser?.role === 'gm');
@@ -60,7 +60,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity
   const currentMap = useMemo(() => {
     return (
       maps.find((m) => m.id === selectedMapId) ||
-      maps[0] || {
+      (maps && maps.length > 0 ? maps[0] : null) || {
         id: 'map-hecos-geral',
         title: 'Hecos: A Bacia do Eclipse',
         description: 'Mapa Geral do Continente Sombrio e Ermos',
@@ -1361,21 +1361,23 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity
       />
 
       {/* Universal Folder Manager Modal for Maps */}
-      <FolderManagerModal
-        isOpen={isFolderManagerOpen}
-        onClose={() => setIsFolderManagerOpen(false)}
-        scope="map"
-        categories={[
-          { id: 'all', name: 'Todos os Mapas' },
-          { id: 'regional', name: 'Mapas Regionais' },
-          { id: 'cities', name: 'Cidades & Assentamentos' },
-          { id: 'dungeons', name: 'Masmorras & Covis' },
-          { id: 'battlemaps', name: 'Mapas Táticos de Batalha' }
-        ]}
-        entities={[]}
-        themeColor="cyan"
-        onRefresh={() => setMaps(HecosStorage.getMaps())}
-      />
+      {isFolderManagerOpen && (
+        <FolderManagerModal
+          isOpen={isFolderManagerOpen}
+          onClose={() => setIsFolderManagerOpen(false)}
+          scope="map"
+          categories={[
+            { id: 'all', name: 'Todos os Mapas' },
+            { id: 'regional', name: 'Mapas Regionais' },
+            { id: 'cities', name: 'Cidades & Assentamentos' },
+            { id: 'dungeons', name: 'Masmorras & Covis' },
+            { id: 'battlemaps', name: 'Mapas Táticos de Batalha' }
+          ]}
+          entities={[]}
+          themeColor="cyan"
+          onRefresh={() => setMaps(HecosStorage.getMaps())}
+        />
+      )}
     </div>
   );
 };

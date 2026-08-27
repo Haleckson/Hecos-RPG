@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Save, Trash2, Award, Shield, Sparkles, Tag as TagIcon, AlertTriangle } from 'lucide-react';
 import { HecosStorage } from '../services/storage';
+import { getTraitInfo, TRAIT_CATEGORIES, sortTraitCategories } from '../utils/traitUtils';
+
+export { TRAIT_CATEGORIES };
 
 interface TraitModalProps {
   isOpen: boolean;
@@ -10,28 +13,16 @@ interface TraitModalProps {
   onSuccess?: () => void;
 }
 
-export const TRAIT_CATEGORIES = [
-  'Ancestralidade e Herança',
-  'Classe',
-  'Ações e Atividades',
-  'Magias e Tradições',
-  'Dano e Elementos',
-  'Equipamento e Itens',
-  'Criaturas',
-  'Condições',
-  'Raridade',
-  'Extra',
-];
-
-const COLOR_OPTIONS = [
+export const COLOR_OPTIONS = [
   { label: 'Ouro / Mecânica (Padrão)', value: 'border-[#3a2e4c] bg-[#1a1426] text-[#cca862]' },
-  { label: 'Âmbar / Incomum', value: 'border-amber-700/80 bg-amber-950/80 text-amber-300' },
-  { label: 'Azul / Raro', value: 'border-blue-700/80 bg-blue-950/80 text-blue-300' },
-  { label: 'Roxo / Único / Linhagem', value: 'border-purple-700/80 bg-purple-950/80 text-purple-300' },
-  { label: 'Vermelho / Fogo / Dano', value: 'border-rose-700/80 bg-rose-950/80 text-rose-300' },
-  { label: 'Ciano / Água / Magia', value: 'border-cyan-700/80 bg-cyan-950/80 text-cyan-300' },
-  { label: 'Verde / Terra / Condição', value: 'border-emerald-700/80 bg-emerald-950/80 text-emerald-300' },
-  { label: 'Cinza / Comum / Criaturas', value: 'border-zinc-700 bg-zinc-900 text-zinc-300' },
+  { label: 'Ciano / Cinética / Água', value: 'border-cyan-700/80 bg-cyan-950/80 text-cyan-300' },
+  { label: 'Roxo / Etérea / Ilusão', value: 'border-purple-700/80 bg-purple-950/80 text-purple-300' },
+  { label: 'Verde / Biológica / Cura', value: 'border-emerald-700/80 bg-emerald-950/80 text-emerald-300' },
+  { label: 'Âmbar / Abiótica / Incomum', value: 'border-amber-700/80 bg-amber-950/80 text-amber-300' },
+  { label: 'Rosa / Omni / Fogo Vivo', value: 'border-rose-600/80 bg-rose-950/80 text-rose-300' },
+  { label: 'Azul / Raro / Abjuração', value: 'border-blue-700/80 bg-blue-950/80 text-blue-300' },
+  { label: 'Teal / Ar / Tempestade', value: 'border-teal-700/80 bg-teal-950/80 text-teal-300' },
+  { label: 'Cinza / Comum / Geral', value: 'border-zinc-700 bg-zinc-900 text-zinc-300' },
 ];
 
 export const TraitModal: React.FC<TraitModalProps> = ({
@@ -41,34 +32,27 @@ export const TraitModal: React.FC<TraitModalProps> = ({
   onSuccess,
 }) => {
   const [name, setName] = useState('');
-  const [category, setCategory] = useState('Ações e Atividades');
+  const [category, setCategory] = useState('Tradições de Hecos');
   const [description, setDescription] = useState('');
-  const [color, setColor] = useState(COLOR_OPTIONS[0].value);
+  const defaultColor = COLOR_OPTIONS && COLOR_OPTIONS[0] ? COLOR_OPTIONS[0].value : 'border-zinc-700 bg-zinc-900 text-zinc-300';
+  const [color, setColor] = useState(defaultColor);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (traitName) {
       setName(traitName);
-      const cleanKey = traitName.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      const customTraits = HecosStorage.getCustomTraits();
-      const existing = customTraits[cleanKey];
-      if (existing) {
-        setCategory(existing.category || 'Ações e Atividades');
-        setDescription(existing.description || '');
-        setColor(existing.color || COLOR_OPTIONS[0].value);
-      } else {
-        setCategory('Ações e Atividades');
-        setDescription('Traço oficial do Pathfinder 2e aplicado a regras, ações, feitiços, itens ou criaturas.');
-        setColor(COLOR_OPTIONS[0].value);
-      }
+      const info = getTraitInfo(traitName);
+      setCategory(info.category || 'Mecânica PF2e / Hecos');
+      setDescription(info.description || '');
+      setColor(info.color || defaultColor);
     } else {
       setName('');
       setCategory('Ações e Atividades');
       setDescription('');
-      setColor(COLOR_OPTIONS[0].value);
+      setColor(defaultColor);
     }
     setShowDeleteConfirm(false);
-  }, [traitName, isOpen]);
+  }, [traitName, isOpen, defaultColor]);
 
   if (!isOpen) return null;
 

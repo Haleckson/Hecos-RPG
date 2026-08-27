@@ -68,16 +68,30 @@ export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNa
     }
   };
 
+  const handleBadgeClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsHovered(false);
+    
+    if (entity) {
+      window.dispatchEvent(
+        new CustomEvent('hecos:open-entity-drawer', {
+          detail: { entityId: entity.id, slug: entity.slug }
+        })
+      );
+    }
+  };
+
   return (
     <span className="relative inline-block my-0.5">
       <span
         role="button"
         tabIndex={0}
-        onClick={() => onNavigate(entity.id)}
+        onClick={handleBadgeClick}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            onNavigate(entity.id);
+            handleBadgeClick(e as unknown as React.MouseEvent);
           }
         }}
         onMouseEnter={handleMouseEnter}
@@ -170,11 +184,12 @@ export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNa
               )}
 
               <button
-                onClick={() => onNavigate(entity.id)}
-                className="w-full mt-3 py-1 px-2 text-xs font-semibold text-center rounded bg-zinc-800 hover:bg-cyan-900 hover:text-cyan-200 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                type="button"
+                onClick={handleBadgeClick}
+                className="w-full mt-3 py-1.5 px-2.5 text-xs font-semibold text-center rounded-lg bg-zinc-800 hover:bg-cyan-950 hover:text-cyan-200 border border-zinc-700 hover:border-cyan-500/50 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
               >
-                <span>Abrir Artigo de Hecos</span>
-                <ExternalLink className="w-3 h-3" />
+                <span>Ver Artigo Completo no Painel</span>
+                <ExternalLink className="w-3.5 h-3.5 text-cyan-400" />
               </button>
             </motion.div>
           )}

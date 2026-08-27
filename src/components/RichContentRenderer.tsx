@@ -69,7 +69,9 @@ export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
 
   // Helper to parse line-by-line blocks
   const renderBlocks = () => {
-    const lines = content.split('\n');
+    // Strip raw HTML comment payloads (like embedded serialization metadata)
+    const cleanedContent = content.replace(/<!--[\s\S]*?-->/g, '');
+    const lines = cleanedContent.split('\n');
     const elements: React.ReactNode[] = [];
     let i = 0;
 
@@ -265,7 +267,7 @@ export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
         }
 
         const fullCalloutText = calloutLines.join('\n');
-        const firstLine = calloutLines[0];
+        const firstLine = (calloutLines && calloutLines.length > 0 ? calloutLines[0] : '') || '';
 
         // Detect callout style based on lead icon / keyword
         let calloutType: 'info' | 'hazard' | 'eclipse' | 'treasure' | 'nature' | 'secret' | 'quote' = 'quote';
@@ -384,9 +386,9 @@ export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
         }
 
         if (tableLines.length >= 2) {
-          const headerRow = tableLines[0];
+          const headerRow = (tableLines && tableLines.length > 0 ? tableLines[0] : '') || '';
           // Check if line 1 is separator |---|---|
-          const isSep = tableLines[1].replace(/[\s|:-]/g, '').length === 0;
+          const isSep = Boolean(tableLines[1] && tableLines[1].replace(/[\s|:-]/g, '').length === 0);
           const headers = headerRow
             .split('|')
             .slice(1, -1)

@@ -4,6 +4,7 @@ import { HecosStorage } from '../services/storage';
 import { RichContentRenderer } from './RichContentRenderer';
 import { AdjustableImage } from './AdjustableImage';
 import { TraitBadge } from './TraitBadge';
+import { sortTraitsHierarchically } from '../utils/traitUtils';
 import {
   Skull,
   AlertTriangle,
@@ -173,7 +174,13 @@ export const PerilView: React.FC<PerilViewProps> = ({
           {/* Traits */}
           <div className="flex items-center gap-1.5 flex-wrap pt-1">
             {isFieldVisible('typeAndTraits') ? (
-              (peril?.traits || entity.statblock?.traits || ['PF2e']).map((trait, idx) => (
+              sortTraitsHierarchically(
+                peril?.traits || entity.statblock?.traits || ['PF2e'],
+                {
+                  rarity: peril?.rarity || entity.statblock?.rarity || 'Comum',
+                  size: peril?.size || entity.statblock?.size,
+                }
+              ).map((trait, idx) => (
                 <TraitBadge
                   key={idx}
                   trait={trait}

@@ -916,6 +916,142 @@ export function subscribeToImageAdjustmentsRealtime(callback: (adjustments: Reco
 }
 
 /**
+ * Sync Custom Traits to Firebase Realtime Database
+ */
+export async function syncCustomTraitsToFirebase(traits: Record<string, any>): Promise<boolean> {
+  if (!isFirebaseAvailable || !db) return false;
+  try {
+    const traitsRef = ref(db, 'hecos_custom_traits');
+    const safeObj: Record<string, any> = {};
+    for (const [key, val] of Object.entries(traits)) {
+      safeObj[toSafeKey(key)] = cleanForFirebase({ key, ...val });
+    }
+    await withTimeout(set(traitsRef, safeObj), 15000);
+    return true;
+  } catch (err) {
+    console.error("Error syncing custom traits to Firebase:", err);
+    return false;
+  }
+}
+
+/**
+ * Load Custom Traits from Firebase
+ */
+export async function loadCustomTraitsFromFirebase(): Promise<Record<string, any> | null> {
+  if (!isFirebaseAvailable || !db) return null;
+  try {
+    const traitsRef = ref(db, 'hecos_custom_traits');
+    const snap = await withTimeout(get(traitsRef), 15000);
+    if (!snap.exists()) return null;
+    const raw = snap.val();
+    const result: Record<string, any> = {};
+    for (const item of Object.values(raw || {})) {
+      if (item && typeof item === 'object' && (item as any).key) {
+        const { key, ...rest } = item as any;
+        result[key] = rest;
+      }
+    }
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Subscribe to Custom Traits in Realtime
+ */
+export function subscribeToCustomTraitsRealtime(callback: (traits: Record<string, any>) => void): Unsubscribe {
+  if (!isFirebaseAvailable || !db) return () => {};
+  try {
+    const traitsRef = ref(db, 'hecos_custom_traits');
+    return onValue(traitsRef, (snap) => {
+      if (!snap.exists()) return;
+      const raw = snap.val() || {};
+      const result: Record<string, any> = {};
+      for (const item of Object.values(raw)) {
+        if (item && typeof item === 'object' && (item as any).key) {
+          const { key, ...rest } = item as any;
+          result[key] = rest;
+        }
+      }
+      callback(result);
+    }, (error) => {
+      console.warn("Real-time custom traits error:", error);
+    });
+  } catch {
+    return () => {};
+  }
+}
+
+/**
+ * Sync Custom Tags to Firebase Realtime Database
+ */
+export async function syncCustomTagsToFirebase(tags: Record<string, any>): Promise<boolean> {
+  if (!isFirebaseAvailable || !db) return false;
+  try {
+    const tagsRef = ref(db, 'hecos_custom_tags');
+    const safeObj: Record<string, any> = {};
+    for (const [key, val] of Object.entries(tags)) {
+      safeObj[toSafeKey(key)] = cleanForFirebase({ key, ...val });
+    }
+    await withTimeout(set(tagsRef, safeObj), 15000);
+    return true;
+  } catch (err) {
+    console.error("Error syncing custom tags to Firebase:", err);
+    return false;
+  }
+}
+
+/**
+ * Load Custom Tags from Firebase
+ */
+export async function loadCustomTagsFromFirebase(): Promise<Record<string, any> | null> {
+  if (!isFirebaseAvailable || !db) return null;
+  try {
+    const tagsRef = ref(db, 'hecos_custom_tags');
+    const snap = await withTimeout(get(tagsRef), 15000);
+    if (!snap.exists()) return null;
+    const raw = snap.val();
+    const result: Record<string, any> = {};
+    for (const item of Object.values(raw || {})) {
+      if (item && typeof item === 'object' && (item as any).key) {
+        const { key, ...rest } = item as any;
+        result[key] = rest;
+      }
+    }
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Subscribe to Custom Tags in Realtime
+ */
+export function subscribeToCustomTagsRealtime(callback: (tags: Record<string, any>) => void): Unsubscribe {
+  if (!isFirebaseAvailable || !db) return () => {};
+  try {
+    const tagsRef = ref(db, 'hecos_custom_tags');
+    return onValue(tagsRef, (snap) => {
+      if (!snap.exists()) return;
+      const raw = snap.val() || {};
+      const result: Record<string, any> = {};
+      for (const item of Object.values(raw)) {
+        if (item && typeof item === 'object' && (item as any).key) {
+          const { key, ...rest } = item as any;
+          result[key] = rest;
+        }
+      }
+      callback(result);
+    }, (error) => {
+      console.warn("Real-time custom tags error:", error);
+    });
+  } catch {
+    return () => {};
+  }
+}
+
+/**
  * Seed initial database if completely empty
  */
 export async function seedDatabaseIfEmpty(initialEntities: any[]): Promise<boolean> {

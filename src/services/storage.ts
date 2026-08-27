@@ -1,5 +1,6 @@
 import { HecosEntity, InteractiveMapData, YouTubeAmbianceTrack, GoogleDriveResource, TagInfo, HecosUser, FolderPermission, ItemVisibility, TrashedEntity, ImageAdjustment } from '../types';
 import { INITIAL_ENTITIES, INITIAL_MAPS, INITIAL_YOUTUBE_TRACKS, INITIAL_DRIVE_RESOURCES } from '../data/initialHecosData';
+import { migrateAllSpellEntities, migrateSpellEntity } from '../utils/spellMigration';
 import {
   syncEntityToFirebase,
   deleteEntityFromFirebase,
@@ -31,7 +32,13 @@ import {
   subscribeToFolderPermissionsRealtime,
   syncImageAdjustmentsToFirebase,
   loadImageAdjustmentsFromFirebase,
-  subscribeToImageAdjustmentsRealtime
+  subscribeToImageAdjustmentsRealtime,
+  syncCustomTraitsToFirebase,
+  loadCustomTraitsFromFirebase,
+  subscribeToCustomTraitsRealtime,
+  syncCustomTagsToFirebase,
+  loadCustomTagsFromFirebase,
+  subscribeToCustomTagsRealtime
 } from './firebase';
 
 const STORAGE_KEYS = {
@@ -76,6 +83,10 @@ export const DEFAULT_FEAT_CATEGORIES_CONFIG: Record<string, string[]> = {
 
 export const DEFAULT_SPELL_CATEGORIES_CONFIG: Record<string, string[]> = {
   all: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Magias de Ataque', 'Magias Utilitárias', 'Defesa & Abjuração'],
+  cinetica: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Cinética & Força', 'Calor & Fogo', 'Eletricidade & Raios', 'Gravidade'],
+  eterea: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Espaço & Teleporte', 'Tempo & Cronurgia', 'Ilusões & Mente', 'Dimensões & Alma'],
+  biologica: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Cura & Regeneração', 'Biomassa & Carne', 'Flora & Venenos', 'Sangue & Metamorfose'],
+  abiotica: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Metal & Forja', 'Cristais & Vidro Estelar', 'Terra & Rochas', 'Obsidiana & Selos'],
   e_fisica: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Cinética & Força', 'Calor & Fogo', 'Eletricidade & Raios', 'Gravidade'],
   e_meta: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Espaço & Teleporte', 'Tempo & Cronurgia', 'Ilusões & Mente', 'Dimensões & Alma'],
   m_organica: ['Truques', '1º Círculo', '2º Círculo', '3º Círculo', '4º Círculo', '5º Círculo', '6º Círculo', '7º Círculo', '8º Círculo', '9º Círculo', '10º Círculo', 'Cura & Regeneração', 'Biomassa & Carne', 'Flora & Venenos', 'Sangue & Metamorfose'],
@@ -362,7 +373,8 @@ export class HecosStorage {
       });
 
       if (hasNewChanges || map.size !== current.length) {
-        const merged = Array.from(map.values());
+        const rawMerged = Array.from(map.values());
+        const { entities: merged } = migrateAllSpellEntities(rawMerged);
         this.entitiesCache = merged;
         this.saveEntitiesLocal(merged);
         this.notifyEntitySubscribers();
@@ -467,6 +479,44 @@ export class HecosStorage {
         localStorage.setItem(STORAGE_KEYS.IMAGE_ADJUSTMENTS, JSON.stringify(adjustments));
       } catch {}
       this.notifyImageAdjustmentSubscribers();
+    });
+
+    // Start real-time listener for custom traits
+    subscribeToCustomTraitsRealtime((traits) => {
+      if (!traits || typeof traits !== 'object') return;
+      this.customTraitsCache = traits;
+      try {
+        localStorage.setItem(STORAGE_KEYS.CUSTOM_TRAITS, JSON.stringify(traits));
+      } catch {}
+      this.traitSubscribers.forEach((cb) => {
+        try {
+          cb();
+        } catch (e) {
+          console.error(e);
+        }
+      });
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('hecos:traits-updated'));
+      }
+    });
+
+    // Start real-time listener for custom tags
+    subscribeToCustomTagsRealtime((tags) => {
+      if (!tags || typeof tags !== 'object') return;
+      this.customTagsCache = tags;
+      try {
+        localStorage.setItem(STORAGE_KEYS.CUSTOM_TAGS, JSON.stringify(tags));
+      } catch {}
+      this.tagSubscribers.forEach((cb) => {
+        try {
+          cb();
+        } catch (e) {
+          console.error(e);
+        }
+      });
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('hecos:tags-updated'));
+      }
     });
   }
 
@@ -575,7 +625,20 @@ export class HecosStorage {
             changed = true;
           }
         }
-        this.entitiesCache = activeEntities;
+
+        // Automatic spell traditions & traits migration
+        const { entities: migratedEntities, hasAnyChange: spellMigrationOccurred } = migrateAllSpellEntities(activeEntities);
+        if (spellMigrationOccurred) {
+          changed = true;
+          // Sync migrated spells to Firebase if connected
+          migratedEntities.forEach((mEnt) => {
+            if (mEnt.category === 'spell' || mEnt.spellData) {
+              syncEntityToFirebase(mEnt).catch(() => {});
+            }
+          });
+        }
+
+        this.entitiesCache = migratedEntities;
         if (changed || activeEntities.length !== parsed.length) {
           this.saveEntitiesLocal(this.entitiesCache);
         }
@@ -616,9 +679,17 @@ export class HecosStorage {
             map.set(e.id, e);
           }
         });
-        const merged = Array.from(map.values());
+        const rawMerged = Array.from(map.values());
+        const { entities: merged, hasAnyChange } = migrateAllSpellEntities(rawMerged);
         this.entitiesCache = merged;
         this.saveEntitiesLocal(merged);
+        if (hasAnyChange) {
+          merged.forEach((mEnt) => {
+            if (mEnt.category === 'spell' || mEnt.spellData) {
+              syncEntityToFirebase(mEnt).catch(() => {});
+            }
+          });
+        }
         this.notifyEntitySubscribers();
         return merged;
       } else {
@@ -663,8 +734,9 @@ export class HecosStorage {
 
     const list = this.getEntities();
     const index = list.findIndex((e) => e.id === entity.id);
+    const { entity: cleanSpellEntity } = migrateSpellEntity(entity);
     const updatedEntity = {
-      ...entity,
+      ...cleanSpellEntity,
       updatedAt: new Date().toISOString()
     };
 
@@ -1329,7 +1401,7 @@ export class HecosStorage {
         updated = true;
       }
       if (ent.subcategory === subcategoryName) {
-        ent.subcategory = ent.featData?.subcategories?.[0] || ent.subcategories?.[0] || '';
+        ent.subcategory = (ent.featData?.subcategories && ent.featData.subcategories[0]) || (ent.subcategories && ent.subcategories[0]) || '';
         updated = true;
       }
       if (ent.tags?.includes(subcategoryName)) {
@@ -1371,7 +1443,7 @@ export class HecosStorage {
     }
     ent.featData.subcategories = cleanSubcats;
     ent.subcategories = cleanSubcats;
-    ent.subcategory = cleanSubcats[0] || ent.subcategory || '';
+    ent.subcategory = (cleanSubcats && cleanSubcats[0]) || ent.subcategory || '';
     
     // Also add subcategories to tags if helpful
     const currentTags = new Set(ent.tags || []);
@@ -1539,7 +1611,7 @@ export class HecosStorage {
 
         // 3. Unlink from ent.subcategory field
         if (ent.subcategory === subcategoryName) {
-          ent.subcategory = ent.spellData?.subcategories?.[0] || ent.subcategories?.[0] || '';
+          ent.subcategory = (ent.spellData?.subcategories && ent.spellData.subcategories[0]) || (ent.subcategories && ent.subcategories[0]) || '';
           updated = true;
         }
 
@@ -1573,7 +1645,7 @@ export class HecosStorage {
     if (ent.spellData) {
       ent.spellData.subcategories = cleanSubcats;
     }
-    ent.subcategory = cleanSubcats[0] || ent.subcategory || '';
+    ent.subcategory = (cleanSubcats && cleanSubcats[0]) || ent.subcategory || '';
     const currentTags = new Set(ent.tags || []);
     cleanSubcats.forEach((s) => currentTags.add(s));
     ent.tags = Array.from(currentTags);
@@ -1681,7 +1753,7 @@ export class HecosStorage {
           updated = true;
         }
         if (ent.subcategory === subcategoryName) {
-          ent.subcategory = subcats[0] || '';
+          ent.subcategory = (subcats && subcats[0]) || '';
           updated = true;
         }
         if (updated) {
@@ -1697,7 +1769,7 @@ export class HecosStorage {
     if (!ent) return false;
     const cleanSubcats = Array.from(new Set(subcategories.map((s) => s.trim()).filter(Boolean)));
     ent.subcategories = cleanSubcats;
-    ent.subcategory = cleanSubcats[0] || ent.subcategory || '';
+    ent.subcategory = (cleanSubcats && cleanSubcats[0]) || ent.subcategory || '';
     const currentTags = new Set(ent.tags || []);
     cleanSubcats.forEach((s) => currentTags.add(s));
     ent.tags = Array.from(currentTags);
@@ -1836,7 +1908,7 @@ export class HecosStorage {
         updated = true;
       }
       if (ent.subcategory === subcategoryName) {
-        ent.subcategory = ent.subcategories?.[0] || '';
+        ent.subcategory = (ent.subcategories && ent.subcategories[0]) || '';
         updated = true;
       }
       if (ent.featData?.subcategories?.includes(subcategoryName)) {
@@ -1886,7 +1958,7 @@ export class HecosStorage {
     if (!ent) return false;
     const cleanSubcats = Array.from(new Set(subcategories.map((s) => s.trim()).filter(Boolean)));
     ent.subcategories = cleanSubcats;
-    ent.subcategory = cleanSubcats[0] || ent.subcategory || '';
+    ent.subcategory = (cleanSubcats && cleanSubcats[0]) || ent.subcategory || '';
     if (ent.featData) ent.featData.subcategories = cleanSubcats;
     if (ent.spellData) ent.spellData.subcategories = cleanSubcats;
     if (ent.itemData) ent.itemData.subcategories = cleanSubcats;
@@ -1915,12 +1987,19 @@ export class HecosStorage {
 
   /**
    * Check if a folder/subcategory is marked secret (GM only).
-   * BY DEFAULT, EVERY FOLDER IS SECRET unless the GM explicitly clicked the Eye to reveal it!
    */
   static isFolderSecret(folderOrSubcategory: string): boolean {
     if (!folderOrSubcategory) return false;
     const trimmed = folderOrSubcategory.trim();
     if (trimmed === 'all' || trimmed === '__none__' || trimmed === '') return false;
+    
+    // Check granular folder permissions first
+    const perms = this.getFolderPermissions();
+    const perm = perms[trimmed.toLowerCase()] || perms[trimmed];
+    if (perm) {
+      return perm.visibility === 'gm';
+    }
+    
     const publics = this.getPublicFolders();
     const isPublic = publics.has(trimmed) || publics.has(trimmed.toLowerCase());
     return !isPublic;
@@ -2213,6 +2292,10 @@ export class HecosStorage {
    */
   static canUserAccessItem(
     item: {
+      id?: string;
+      category?: string;
+      subcategory?: string;
+      subcategories?: string[];
       visibility?: ItemVisibility;
       allowedUserIds?: string[];
       featEntityId?: string;
@@ -2225,17 +2308,49 @@ export class HecosStorage {
     if (user && user.role === 'gm') {
       return true;
     }
-    const eff = this.getEffectiveItemPermission(item);
-    // If the source entity is not accessible to this user, block access
-    if (!this.canUserAccess(eff.visibility, eff.allowedUserIds, user)) {
+
+    // 1. Explicit item-level visibility
+    if (item.visibility === 'all') {
+      return true;
+    }
+    if (item.visibility === 'gm') {
       return false;
     }
-    // If the local item also specifies its own visibility, check that too
-    if (item.visibility && item.visibility !== 'all') {
-      if (!this.canUserAccess(item.visibility, item.allowedUserIds, user, item.isSecret)) {
-        return false;
+    if (item.visibility === 'custom') {
+      if (!user) return false;
+      return Boolean(item.allowedUserIds?.some((id) =>
+        id === user.id ||
+        id.toLowerCase() === user.username.toLowerCase() ||
+        id.toLowerCase() === user.name.toLowerCase()
+      ));
+    }
+
+    // 2. If item is a link to another entity (e.g. featEntityId or entityId)
+    const eff = this.getEffectiveItemPermission(item);
+    if (eff.sourceEntity) {
+      return this.canUserAccess(eff.visibility, eff.allowedUserIds, user);
+    }
+
+    // 3. Explicit legacy isSecret flag: false means public
+    if (item.isSecret === false) {
+      return true;
+    }
+
+    // 4. Check parent category permission (e.g. 'feat', 'spell', 'item', 'ancestries', etc.)
+    if (item.category) {
+      const catPerm = this.getFolderPermission(item.category);
+      if (catPerm && catPerm.visibility) {
+        if (this.canUserAccess(catPerm.visibility, catPerm.allowedUserIds, user)) {
+          return true;
+        }
       }
     }
+
+    // 5. If item has isSecret === true and no category permission opened it
+    if (item.isSecret === true) {
+      return false;
+    }
+
     return true;
   }
 
@@ -2621,37 +2736,55 @@ export class HecosStorage {
     data: { description: string; category?: string; color?: string }
   ): void {
     if (!tagName) return;
-    const cleanKey = tagName.trim().toLowerCase().replace(/^#/, '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const clean = tagName.trim().replace(/^#/, '');
+    const cleanKey = clean.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const exactKey = clean.toLowerCase();
     const all = { ...this.getCustomTags() };
-    all[cleanKey] = {
+    const entry = {
       category: data.category || 'Campanha e Narrativa',
       description: data.description || 'Tag temática ou de organização em Hecos.',
       color: data.color || 'border-cyan-800/80 bg-cyan-950/80 text-cyan-300',
     };
+    all[cleanKey] = entry;
+    if (exactKey !== cleanKey) {
+      all[exactKey] = entry;
+    }
     this.customTagsCache = all;
     try {
       localStorage.setItem(STORAGE_KEYS.CUSTOM_TAGS, JSON.stringify(all));
     } catch (e) {
       console.warn("Error saving custom tag:", e);
     }
+    syncCustomTagsToFirebase(all).catch(() => {});
     this.tagSubscribers.forEach((cb) => cb());
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('hecos:tags-updated', { detail: { tag: clean } }));
+    }
   }
 
   static deleteCustomTag(tagName: string): void {
     if (!tagName) return;
-    const cleanKey = tagName.trim().toLowerCase().replace(/^#/, '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const clean = tagName.trim().replace(/^#/, '');
+    const cleanKey = clean.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const exactKey = clean.toLowerCase();
     const all = { ...this.getCustomTags() };
     delete all[cleanKey];
+    delete all[exactKey];
     this.customTagsCache = all;
     try {
       localStorage.setItem(STORAGE_KEYS.CUSTOM_TAGS, JSON.stringify(all));
     } catch (e) {
       console.warn("Error deleting custom tag:", e);
     }
+    syncCustomTagsToFirebase(all).catch(() => {});
     this.tagSubscribers.forEach((cb) => cb());
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('hecos:tags-updated', { detail: { tag: clean } }));
+    }
   }
 
   static subscribeTags(callback: () => void): () => void {
+    this.ensureRealtimeInitialized();
     this.tagSubscribers.add(callback);
     return () => this.tagSubscribers.delete(callback);
   }
@@ -2676,37 +2809,55 @@ export class HecosStorage {
     data: { category: string; description: string; color?: string }
   ): void {
     if (!traitName) return;
-    const cleanKey = traitName.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const clean = traitName.trim();
+    const cleanKey = clean.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const exactKey = clean.toLowerCase();
     const all = { ...this.getCustomTraits() };
-    all[cleanKey] = {
+    const entry = {
       category: data.category || 'Mecânica Hecos',
       description: data.description || 'Traço customizado do mundo de Hecos.',
       color: data.color || 'border-[#3a2e4c] bg-[#1a1426] text-[#cca862]',
     };
+    all[cleanKey] = entry;
+    if (exactKey !== cleanKey) {
+      all[exactKey] = entry;
+    }
     this.customTraitsCache = all;
     try {
       localStorage.setItem(STORAGE_KEYS.CUSTOM_TRAITS, JSON.stringify(all));
     } catch (e) {
       console.warn("Error saving custom trait:", e);
     }
+    syncCustomTraitsToFirebase(all).catch(() => {});
     this.traitSubscribers.forEach((cb) => cb());
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('hecos:traits-updated', { detail: { trait: clean } }));
+    }
   }
 
   static deleteCustomTrait(traitName: string): void {
     if (!traitName) return;
-    const cleanKey = traitName.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const clean = traitName.trim();
+    const cleanKey = clean.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const exactKey = clean.toLowerCase();
     const all = { ...this.getCustomTraits() };
     delete all[cleanKey];
+    delete all[exactKey];
     this.customTraitsCache = all;
     try {
       localStorage.setItem(STORAGE_KEYS.CUSTOM_TRAITS, JSON.stringify(all));
     } catch (e) {
       console.warn("Error deleting custom trait:", e);
     }
+    syncCustomTraitsToFirebase(all).catch(() => {});
     this.traitSubscribers.forEach((cb) => cb());
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('hecos:traits-updated', { detail: { trait: clean } }));
+    }
   }
 
   static subscribeTraits(callback: () => void): () => void {
+    this.ensureRealtimeInitialized();
     this.traitSubscribers.add(callback);
     return () => this.traitSubscribers.delete(callback);
   }
