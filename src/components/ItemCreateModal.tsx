@@ -11,6 +11,7 @@ import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { TraitBadge } from './TraitBadge';
 import { TraitInputCombobox } from './TraitInputCombobox';
+import { FolderManagerModal } from './FolderManagerModal';
 import {
   Package,
   X,
@@ -25,6 +26,8 @@ import {
   Backpack,
   Sparkles,
   Folder,
+  FolderPlus,
+  FolderTree,
   Eye,
   Coins,
   Weight,
@@ -38,6 +41,7 @@ import {
   Lock,
   Flame,
   Info,
+  Settings2,
 } from 'lucide-react';
 
 interface ItemCreateModalProps {
@@ -290,8 +294,19 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
     }
   }, [isOpen, targetEditEntity, effectiveCategory, effectiveSubcategory]);
 
-  // Available item folders from storage
-  const itemConfig = useMemo(() => HecosStorage.getAllItemSubcategoriesConfig(), []);
+  // Available item folders from storage with real-time subscription
+  const [itemConfig, setItemConfig] = useState<Record<string, string[]>>(() =>
+    HecosStorage.getAllItemSubcategoriesConfig()
+  );
+  const [isFolderManagerOpen, setIsFolderManagerOpen] = useState(false);
+
+  useEffect(() => {
+    const unsub = HecosStorage.subscribeItemCategories((newCfg) => {
+      setItemConfig(newCfg);
+    });
+    return () => unsub();
+  }, []);
+
   const allExistingFolders = useMemo(() => {
     const set = new Set<string>();
     (Object.values(itemConfig) as string[][]).forEach((list) => {
@@ -684,28 +699,53 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
               </div>
 
               {/* Row 5: Subcategories / Folders */}
-              <div className="space-y-1.5 p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-800">
-                <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
-                  <Folder className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Pastas & Tipos de Item:</span>
-                </label>
+              <div className="space-y-2 p-3.5 rounded-xl bg-zinc-950/70 border border-zinc-800/90 shadow-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+                    <Folder className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Pastas do Item (Organização):</span>
+                    {selectedSubcategories.length > 0 && (
+                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        {selectedSubcategories.length}
+                      </span>
+                    )}
+                  </label>
 
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {selectedSubcategories.map((subcat) => (
-                    <span
-                      key={subcat}
-                      className="px-2.5 py-1 rounded-lg bg-purple-950 border border-purple-800 text-purple-200 text-xs font-bold flex items-center gap-1"
-                    >
-                      <span>{subcat}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveSubcategory(subcat)}
-                        className="hover:text-rose-400 text-purple-400"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsFolderManagerOpen(true)}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-amber-300 border border-zinc-700/80 hover:border-amber-500/40 text-[11px] font-bold transition-all cursor-pointer"
+                    title="Abrir gerenciador avançado de pastas e subcategorias de itens"
+                  >
+                    <Settings2 className="w-3 h-3 text-amber-400" />
+                    <span>Gerenciar Pastas</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-wrap min-h-[28px]">
+                  {selectedSubcategories.length === 0 ? (
+                    <span className="text-[11px] text-zinc-500 italic">
+                      Nenhuma pasta atribuída. Selecione ou crie uma pasta abaixo.
                     </span>
-                  ))}
+                  ) : (
+                    selectedSubcategories.map((subcat) => (
+                      <span
+                        key={subcat}
+                        className="px-2.5 py-1 rounded-lg bg-amber-950/60 border border-amber-700/50 text-amber-200 text-xs font-bold flex items-center gap-1.5 shadow-xs"
+                      >
+                        <Folder className="w-3 h-3 text-amber-400" />
+                        <span>{subcat}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSubcategory(subcat)}
+                          className="hover:text-rose-400 text-amber-400/70 cursor-pointer"
+                          title={`Remover pasta ${subcat}`}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2 pt-1 flex-wrap sm:flex-nowrap">
@@ -717,34 +757,70 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                       e.target.value = '';
                     }}
                     defaultValue=""
-                    className="w-full sm:w-auto px-3 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-300 outline-none focus:border-amber-400"
+                    className="w-full sm:w-auto px-3 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-300 outline-none focus:border-amber-400 cursor-pointer"
                   >
                     <option value="" disabled>
                       + Selecionar Pasta Existente...
                     </option>
-                    {allExistingFolders.map((f) => (
-                      <option key={f} value={f}>
-                        {f}
-                      </option>
-                    ))}
+                    {Object.entries(itemConfig).map(([catKey, subList]) => {
+                      const list = (subList as string[]) || [];
+                      const unselectedInCat = list.filter((s) => !selectedSubcategories.includes(s));
+                      if (unselectedInCat.length === 0) return null;
+                      const catName =
+                        catKey === 'weapons'
+                          ? 'Armas'
+                          : catKey === 'armor'
+                          ? 'Armaduras & Escudos'
+                          : catKey === 'consumables'
+                          ? 'Consumíveis'
+                          : catKey === 'alchemical'
+                          ? 'Alquimia & Venenos'
+                          : catKey === 'magical'
+                          ? 'Itens Mágicos'
+                          : catKey === 'artifacts'
+                          ? 'Artefatos & Relíquias'
+                          : catKey === 'gear'
+                          ? 'Equipamento de Aventura'
+                          : catKey === 'extras'
+                          ? 'Especiais & Homebrew'
+                          : 'Gerais';
+                      return (
+                        <optgroup key={catKey} label={catName}>
+                          {unselectedInCat.map((f) => (
+                            <option key={f} value={f}>
+                              {f}
+                            </option>
+                          ))}
+                        </optgroup>
+                      );
+                    })}
                   </select>
 
-                  <input
-                    type="text"
-                    value={newSubcategoryInput}
-                    onChange={(e) => setNewSubcategoryInput(e.target.value)}
-                    placeholder="Ou criar nova pasta..."
-                    className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 placeholder-zinc-500 outline-none focus:border-amber-400"
-                  />
+                  <div className="flex-1 flex items-center gap-1.5 w-full">
+                    <input
+                      type="text"
+                      value={newSubcategoryInput}
+                      onChange={(e) => setNewSubcategoryInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddSubcategory();
+                        }
+                      }}
+                      placeholder="Ou digitar nova pasta (Enter para adicionar)..."
+                      className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 placeholder-zinc-500 outline-none focus:border-amber-400"
+                    />
 
-                  <button
-                    type="button"
-                    onClick={handleAddSubcategory}
-                    disabled={!newSubcategoryInput.trim()}
-                    className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    + Adicionar
-                  </button>
+                    <button
+                      type="button"
+                      onClick={handleAddSubcategory}
+                      disabled={!newSubcategoryInput.trim()}
+                      className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-amber-300 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0 flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Adicionar</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1409,6 +1485,19 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
             </button>
           </div>
         </div>
+        {/* Subcategories / Folders Manager Modal */}
+        {isFolderManagerOpen && (
+          <FolderManagerModal
+            isOpen={isFolderManagerOpen}
+            onClose={() => setIsFolderManagerOpen(false)}
+            scope="item"
+            initialCategoryId={itemData.itemType || 'gear'}
+            themeColor="amber"
+            onRefresh={() => {
+              setItemConfig(HecosStorage.getAllItemSubcategoriesConfig());
+            }}
+          />
+        )}
       </div>
     </div>
   );

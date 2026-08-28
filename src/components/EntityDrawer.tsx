@@ -198,7 +198,11 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-            className="w-screen max-w-2xl lg:max-w-3xl xl:max-w-4xl bg-[#09080e] border-l border-zinc-800 shadow-2xl flex flex-col h-full overflow-hidden text-zinc-100 relative"
+            className={`w-screen ${
+              currentEntity?.category === 'peril' || currentEntity?.category === 'creature' || currentEntity?.perilData
+                ? 'max-w-[90vw] md:max-w-[90vw] lg:max-w-[90vw]'
+                : 'max-w-2xl lg:max-w-3xl xl:max-w-4xl'
+            } bg-[#09080e] border-l border-zinc-800 shadow-2xl flex flex-col h-full overflow-hidden text-zinc-100 relative`}
           >
             {/* 1. Header Toolbar */}
             <div className="px-5 py-3.5 bg-[#100d1b] border-b border-zinc-800/90 flex items-center justify-between gap-3 shrink-0 z-30 shadow-md">

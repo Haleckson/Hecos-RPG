@@ -64,9 +64,20 @@ export const TraitBadge: React.FC<TraitBadgeProps> = ({
   const handleMouseEnter = (e: React.MouseEvent) => {
     if (showConfirmDelete || !showTooltip) return;
     const rect = e.currentTarget.getBoundingClientRect();
+    const tooltipH = 150;
+    const spaceBelow = window.innerHeight - rect.bottom - 12;
+    const spaceAbove = rect.top - 12;
+
+    let targetY = rect.bottom + 8;
+    if (spaceBelow < tooltipH && spaceAbove > spaceBelow) {
+      targetY = rect.top - tooltipH - 8;
+    }
+
+    const targetX = rect.left + rect.width / 2 - 140;
+
     setHoverPos({
-      x: rect.left,
-      y: rect.bottom + 6,
+      x: Math.max(12, Math.min(window.innerWidth - 300, targetX)),
+      y: Math.max(8, Math.min(window.innerHeight - tooltipH - 8, targetY)),
     });
     setIsHovered(true);
   };
@@ -154,8 +165,8 @@ export const TraitBadge: React.FC<TraitBadgeProps> = ({
                   transition={{ duration: 0.12 }}
                   className="fixed z-[9999] w-72 max-w-[85vw] p-3.5 rounded-xl bg-[#0d0918]/95 backdrop-blur-md border border-amber-600/50 shadow-2xl text-left pointer-events-none"
                   style={{
-                    top: Math.min(hoverPos.y, window.innerHeight - 160),
-                    left: Math.min(Math.max(12, hoverPos.x), window.innerWidth - 300),
+                    top: hoverPos.y,
+                    left: hoverPos.x,
                   }}
                 >
                   <div className="flex items-center justify-between gap-2 border-b border-zinc-800 pb-1.5 mb-1.5">

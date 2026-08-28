@@ -327,7 +327,7 @@ export const ClassView: React.FC<ClassViewProps> = ({
                   <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
                     Talentos Adicionais do Arquétipo
                   </h3>
-                  {classData.archetypeFeats.map((feat) => (
+                  {(classData?.archetypeFeats || []).map((feat) => (
                     <div key={feat.id} className="p-3.5 rounded-xl bg-[#120e20] border border-zinc-800 space-y-1.5">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-zinc-100">

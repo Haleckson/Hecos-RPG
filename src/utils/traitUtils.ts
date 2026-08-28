@@ -15,6 +15,95 @@ export const CANONICAL_TRADITIONS: Array<'Cinética' | 'Etérea' | 'Biológica' 
   'Omni',
 ];
 
+export const CANONICAL_RARITIES: Array<'Comum' | 'Incomum' | 'Raro' | 'Único'> = [
+  'Comum',
+  'Incomum',
+  'Raro',
+  'Único',
+];
+
+export const CANONICAL_SIZES: Array<'Minúsculo' | 'Pequeno' | 'Médio' | 'Grande' | 'Enorme' | 'Gigantesco'> = [
+  'Minúsculo',
+  'Pequeno',
+  'Médio',
+  'Grande',
+  'Enorme',
+  'Gigantesco',
+];
+
+/**
+ * Normalizes size strings into canonical Portuguese standard:
+ * Minúsculo, Pequeno, Médio, Grande, Enorme, Gigantesco
+ */
+export function canonicalizeSizeName(size: string | undefined | null): string {
+  if (!size || typeof size !== 'string') return '';
+  const norm = size.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (norm === 'minusculo' || norm === 'tiny') return 'Minúsculo';
+  if (norm === 'pequeno' || norm === 'small') return 'Pequeno';
+  if (norm === 'medio' || norm === 'medium') return 'Médio';
+  if (norm === 'grande' || norm === 'large') return 'Grande';
+  if (norm === 'enorme' || norm === 'huge') return 'Enorme';
+  if (norm === 'gigantesco' || norm === 'gargantuesco' || norm === 'imenso' || norm === 'gargantuan') return 'Gigantesco';
+  return size.trim();
+}
+
+/**
+ * Normalizes rarity strings into canonical Portuguese standard:
+ * Comum, Incomum, Raro, Único
+ */
+export function canonicalizeRarityName(rarity: string | undefined | null): string {
+  if (!rarity || typeof rarity !== 'string') return '';
+  const norm = rarity.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (norm === 'comum' || norm === 'common') return 'Comum';
+  if (norm === 'incomum' || norm === 'uncommon') return 'Incomum';
+  if (norm === 'raro' || norm === 'rare') return 'Raro';
+  if (norm === 'unico' || norm === 'unique') return 'Único';
+  return rarity.trim();
+}
+
+/**
+ * Normalizes any trait name to its canonical display form
+ */
+export function canonicalizeTraitName(traitName: string | undefined | null): string {
+  if (!traitName || typeof traitName !== 'string') return '';
+  const clean = traitName.trim();
+  if (!clean) return '';
+  const norm = clean.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  // Check Rarity
+  if (CORE_RARITIES.some(r => r.normalize('NFD').replace(/[\u0300-\u036f]/g, '') === norm)) {
+    return canonicalizeRarityName(clean);
+  }
+
+  // Check Size
+  if (CORE_SIZES.some(s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') === norm)) {
+    return canonicalizeSizeName(clean);
+  }
+
+  // Check Traditions
+  if (norm === 'cinetica') return 'Cinética';
+  if (norm === 'eterea') return 'Etérea';
+  if (norm === 'biologica') return 'Biológica';
+  if (norm === 'abiotica') return 'Abiótica';
+  if (norm === 'omni') return 'Omni';
+  if (norm === 'arcana' || norm === 'arcane') return 'Arcana';
+  if (norm === 'divina' || norm === 'divine') return 'Divina';
+  if (norm === 'oculta' || norm === 'occult') return 'Oculta';
+  if (norm === 'primal') return 'Primal';
+
+  // Return formatted display
+  return clean.charAt(0).toUpperCase() + clean.slice(1);
+}
+
+/**
+ * Returns a unique canonical key for deduplication
+ */
+export function getTraitCanonicalKey(traitName: string | undefined | null): string {
+  if (!traitName || typeof traitName !== 'string') return '';
+  const canonical = canonicalizeTraitName(traitName);
+  return canonical.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 /**
  * Standard categories for Traits in Hecos & PF2e, ordered by canonical hierarchy:
  * [Raridade] -> [Tradições de Hecos] -> [Tamanho] -> [Outros Traits em Ordem Alfabética]
@@ -316,16 +405,32 @@ export function extractEntityAllTraits(ent: HecosEntity): string[] {
   }
 
   // Rarity treated globally as trait
+  if ((ent.statblock as any)?.rarity) add((ent.statblock as any).rarity);
   if (ent.featData?.rarity) add(ent.featData.rarity);
   if (ent.spellData?.rarity) add(ent.spellData.rarity);
   if (ent.itemData?.rarity) add(ent.itemData.rarity);
   if (ent.perilData?.rarity) add(ent.perilData.rarity);
   if (ent.classData?.rarity) add(ent.classData.rarity);
 
+  // Size treated globally as trait
+  if ((ent.statblock as any)?.size) add((ent.statblock as any).size);
+  if (ent.perilData?.size) add(ent.perilData.size);
+  if (ent.ancestryData?.size) add(ent.ancestryData.size);
+
   return sortTraitsHierarchically(Array.from(result));
 }
 
-export const CORE_RARITIES = ['comum', 'incomum', 'raro', 'unico', 'único', 'common', 'uncommon', 'rare', 'unique'];
+export const CORE_RARITIES = [
+  'comum',
+  'incomum',
+  'raro',
+  'unico',
+  'único',
+  'common',
+  'uncommon',
+  'rare',
+  'unique'
+];
 
 export const CORE_SIZES = [
   'minusculo',
@@ -340,6 +445,7 @@ export const CORE_SIZES = [
   'large',
   'enorme',
   'huge',
+  'gigantesco',
   'imenso',
   'gargantuesco',
   'gargantuan',
@@ -427,6 +533,7 @@ export function getTraitHierarchyTier(traitName: string): number {
 /**
  * Sorts any list of traits following the strict canonical hierarchy:
  * [Raridade] + [Tradição] + [Tamanho] + [Outros Traits em Ordem Alfabética]
+ * Strictly deduplicates entries (e.g., 'Medium' and 'Médio', 'Comum' and 'common').
  */
 export function sortTraitsHierarchically(
   traits: (string | undefined | null)[],
@@ -436,19 +543,21 @@ export function sortTraitsHierarchically(
     size?: string;
   }
 ): string[] {
-  const map = new Map<string, string>(); // lowercase key -> display name
+  const map = new Map<string, string>(); // canonical key -> display canonical name
 
   const add = (t?: string | null) => {
     if (!t || typeof t !== 'string') return;
     const clean = t.trim();
     if (!clean) return;
-    const key = clean.toLowerCase();
+    const canonicalName = canonicalizeTraitName(clean);
+    const key = getTraitCanonicalKey(canonicalName);
+    if (!key) return;
     if (!map.has(key)) {
-      map.set(key, clean);
+      map.set(key, canonicalName);
     }
   };
 
-  // Add explicit options if provided
+  // Add explicit options if provided (Canonicalized)
   if (options?.rarity) add(options.rarity);
   if (options?.traditions) {
     options.traditions.forEach(add);
@@ -468,7 +577,7 @@ export function sortTraitsHierarchically(
       return tierA - tierB;
     }
 
-    // Within Tier 1 (Rarity): preserve custom priority order if desired (Unico > Raro > Incomum > Comum)
+    // Within Tier 1 (Rarity): canonical order (Único > Raro > Incomum > Comum)
     if (tierA === 1) {
       const rarityRank = (r: string) => {
         const norm = r.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -480,7 +589,7 @@ export function sortTraitsHierarchically(
       return rarityRank(a) - rarityRank(b);
     }
 
-    // Within Tier 3 (Size): minúsculo -> pequeno -> médio -> grande -> enorme -> imenso/gargantuesco
+    // Within Tier 3 (Size): minúsculo -> pequeno -> médio -> grande -> enorme -> gigantesco
     if (tierA === 3) {
       const sizeRank = (s: string) => {
         const norm = s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -489,7 +598,7 @@ export function sortTraitsHierarchically(
         if (norm === 'medio' || norm === 'medium') return 3;
         if (norm === 'grande' || norm === 'large') return 4;
         if (norm === 'enorme' || norm === 'huge') return 5;
-        return 6; // imenso, gargantuesco
+        return 6; // gigantesco, imenso, gargantuesco, gargantuan
       };
       return sizeRank(a) - sizeRank(b);
     }

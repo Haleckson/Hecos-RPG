@@ -29,8 +29,89 @@ import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { TraitBadge } from './TraitBadge';
 import { TraitModal } from './TraitModal';
 import { TagModal } from './TagModal';
+import { Tooltip } from './Tooltip';
 import { FolderManagerModal } from './FolderManagerModal';
-import { getTraitInfo, CANONICAL_TRADITIONS, extractEntityAllTraits, getTraitHierarchyTier } from '../utils/traitUtils';
+import {
+  getTraitInfo,
+  CANONICAL_TRADITIONS,
+  CANONICAL_RARITIES,
+  CANONICAL_SIZES,
+  canonicalizeTraitName,
+  getTraitCanonicalKey,
+  extractEntityAllTraits,
+  getTraitHierarchyTier
+} from '../utils/traitUtils';
+
+// Helper Tooltip Content for Traits in TagExplorer
+function TraitTooltipContent({
+  traitName,
+  info,
+  count,
+}: {
+  traitName: string;
+  info: ReturnType<typeof getTraitInfo>;
+  count: number;
+}) {
+  return (
+    <div className="p-3 max-w-xs sm:max-w-sm space-y-2 text-left bg-[#0f0b1a] border border-amber-500/50 rounded-xl shadow-2xl">
+      <div className="flex items-center justify-between gap-2 border-b border-zinc-800 pb-1.5">
+        <span className="text-[10px] uppercase font-bold text-cyan-400 font-mono tracking-wider flex items-center gap-1">
+          {info.isTradition ? <Wand2 className="w-3 h-3 text-cyan-300" /> : <Layers className="w-3 h-3 text-amber-400" />}
+          <span>{info.category}</span>
+        </span>
+        <span className="text-xs font-bold text-amber-300 font-serif uppercase tracking-wide">
+          {traitName}
+        </span>
+      </div>
+      <p className="text-xs text-zinc-300 leading-relaxed font-sans">
+        {info.description || 'Traço temático ou de regras de Hecos.'}
+      </p>
+      <div className="pt-1.5 border-t border-zinc-800/80 text-[10px] text-zinc-400 flex items-center justify-between font-mono">
+        <span className="text-zinc-400">
+          {count} artigo{count !== 1 ? 's' : ''} associado{count !== 1 ? 's' : ''}
+        </span>
+        <span className="text-amber-400 font-semibold">Clique para abrir painel</span>
+      </div>
+    </div>
+  );
+}
+
+// Helper Tooltip Content for Tags in TagExplorer
+function TagTooltipContent({
+  tagName,
+  count,
+}: {
+  tagName: string;
+  count: number;
+}) {
+  const clean = tagName.replace(/^#/, '').trim();
+  const customTags = HecosStorage.getCustomTags();
+  const norm = clean.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const tagData = customTags[norm] || customTags[clean.toLowerCase()];
+
+  return (
+    <div className="p-3 max-w-xs sm:max-w-sm space-y-2 text-left bg-[#0c121e] border border-cyan-500/50 rounded-xl shadow-2xl">
+      <div className="flex items-center justify-between gap-2 border-b border-zinc-800 pb-1.5">
+        <span className="text-[10px] uppercase font-bold text-cyan-400 font-mono tracking-wider flex items-center gap-1">
+          <TagIcon className="w-3 h-3 text-cyan-300" />
+          <span>{tagData?.category || 'Tag de Campanha'}</span>
+        </span>
+        <span className="text-xs font-bold text-cyan-200 font-mono">
+          #{clean}
+        </span>
+      </div>
+      <p className="text-xs text-zinc-300 leading-relaxed font-sans">
+        {tagData?.description || 'Tag de agrupamento temático e narrativo para os artigos de Hecos.'}
+      </p>
+      <div className="pt-1.5 border-t border-zinc-800/80 text-[10px] text-zinc-400 flex items-center justify-between font-mono">
+        <span className="text-zinc-400">
+          {count} artigo{count !== 1 ? 's' : ''} associado{count !== 1 ? 's' : ''}
+        </span>
+        <span className="text-cyan-400 font-semibold">Clique para abrir painel</span>
+      </div>
+    </div>
+  );
+}
 
 interface TagExplorerProps {
   onNavigateEntity: (id: string) => void;
@@ -107,6 +188,21 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
   const [editingTagName, setEditingTagName] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Subscribe to real-time trait and tag updates
+  React.useEffect(() => {
+    const handleUpdate = () => setRefreshKey((k) => k + 1);
+    const unsubTraits = HecosStorage.subscribeTraits(() => setRefreshKey((k) => k + 1));
+    const unsubTags = HecosStorage.subscribeTags(() => setRefreshKey((k) => k + 1));
+    window.addEventListener('hecos:traits-updated', handleUpdate);
+    window.addEventListener('hecos:tags-updated', handleUpdate);
+    return () => {
+      unsubTraits();
+      unsubTags();
+      window.removeEventListener('hecos:traits-updated', handleUpdate);
+      window.removeEventListener('hecos:tags-updated', handleUpdate);
+    };
+  }, []);
+
   const currentUser = HecosStorage.getCurrentUser();
   const isActualGm = Boolean(isGmMode || currentUser?.role === 'gm');
 
@@ -164,14 +260,27 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
     return list;
   }, [accessibleEntities, searchTerm, sortBy]);
 
-  // Compute dynamic traits with traditions integration, case-insensitive deduplication & storage union
+  // Compute dynamic traits with traditions, rarities, sizes integration & case-insensitive deduplication
   const traits: TagInfo[] = useMemo(() => {
     const map = new Map<string, { displayName: string; count: number }>();
 
-    // 1. Preload Canonical Traditions so they are ALWAYS available in Traits page
+    // 1. Preload Canonical Rarities, Traditions, and Sizes so they are ALWAYS available in Traits page
+    CANONICAL_RARITIES.forEach((rarity) => {
+      const canonical = canonicalizeTraitName(rarity);
+      const key = getTraitCanonicalKey(canonical);
+      map.set(key, { displayName: canonical, count: 0 });
+    });
+
     CANONICAL_TRADITIONS.forEach((trad) => {
-      const lower = trad.toLowerCase();
-      map.set(lower, { displayName: trad, count: 0 });
+      const canonical = canonicalizeTraitName(trad);
+      const key = getTraitCanonicalKey(canonical);
+      map.set(key, { displayName: canonical, count: 0 });
+    });
+
+    CANONICAL_SIZES.forEach((size) => {
+      const canonical = canonicalizeTraitName(size);
+      const key = getTraitCanonicalKey(canonical);
+      map.set(key, { displayName: canonical, count: 0 });
     });
 
     // 2. Add all registered custom traits from HecosStorage
@@ -179,29 +288,27 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
     Object.keys(custom).forEach((k) => {
       const clean = k.trim();
       if (clean) {
-        const lower = clean.toLowerCase();
-        const display = clean.charAt(0).toUpperCase() + clean.slice(1);
-        if (!map.has(lower)) {
-          map.set(lower, { displayName: display, count: 0 });
+        const canonical = canonicalizeTraitName(clean);
+        const key = getTraitCanonicalKey(canonical);
+        if (!map.has(key)) {
+          map.set(key, { displayName: canonical, count: 0 });
         }
       }
     });
 
-    // 3. Count occurrences from all entities (including spell traditions)
+    // 3. Count occurrences from all entities (including spell traditions, rarities, sizes)
     accessibleEntities.forEach((ent) => {
       const entTraits = extractEntityAllTraits(ent);
       entTraits.forEach((tr) => {
         const clean = typeof tr === 'string' ? tr.trim() : '';
         if (clean) {
-          const lower = clean.toLowerCase();
-          const existing = map.get(lower);
+          const canonical = canonicalizeTraitName(clean);
+          const key = getTraitCanonicalKey(canonical);
+          const existing = map.get(key);
           if (existing) {
             existing.count += 1;
-            if (clean?.[0] && clean[0] === clean[0].toUpperCase() && existing?.displayName?.[0] && existing.displayName[0] === existing.displayName[0].toLowerCase()) {
-              existing.displayName = clean;
-            }
           } else {
-            map.set(lower, { displayName: clean, count: 1 });
+            map.set(key, { displayName: canonical, count: 1 });
           }
         }
       });
@@ -470,31 +577,37 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
                       : 'bg-[#120f1b] hover:bg-[#181324] border-zinc-800/80 hover:border-cyan-500/50'
                   }`}
                 >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = isSelected ? null : tag.name;
-                      setSelectedTag(next);
-                      window.dispatchEvent(
-                        new CustomEvent('hecos:open-tag-drawer', {
-                          detail: { tag: tag.name },
-                        })
-                      );
-                    }}
-                    className="flex items-center gap-2 min-w-0 flex-1 text-left cursor-pointer group"
+                  <Tooltip
+                    content={<TagTooltipContent tagName={tag.name} count={tag.count} />}
+                    side="top"
+                    className="flex-1 min-w-0"
                   >
-                    <div className="p-1.5 rounded-lg bg-cyan-950/80 border border-cyan-800/60 text-cyan-300 group-hover:text-cyan-200">
-                      <TagIcon className="w-3.5 h-3.5" />
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className="text-xs font-bold text-zinc-100 group-hover:text-cyan-300 truncate">
-                        #{tag.name}
-                      </h4>
-                      <p className="text-[10px] text-zinc-400 font-mono">
-                        {tag.count} artigo{tag.count !== 1 ? 's' : ''}
-                      </p>
-                    </div>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = isSelected ? null : tag.name;
+                        setSelectedTag(next);
+                        window.dispatchEvent(
+                          new CustomEvent('hecos:open-tag-drawer', {
+                            detail: { tag: tag.name },
+                          })
+                        );
+                      }}
+                      className="flex items-center gap-2 min-w-0 w-full text-left cursor-pointer group"
+                    >
+                      <div className="p-1.5 rounded-lg bg-cyan-950/80 border border-cyan-800/60 text-cyan-300 group-hover:text-cyan-200">
+                        <TagIcon className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-bold text-zinc-100 group-hover:text-cyan-300 truncate">
+                          #{tag.name}
+                        </h4>
+                        <p className="text-[10px] text-zinc-400 font-mono">
+                          {tag.count} artigo{tag.count !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                    </button>
+                  </Tooltip>
 
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
@@ -550,30 +663,35 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
                       : 'bg-[#120f1b] hover:bg-purple-950/60 text-zinc-300 hover:text-purple-300 border-zinc-800'
                   }`}
                 >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = isSelected ? null : tag.name;
-                      setSelectedTag(next);
-                      if (next) {
-                        window.dispatchEvent(
-                          new CustomEvent('hecos:open-tag-drawer', {
-                            detail: { tag: next },
-                          })
-                        );
-                      }
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold cursor-pointer"
+                  <Tooltip
+                    content={<TagTooltipContent tagName={tag.name} count={tag.count} />}
+                    side="top"
                   >
-                    <span>#{tag.name}</span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                        isSelected ? 'bg-zinc-900 text-cyan-300' : 'bg-black/60 text-zinc-500'
-                      }`}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = isSelected ? null : tag.name;
+                        setSelectedTag(next);
+                        if (next) {
+                          window.dispatchEvent(
+                            new CustomEvent('hecos:open-tag-drawer', {
+                              detail: { tag: next },
+                            })
+                          );
+                        }
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold cursor-pointer"
                     >
-                      {tag.count}
-                    </span>
-                  </button>
+                      <span>#{tag.name}</span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                          isSelected ? 'bg-zinc-900 text-cyan-300' : 'bg-black/60 text-zinc-500'
+                        }`}
+                      >
+                        {tag.count}
+                      </span>
+                    </button>
+                  </Tooltip>
 
                   {/* Edit / Delete Tag Icon for GM */}
                   {isActualGm && (
@@ -619,38 +737,44 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
                     : `${traitInfo.color} bg-opacity-40 hover:bg-opacity-70 hover:brightness-110`
                 }`}
               >
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = isSelected ? null : tr.name;
-                    setSelectedTrait(next);
-                    window.dispatchEvent(
-                      new CustomEvent('hecos:open-trait-drawer', {
-                        detail: { trait: tr.name },
-                      })
-                    );
-                  }}
-                  className="flex items-center gap-2.5 min-w-0 flex-1 text-left cursor-pointer group"
+                <Tooltip
+                  content={<TraitTooltipContent traitName={tr.name} info={traitInfo} count={tr.count} />}
+                  side="top"
+                  className="flex-1 min-w-0"
                 >
-                  <div className="p-1.5 rounded-lg bg-black/40 border border-current/30 text-inherit">
-                    {traitInfo.isTradition ? <Wand2 className="w-3.5 h-3.5" /> : <Layers className="w-3.5 h-3.5" />}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <h4 className="text-xs font-mono font-bold tracking-wide uppercase text-inherit truncate">
-                        {tr.name}
-                      </h4>
-                      {traitInfo.isTradition && (
-                        <span className="text-[9px] px-1 py-0.2 rounded bg-black/50 border border-current/30 text-inherit font-mono uppercase">
-                          Tradição
-                        </span>
-                      )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = isSelected ? null : tr.name;
+                      setSelectedTrait(next);
+                      window.dispatchEvent(
+                        new CustomEvent('hecos:open-trait-drawer', {
+                          detail: { trait: tr.name },
+                        })
+                      );
+                    }}
+                    className="flex items-center gap-2.5 min-w-0 w-full text-left cursor-pointer group"
+                  >
+                    <div className="p-1.5 rounded-lg bg-black/40 border border-current/30 text-inherit">
+                      {traitInfo.isTradition ? <Wand2 className="w-3.5 h-3.5" /> : <Layers className="w-3.5 h-3.5" />}
                     </div>
-                    <p className="text-[10px] opacity-80 truncate font-mono">
-                      {tr.count} artigo{tr.count !== 1 ? 's' : ''} • {traitInfo.category}
-                    </p>
-                  </div>
-                </button>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="text-xs font-mono font-bold tracking-wide uppercase text-inherit truncate">
+                          {tr.name}
+                        </h4>
+                        {traitInfo.isTradition && (
+                          <span className="text-[9px] px-1 py-0.2 rounded bg-black/50 border border-current/30 text-inherit font-mono uppercase">
+                            Tradição
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] opacity-80 truncate font-mono">
+                        {tr.count} artigo{tr.count !== 1 ? 's' : ''} • {traitInfo.category}
+                      </p>
+                    </div>
+                  </button>
+                </Tooltip>
 
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
@@ -703,26 +827,31 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
                     : 'hover:brightness-125'
                 }`}
               >
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = isSelected ? null : tr.name;
-                    setSelectedTrait(next);
-                    if (next) {
-                      window.dispatchEvent(
-                        new CustomEvent('hecos:open-trait-drawer', {
-                          detail: { trait: next },
-                        })
-                      );
-                    }
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-bold tracking-wide uppercase cursor-pointer"
+                <Tooltip
+                  content={<TraitTooltipContent traitName={tr.name} info={traitInfo} count={tr.count} />}
+                  side="top"
                 >
-                  <span>{tr.name}</span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/60 text-inherit font-bold">
-                    {tr.count}
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = isSelected ? null : tr.name;
+                      setSelectedTrait(next);
+                      if (next) {
+                        window.dispatchEvent(
+                          new CustomEvent('hecos:open-trait-drawer', {
+                            detail: { trait: next },
+                          })
+                        );
+                      }
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-bold tracking-wide uppercase cursor-pointer"
+                  >
+                    <span>{tr.name}</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/60 text-inherit font-bold">
+                      {tr.count}
+                    </span>
+                  </button>
+                </Tooltip>
 
                 {/* Edit / Configure Trait button */}
                 {isActualGm && (

@@ -173,6 +173,8 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
   const [activeCategory, setActiveCategory] = useState<ItemCategoryType>('all');
   const [activeSubcategory, setActiveSubcategory] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'table' | 'tree'>('grid');
+  const [isFolderDropdownOpen, setIsFolderDropdownOpen] = useState(false);
+  const [folderDropdownSearch, setFolderDropdownSearch] = useState('');
 
   // 2. Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -298,6 +300,43 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
     }
     return categoriesConfig[activeCategory] || [];
   }, [activeCategory, categoriesConfig]);
+
+  // Subcategory / Folder Counts
+  const subcategoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { __none__: 0 };
+    const allSubs = new Set<string>();
+    (Object.values(categoriesConfig) as string[][]).forEach((list) => {
+      (list || []).forEach((s) => allSubs.add(s));
+    });
+
+    itemEntities.forEach((it) => {
+      if (activeCategory !== 'all') {
+        const data = it.itemData;
+        const tags = (it.tags || []).map((t) => t.toLowerCase());
+        let matches = false;
+        if (activeCategory === 'weapons' && (data?.itemType === 'weapons' || tags.includes('arma') || tags.includes('weapon') || tags.includes('espada') || tags.includes('arco'))) matches = true;
+        else if (activeCategory === 'armor' && (data?.itemType === 'armor' || tags.includes('armadura') || tags.includes('escudo') || tags.includes('armor') || tags.includes('shield'))) matches = true;
+        else if (activeCategory === 'consumables' && (data?.itemType === 'consumables' || tags.includes('poção') || tags.includes('elixir') || tags.includes('pergaminho') || tags.includes('consumable'))) matches = true;
+        else if (activeCategory === 'alchemical' && (data?.itemType === 'alchemical' || tags.includes('alquimia') || tags.includes('alchemical') || tags.includes('veneno'))) matches = true;
+        else if (activeCategory === 'magical' && (data?.itemType === 'magical' || tags.includes('mágico') || tags.includes('varinha') || tags.includes('cajado') || tags.includes('anel'))) matches = true;
+        else if (activeCategory === 'artifacts' && (data?.itemType === 'artifacts' || tags.includes('artefato') || tags.includes('relíquia') || tags.includes('artifact'))) matches = true;
+        else if (activeCategory === 'gear' && (data?.itemType === 'gear' || tags.includes('equipamento') || tags.includes('gear'))) matches = true;
+
+        if (!matches) return;
+      }
+
+      const subs = it.itemData?.subcategories || it.subcategories || (it.subcategory ? [it.subcategory] : []);
+      if (subs.length === 0) {
+        counts.__none__ = (counts.__none__ || 0) + 1;
+      } else {
+        subs.forEach((s) => {
+          counts[s] = (counts[s] || 0) + 1;
+        });
+      }
+    });
+
+    return counts;
+  }, [itemEntities, activeCategory, categoriesConfig]);
 
   // Filtered and sorted items
   const filteredItems = useMemo(() => {
@@ -621,64 +660,6 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
         </div>
       </div>
 
-      {/* Subcategory / Folder Pills Bar */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-zinc-800">
-        <button
-          type="button"
-          onClick={() => setActiveSubcategory(null)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors cursor-pointer border ${
-            activeSubcategory === null
-              ? 'bg-zinc-100 text-zinc-950 border-zinc-100 shadow-xs'
-              : 'bg-zinc-900/80 text-zinc-400 border-zinc-800 hover:border-zinc-700 hover:text-zinc-200'
-          }`}
-        >
-          <Layers className="w-3.5 h-3.5" />
-          <span>Todas as Pastas</span>
-          <span className="text-[10px] opacity-75">({filteredItems.length})</span>
-        </button>
-
-        {currentSubcategories.map((subcat) => {
-          const isSubActive = activeSubcategory === subcat;
-          const subCount = itemEntities.filter((it) => {
-            if (activeCategory !== 'all' && it.itemData?.itemType !== activeCategory) return false;
-            return (
-              it.itemData?.subcategories?.includes(subcat) ||
-              it.subcategories?.includes(subcat) ||
-              it.subcategory === subcat
-            );
-          }).length;
-
-          return (
-            <button
-              key={subcat}
-              type="button"
-              onClick={() => setActiveSubcategory(isSubActive ? null : subcat)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer border ${
-                isSubActive
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/60 shadow-xs'
-                  : 'bg-zinc-900/80 text-zinc-400 border-zinc-800 hover:border-zinc-700 hover:text-zinc-200'
-              }`}
-            >
-              <Folder className="w-3.5 h-3.5 text-amber-400/80" />
-              <span>{subcat}</span>
-              <span className="text-[10px] opacity-70">({subCount})</span>
-            </button>
-          );
-        })}
-
-        <button
-          type="button"
-          onClick={() => setActiveSubcategory(activeSubcategory === '__none__' ? null : '__none__')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors cursor-pointer border ${
-            activeSubcategory === '__none__'
-              ? 'bg-zinc-700 text-zinc-100 border-zinc-600'
-              : 'bg-zinc-900/60 text-zinc-500 border-zinc-800 hover:border-zinc-700'
-          }`}
-        >
-          <span>Sem Pasta</span>
-        </button>
-      </div>
-
       {/* Smart Quick Level Range Filter Bar */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
         <span className="text-[10px] font-mono uppercase font-bold text-zinc-500 shrink-0 mr-1 flex items-center gap-1">
@@ -740,9 +721,9 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
         })}
       </div>
 
-      {/* Search & Toolbar */}
+      {/* Search & Toolbar with Integrated Folder Selector */}
       <div className="p-4 rounded-2xl bg-[#0b0816] border border-zinc-800/80 space-y-3">
-        <div className="flex flex-col sm:flex-row items-center gap-3">
+        <div className="flex flex-col lg:flex-row items-center gap-3">
           {/* Search Input */}
           <div className="relative flex-1 w-full">
             <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -757,10 +738,168 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-100"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-100 cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
+            )}
+          </div>
+
+          {/* Folder / Subcategory Dropdown Filter with Built-in Search */}
+          <div className="relative w-full sm:w-64 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsFolderDropdownOpen(!isFolderDropdownOpen)}
+              className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                activeSubcategory !== null
+                  ? 'bg-amber-950/70 border-amber-500/80 text-amber-200 shadow-xs'
+                  : 'bg-[#120d22] border-zinc-700/70 text-zinc-300 hover:border-zinc-600 hover:text-zinc-100'
+              }`}
+            >
+              <div className="flex items-center gap-2 truncate">
+                <Folder className={`w-3.5 h-3.5 shrink-0 ${activeSubcategory ? 'text-amber-400' : 'text-zinc-400'}`} />
+                <span className="truncate">
+                  {activeSubcategory === null
+                    ? 'Todas as Pastas'
+                    : activeSubcategory === '__none__'
+                    ? 'Sem Pasta Definida'
+                    : activeSubcategory}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-amber-300 border border-zinc-800">
+                  {activeSubcategory === null
+                    ? filteredItems.length
+                    : activeSubcategory === '__none__'
+                    ? subcategoryCounts.__none__ || 0
+                    : subcategoryCounts[activeSubcategory] || 0}
+                </span>
+                <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${isFolderDropdownOpen ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            {/* Folder Selector Dropdown Menu */}
+            {isFolderDropdownOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-30"
+                  onClick={() => setIsFolderDropdownOpen(false)}
+                />
+                <div className="absolute left-0 right-0 sm:right-auto sm:w-80 mt-1.5 z-40 bg-[#0d0a17] border border-zinc-700/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-80 animate-fade-in">
+                  {/* Search inside folder dropdown */}
+                  <div className="p-2.5 border-b border-zinc-800/80 bg-zinc-950/70 flex items-center gap-1.5">
+                    <Search className="w-3.5 h-3.5 text-zinc-500 ml-1 shrink-0" />
+                    <input
+                      type="text"
+                      value={folderDropdownSearch}
+                      onChange={(e) => setFolderDropdownSearch(e.target.value)}
+                      placeholder="Procurar pasta..."
+                      className="flex-1 bg-transparent text-xs text-zinc-200 placeholder-zinc-500 outline-none"
+                      autoFocus
+                    />
+                    {folderDropdownSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setFolderDropdownSearch('')}
+                        className="p-1 text-zinc-500 hover:text-zinc-300"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Folders List */}
+                  <div className="p-1.5 overflow-y-auto space-y-1 flex-1 scrollbar-thin scrollbar-thumb-zinc-800">
+                    {/* Option: All Folders */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveSubcategory(null);
+                        setIsFolderDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left cursor-pointer ${
+                        activeSubcategory === null
+                          ? 'bg-amber-950/80 text-amber-200 border border-amber-500/50'
+                          : 'text-zinc-300 hover:bg-zinc-900/90'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Folder className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Todas as Pastas</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-zinc-400">
+                        {activeCategory === 'all'
+                          ? itemEntities.length
+                          : itemEntities.filter(it => it.itemData?.itemType === activeCategory || (it.tags || []).includes(activeCategory)).length}
+                      </span>
+                    </button>
+
+                    {/* Option: Without Folder */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveSubcategory('__none__');
+                        setIsFolderDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left cursor-pointer ${
+                        activeSubcategory === '__none__'
+                          ? 'bg-amber-950/80 text-amber-200 border border-amber-500/50'
+                          : 'text-zinc-400 hover:bg-zinc-900/90'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Folder className="w-3.5 h-3.5 text-zinc-600" />
+                        <span className="italic">Sem Pasta Definida</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        {subcategoryCounts.__none__ || 0}
+                      </span>
+                    </button>
+
+                    <div className="my-1 border-t border-zinc-800/80" />
+
+                    {/* Custom subcategories filtered by search */}
+                    {currentSubcategories
+                      .filter((s) =>
+                        s.toLowerCase().includes(folderDropdownSearch.toLowerCase().trim())
+                      )
+                      .map((subcat) => {
+                        const isSelected = activeSubcategory === subcat;
+                        const count = subcategoryCounts[subcat] || 0;
+
+                        return (
+                          <button
+                            key={subcat}
+                            type="button"
+                            onClick={() => {
+                              setActiveSubcategory(isSelected ? null : subcat);
+                              setIsFolderDropdownOpen(false);
+                            }}
+                            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left cursor-pointer ${
+                              isSelected
+                                ? 'bg-amber-950/80 text-amber-200 border border-amber-500/50'
+                                : 'text-zinc-300 hover:bg-zinc-900/90'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 truncate">
+                              <Folder className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                              <span className="truncate">{subcat}</span>
+                            </div>
+                            <span className="text-[10px] font-mono text-zinc-400 shrink-0 ml-2">
+                              {count}
+                            </span>
+                          </button>
+                        );
+                      })}
+
+                    {currentSubcategories.length === 0 && (
+                      <div className="py-4 text-center text-xs text-zinc-500">
+                        Nenhuma pasta cadastrada nesta categoria.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
             )}
           </div>
 
@@ -829,7 +968,30 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
 
         {/* Advanced Filters Expandable Drawer */}
         {showFilters && (
-          <div className="pt-3 border-t border-zinc-800/80 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="pt-3 border-t border-zinc-800/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Folder Select in Drawer */}
+            <div>
+              <label className="block text-[10px] font-mono uppercase font-bold text-zinc-400 mb-1">
+                Pasta / Subcategoria
+              </label>
+              <select
+                value={activeSubcategory === null ? 'all' : activeSubcategory}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setActiveSubcategory(val === 'all' ? null : val);
+                }}
+                className="w-full bg-[#120d22] border border-zinc-700/70 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-amber-500 cursor-pointer"
+              >
+                <option value="all">Todas as Pastas</option>
+                <option value="__none__">Sem Pasta Definida</option>
+                {currentSubcategories.map((s) => (
+                  <option key={s} value={s}>
+                    {s} ({subcategoryCounts[s] || 0})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Rarity */}
             <div>
               <label className="block text-[10px] font-mono uppercase font-bold text-zinc-400 mb-1">
@@ -838,7 +1000,7 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
               <select
                 value={selectedRarity}
                 onChange={(e) => setSelectedRarity(e.target.value)}
-                className="w-full bg-[#120d22] border border-zinc-700/70 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-amber-500"
+                className="w-full bg-[#120d22] border border-zinc-700/70 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-amber-500 cursor-pointer"
               >
                 <option value="all">Todas as Raridades</option>
                 <option value="Comum">Comum</option>
@@ -856,7 +1018,7 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
               <select
                 value={selectedLevel}
                 onChange={(e) => setSelectedLevel(e.target.value)}
-                className="w-full bg-[#120d22] border border-zinc-700/70 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-amber-500"
+                className="w-full bg-[#120d22] border border-zinc-700/70 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-amber-500 cursor-pointer"
               >
                 <option value="all">Qualquer Nível</option>
                 {Array.from({ length: 21 }, (_, i) => i).map((lvl) => (
@@ -875,7 +1037,7 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
               <select
                 value={selectedTrait}
                 onChange={(e) => setSelectedTrait(e.target.value)}
-                className="w-full bg-[#120d22] border border-zinc-700/70 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-amber-500"
+                className="w-full bg-[#120d22] border border-zinc-700/70 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-amber-500 cursor-pointer"
               >
                 <option value="all">Todos os Traços</option>
                 {allTraits.map((t) => (
@@ -962,8 +1124,10 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
                     >
                       <td className="py-3 px-4 font-bold text-zinc-100 group-hover:text-amber-300">
                         <Tooltip
+                          side="right"
+                          delay={180}
+                          noScroll={true}
                           content={<ItemTooltipCard item={item} onSelectEntity={handleOpenItemDrawer} />}
-                          placement="right"
                         >
                           <span className="flex items-center gap-2">
                             <Package className="w-3.5 h-3.5 text-amber-400 shrink-0" />

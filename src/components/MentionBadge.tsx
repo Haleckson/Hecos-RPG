@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { createPortal } from 'react-dom';
+import React from 'react';
 import { HecosEntity } from '../types';
 import { HecosStorage } from '../services/storage';
 import { Skull, Sparkles, Gem, Compass, User, Users, Lock, BookOpen, ExternalLink, Shield } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
+import { Tooltip } from './Tooltip';
+import { PerilTooltipCard } from './PerilTooltipCard';
 
 interface MentionBadgeProps {
   entityIdOrSlug: string;
@@ -13,9 +13,6 @@ interface MentionBadgeProps {
 }
 
 export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNavigate, displayText }) => {
-  const [isHovered, setIsHovered] = useState(false);
-  const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
-
   const cleanSlug = String(entityIdOrSlug || '').replace(/^@/, '').toLowerCase().trim();
   const allEntities = HecosStorage.getEntities();
   
@@ -26,15 +23,6 @@ export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNa
          (e.title || '').toLowerCase() === cleanSlug ||
          (e.title || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') === cleanSlug
   );
-
-  const handleMouseEnter = (e: React.MouseEvent) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setHoverPos({
-      x: rect.left,
-      y: rect.bottom + 8
-    });
-    setIsHovered(true);
-  };
 
   if (!entity) {
     return (
@@ -47,7 +35,7 @@ export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNa
   // Category styling
   const isCiano = ['pc', 'spell', 'ancestry', 'rule'].includes(entity.category);
   const isMalva = ['npc', 'item', 'flora', 'class', 'feat', 'timeline'].includes(entity.category);
-  const isBordo = ['creature', 'fauna', 'organization', 'gm_note', 'archetype', 'session'].includes(entity.category);
+  const isBordo = ['creature', 'fauna', 'organization', 'gm_note', 'archetype', 'session', 'peril'].includes(entity.category);
 
   const themeClasses = isCiano
     ? 'bg-cyan-950/40 text-cyan-300 border-cyan-500/40 hover:bg-cyan-900/60 hover:border-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.15)]'
@@ -57,6 +45,7 @@ export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNa
 
   const getEntityIcon = (cat: string) => {
     switch (cat) {
+      case 'peril':
       case 'creature': return <Skull className="w-3.5 h-3.5" />;
       case 'spell': return <Sparkles className="w-3.5 h-3.5" />;
       case 'item': return <Gem className="w-3.5 h-3.5" />;
@@ -71,7 +60,6 @@ export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNa
   const handleBadgeClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsHovered(false);
     
     if (entity) {
       window.dispatchEvent(
@@ -82,121 +70,122 @@ export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNa
     }
   };
 
-  return (
-    <span className="relative inline-block my-0.5">
-      <span
-        role="button"
-        tabIndex={0}
-        onClick={handleBadgeClick}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            handleBadgeClick(e as unknown as React.MouseEvent);
-          }
-        }}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={() => setIsHovered(false)}
-        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border font-medium text-xs sm:text-sm transition-all duration-150 cursor-pointer select-none ${themeClasses}`}
-      >
-        <span className="opacity-80">{getEntityIcon(entity.category)}</span>
-        <span>{displayText || entity.title}</span>
-        <ExternalLink className="w-3 h-3 opacity-60 ml-0.5" />
-      </span>
-
-      {/* Hover Preview Card Popup */}
-      {typeof document !== 'undefined' && createPortal(
-        <AnimatePresence>
-          {isHovered && (
-            <motion.div
-              initial={{ opacity: 0, y: 6, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 4, scale: 0.97 }}
-              transition={{ duration: 0.15 }}
-              className="fixed z-50 w-80 max-w-[90vw] p-3.5 rounded-xl bg-[#0e0c15]/95 backdrop-blur-md border border-zinc-800 shadow-2xl text-left pointer-events-auto"
-              style={{
-                top: Math.min(hoverPos.y, window.innerHeight - 300),
-                left: Math.min(hoverPos.x, window.innerWidth - 330)
-              }}
-              onMouseEnter={() => setIsHovered(true)}
-              onMouseLeave={() => setIsHovered(false)}
-            >
-              {/* Header with cover or icon */}
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div>
-                  <span className={`inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded border ${
-                    isCiano ? 'bg-cyan-950 text-cyan-300 border-cyan-800' :
-                    isMalva ? 'bg-purple-950 text-purple-300 border-purple-800' :
-                    'bg-rose-950 text-rose-300 border-rose-900'
-                  }`}>
-                    {entity.category.toUpperCase()} {entity.statblock ? `• Nível ${entity.statblock.level}` : ''}
-                  </span>
-                  <div className="text-sm font-semibold text-zinc-100 mt-1 line-clamp-1">{entity.title}</div>
-                  {entity.subtitle && (
-                    <div className="text-xs text-zinc-400 line-clamp-1">{entity.subtitle}</div>
-                  )}
-                </div>
-              </div>
-
-              {/* Quick Stat Bar */}
-              {entity.statblock && (
-                <div className="grid grid-cols-4 gap-1 p-1.5 my-2 rounded bg-black/60 border border-zinc-800/80 text-center text-xs">
-                  <div>
-                    <span className="text-[10px] text-zinc-500 block">CA</span>
-                    <span className="font-bold text-cyan-400">{entity.statblock.ac}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-zinc-500 block">PV</span>
-                    <span className="font-bold text-rose-400">{entity.statblock.hp}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-zinc-500 block">VEL</span>
-                    <span className="font-bold text-purple-400">{entity.statblock.speed || '25 ft'}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-zinc-500 block">PER</span>
-                    <span className="font-bold text-zinc-300">+{entity.statblock.perception || 0}</span>
-                  </div>
-                </div>
-              )}
-
-              {entity.spellData && (
-                <div className="flex items-center gap-2 p-1.5 my-2 rounded bg-black/60 border border-cyan-900/40 text-xs">
-                  <span className="text-cyan-400 font-bold">Rank {entity.spellData.rank}</span>
-                  <span className="text-zinc-400">• {entity.spellData.castTime}</span>
-                  <span className="text-zinc-500 text-[10px] ml-auto">{(entity.spellData.traditions || []).join(', ')}</span>
-                </div>
-              )}
-
-              {/* Summary */}
-              <div className="text-xs text-zinc-300 line-clamp-2 my-2 leading-relaxed">
-                {parseInlineFormatting(entity.summary || 'Sem resumo cadastrado.', onNavigate)}
-              </div>
-
-              {/* Tags */}
-              {(entity.tags || []).length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-zinc-800/80">
-                  {(entity.tags || []).slice(0, 4).map(t => (
-                    <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">
-                      #{t}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={handleBadgeClick}
-                className="w-full mt-3 py-1.5 px-2.5 text-xs font-semibold text-center rounded-lg bg-zinc-800 hover:bg-cyan-950 hover:text-cyan-200 border border-zinc-700 hover:border-cyan-500/50 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-              >
-                <span>Ver Artigo Completo no Painel</span>
-                <ExternalLink className="w-3.5 h-3.5 text-cyan-400" />
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
+  const badgeTrigger = (
+    <span
+      role="button"
+      tabIndex={0}
+      onClick={handleBadgeClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleBadgeClick(e as unknown as React.MouseEvent);
+        }
+      }}
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border font-medium text-xs sm:text-sm transition-all duration-150 cursor-pointer select-none ${themeClasses}`}
+    >
+      <span className="opacity-80">{getEntityIcon(entity.category)}</span>
+      <span>{displayText || entity.title}</span>
+      <ExternalLink className="w-3 h-3 opacity-60 ml-0.5" />
     </span>
+  );
+
+  // If this entity is a Peril or Creature, use the rich PerilTooltipCard
+  if (entity.category === 'peril' || entity.category === 'creature' || entity.perilData) {
+    return (
+      <Tooltip
+        content={<PerilTooltipCard peril={entity} onSelectEntity={onNavigate} />}
+        placement="top"
+        delay={160}
+      >
+        {badgeTrigger}
+      </Tooltip>
+    );
+  }
+
+  // Generic preview tooltip for spells, items, NPCs, locations, etc.
+  const genericPreviewCard = (
+    <div className="w-80 max-w-[90vw] p-3.5 rounded-xl bg-[#0e0c15] border border-zinc-800 shadow-2xl text-left pointer-events-auto">
+      {/* Header with category and title */}
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div>
+          <span className={`inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded border ${
+            isCiano ? 'bg-cyan-950 text-cyan-300 border-cyan-800' :
+            isMalva ? 'bg-purple-950 text-purple-300 border-purple-800' :
+            'bg-rose-950 text-rose-300 border-rose-900'
+          }`}>
+            {entity.category.toUpperCase()} {entity.statblock ? `• Nível ${entity.statblock.level}` : ''}
+          </span>
+          <div className="text-sm font-semibold text-zinc-100 mt-1 line-clamp-1">{entity.title}</div>
+          {entity.subtitle && (
+            <div className="text-xs text-zinc-400 line-clamp-1">{entity.subtitle}</div>
+          )}
+        </div>
+      </div>
+
+      {entity.statblock && (
+        <div className="grid grid-cols-4 gap-1 p-1.5 my-2 rounded bg-black/60 border border-zinc-800/80 text-center text-xs">
+          <div>
+            <span className="text-[10px] text-zinc-500 block">CA</span>
+            <span className="font-bold text-cyan-400">{entity.statblock.ac}</span>
+          </div>
+          <div>
+            <span className="text-[10px] text-zinc-500 block">PV</span>
+            <span className="font-bold text-rose-400">{entity.statblock.hp}</span>
+          </div>
+          <div>
+            <span className="text-[10px] text-zinc-500 block">VEL</span>
+            <span className="font-bold text-purple-400">{entity.statblock.speed || '25 ft'}</span>
+          </div>
+          <div>
+            <span className="text-[10px] text-zinc-500 block">PER</span>
+            <span className="font-bold text-zinc-300">+{entity.statblock.perception || 0}</span>
+          </div>
+        </div>
+      )}
+
+      {entity.spellData && (
+        <div className="flex items-center gap-2 p-1.5 my-2 rounded bg-black/60 border border-cyan-900/40 text-xs">
+          <span className="text-cyan-400 font-bold">Rank {entity.spellData.rank}</span>
+          <span className="text-zinc-400">• {entity.spellData.castTime}</span>
+          <span className="text-zinc-500 text-[10px] ml-auto">{(entity.spellData.traditions || []).join(', ')}</span>
+        </div>
+      )}
+
+      {/* Summary */}
+      <div className="text-xs text-zinc-300 line-clamp-2 my-2 leading-relaxed">
+        {entity.summary || 'Sem resumo cadastrado.'}
+      </div>
+
+      {/* Tags */}
+      {(entity.tags || []).length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-zinc-800/80">
+          {(entity.tags || []).slice(0, 4).map(t => (
+            <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">
+              #{t}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={handleBadgeClick}
+        className="w-full mt-3 py-1.5 px-2.5 text-xs font-semibold text-center rounded-lg bg-zinc-800 hover:bg-cyan-950 hover:text-cyan-200 border border-zinc-700 hover:border-cyan-500/50 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+      >
+        <span>Ver Artigo Completo no Painel</span>
+        <ExternalLink className="w-3.5 h-3.5 text-cyan-400" />
+      </button>
+    </div>
+  );
+
+  return (
+    <Tooltip
+      content={genericPreviewCard}
+      placement="top"
+      delay={160}
+    >
+      {badgeTrigger}
+    </Tooltip>
   );
 };
 

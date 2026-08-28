@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X,
@@ -48,6 +48,17 @@ export const TraitDrawer: React.FC<TraitDrawerProps> = ({
   const [isEditingCustomTrait, setIsEditingCustomTrait] = useState(false);
   const [editDescription, setEditDescription] = useState('');
   const [editCategory, setEditCategory] = useState('');
+  const [version, setVersion] = useState(0);
+
+  useEffect(() => {
+    const handleUpdate = () => setVersion((v) => v + 1);
+    const unsub = HecosStorage.subscribeTraits(() => setVersion((v) => v + 1));
+    window.addEventListener('hecos:traits-updated', handleUpdate);
+    return () => {
+      unsub();
+      window.removeEventListener('hecos:traits-updated', handleUpdate);
+    };
+  }, []);
 
   const currentUser = HecosStorage.getCurrentUser();
   const effectiveIsGm = isGmMode || currentUser?.role === 'gm' || HecosStorage.getGmMode();
@@ -55,7 +66,7 @@ export const TraitDrawer: React.FC<TraitDrawerProps> = ({
   const cleanTrait = trait ? trait.trim() : '';
   const normalizedKey = cleanTrait.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-  const traitInfo = getTraitInfo(cleanTrait);
+  const traitInfo = useMemo(() => getTraitInfo(cleanTrait), [cleanTrait, version]);
 
   // Find all accessible entities that have this trait
   const matchingEntities = useMemo(() => {
@@ -126,13 +137,14 @@ export const TraitDrawer: React.FC<TraitDrawerProps> = ({
   };
 
   const handleSaveCustomTrait = () => {
-    if (!normalizedKey) return;
-    HecosStorage.saveCustomTrait(normalizedKey, {
+    if (!cleanTrait) return;
+    HecosStorage.saveCustomTrait(cleanTrait, {
       category: editCategory.trim() || 'Mecânica Personalizada',
       description: editDescription.trim() || 'Sem descrição.',
       color: traitInfo.color || 'border-cyan-700 bg-cyan-950 text-cyan-300'
     });
     setIsEditingCustomTrait(false);
+    setVersion((v) => v + 1);
   };
 
   if (!isOpen || !trait) return null;

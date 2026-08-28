@@ -265,9 +265,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity
 
     let updatedPins: MapPin[];
     if (editingPin) {
-      updatedPins = currentMap.pins.map((p) => (p.id === editingPin.id ? pinData : p));
+      updatedPins = (currentMap.pins || []).map((p) => (p.id === editingPin.id ? pinData : p));
     } else {
-      updatedPins = [...currentMap.pins, pinData];
+      updatedPins = [...(currentMap.pins || []), pinData];
     }
 
     const updatedMap: InteractiveMapData = {
@@ -792,7 +792,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity
                           allowedUserIds={selectedPin.allowedUserIds || []}
                           isSecret={selectedPin.isSecret}
                           onChange={(newVis, newAllowed) => {
-                            const updatedPins = currentMap.pins.map((p) =>
+                            const updatedPins = (currentMap.pins || []).map((p) =>
                               p.id === selectedPin.id
                                 ? { ...p, visibility: newVis, allowedUserIds: newAllowed, isSecret: newVis === 'gm' }
                                 : p

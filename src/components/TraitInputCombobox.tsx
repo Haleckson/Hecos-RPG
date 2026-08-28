@@ -5,7 +5,8 @@ import { Search, Plus, X, Award, Check, Sparkles } from 'lucide-react';
 import { CANONICAL_TRADITIONS, DEFAULT_TRAIT_DESCRIPTIONS, getTraitHierarchyTier, sortTraitsHierarchically } from '../utils/traitUtils';
 
 interface TraitInputComboboxProps {
-  selectedTraits: string[];
+  selectedTraits?: string[];
+  value?: string[] | string;
   onChange: (traits: string[]) => void;
   placeholder?: string;
   maxTraits?: number;
@@ -17,7 +18,8 @@ interface TraitInputComboboxProps {
 }
 
 export const TraitInputCombobox: React.FC<TraitInputComboboxProps> = ({
-  selectedTraits,
+  selectedTraits: rawSelectedTraits,
+  value,
   onChange,
   placeholder = 'Buscar ou criar traço (ex: Fogo, Ágil, Oculto)...',
   maxTraits,
@@ -25,12 +27,32 @@ export const TraitInputCombobox: React.FC<TraitInputComboboxProps> = ({
   defaultCategory = 'Mecânica e Regras',
   className = '',
   badgeTheme = 'default',
-  quickSuggestions,
+  quickSuggestions = [],
 }) => {
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Normalize selectedTraits safely whether passed as selectedTraits or value (array or CSV string)
+  const selectedTraits = useMemo<string[]>(() => {
+    let source: unknown = rawSelectedTraits;
+    if (source === undefined || source === null) {
+      source = value;
+    }
+    if (Array.isArray(source)) {
+      return source
+        .filter((t): t is string => typeof t === 'string' && Boolean(t.trim()))
+        .map((t) => t.trim());
+    }
+    if (typeof source === 'string') {
+      return source
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+    }
+    return [];
+  }, [rawSelectedTraits, value]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -122,7 +144,7 @@ export const TraitInputCombobox: React.FC<TraitInputComboboxProps> = ({
   // Filtered traits based on query
   const filteredTraits = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const selectedLower = new Set(selectedTraits.map((t) => t.toLowerCase()));
+    const selectedLower = new Set((selectedTraits || []).map((t) => (typeof t === 'string' ? t.toLowerCase() : '')));
 
     if (!q) {
       // Show unselected known traits (up to 20)
@@ -141,7 +163,7 @@ export const TraitInputCombobox: React.FC<TraitInputComboboxProps> = ({
   const exactMatchExists = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return true;
-    const selectedLower = new Set(selectedTraits.map((t) => t.toLowerCase()));
+    const selectedLower = new Set((selectedTraits || []).map((t) => (typeof t === 'string' ? t.toLowerCase() : '')));
     if (selectedLower.has(q)) return true;
     return allKnownTraits.some((t) => t.name.toLowerCase() === q);
   }, [query, selectedTraits, allKnownTraits]);
@@ -149,10 +171,10 @@ export const TraitInputCombobox: React.FC<TraitInputComboboxProps> = ({
   const handleSelectTrait = (traitName: string) => {
     const clean = traitName.trim();
     if (!clean) return;
-    const selectedLower = new Set(selectedTraits.map((t) => t.toLowerCase()));
+    const selectedLower = new Set((selectedTraits || []).map((t) => (typeof t === 'string' ? t.toLowerCase() : '')));
     if (!selectedLower.has(clean.toLowerCase())) {
-      if (maxTraits && selectedTraits.length >= maxTraits) return;
-      onChange([...selectedTraits, clean]);
+      if (maxTraits && (selectedTraits || []).length >= maxTraits) return;
+      onChange([...(selectedTraits || []), clean]);
     }
     setQuery('');
     setIsOpen(false);
@@ -161,9 +183,9 @@ export const TraitInputCombobox: React.FC<TraitInputComboboxProps> = ({
   const handleCreateAndSelect = () => {
     const clean = query.trim();
     if (!clean) return;
-    const selectedLower = new Set(selectedTraits.map((t) => t.toLowerCase()));
+    const selectedLower = new Set((selectedTraits || []).map((t) => (typeof t === 'string' ? t.toLowerCase() : '')));
     if (!selectedLower.has(clean.toLowerCase())) {
-      if (maxTraits && selectedTraits.length >= maxTraits) return;
+      if (maxTraits && (selectedTraits || []).length >= maxTraits) return;
 
       // Save to HecosStorage custom traits
       HecosStorage.saveCustomTrait(clean, {
@@ -172,26 +194,26 @@ export const TraitInputCombobox: React.FC<TraitInputComboboxProps> = ({
         color: 'border-cyan-800/80 bg-cyan-950/80 text-cyan-300',
       });
 
-      onChange([...selectedTraits, clean]);
+      onChange([...(selectedTraits || []), clean]);
     }
     setQuery('');
     setIsOpen(false);
   };
 
   const handleRemoveTrait = (traitToRemove: string) => {
-    onChange(selectedTraits.filter((t) => t.toLowerCase() !== traitToRemove.toLowerCase()));
+    onChange((selectedTraits || []).filter((t) => (typeof t === 'string' ? t.toLowerCase() : '') !== traitToRemove.toLowerCase()));
   };
 
   return (
     <div ref={containerRef} className={`space-y-2 ${className}`}>
       {/* Selected Traits Chips */}
       <div className="flex flex-wrap gap-1.5 min-h-[36px] p-2 rounded-xl bg-black/50 border border-zinc-800/80 items-center">
-        {selectedTraits.length === 0 ? (
+        {!selectedTraits || selectedTraits.length === 0 ? (
           <span className="text-xs text-zinc-500 italic px-1">
             Nenhum traço selecionado. Digite ou busque na lista abaixo.
           </span>
         ) : (
-          sortTraitsHierarchically(selectedTraits).map((trait) => (
+          sortTraitsHierarchically(selectedTraits || []).map((trait) => (
             <div
               key={trait}
               className="inline-flex items-center gap-1 pl-1 pr-1.5 py-0.5 rounded-lg bg-zinc-900 border border-zinc-700/80 text-zinc-200 shadow-sm"
@@ -319,9 +341,10 @@ export const TraitInputCombobox: React.FC<TraitInputComboboxProps> = ({
       {quickSuggestions && quickSuggestions.length > 0 && (
         <div className="flex items-center gap-1 flex-wrap pt-0.5">
           <span className="text-[10px] text-zinc-500 mr-1">Sugestões rápidas:</span>
-          {quickSuggestions.slice(0, 10).map((preset) => {
-            const isSelected = selectedTraits.some(
-              (t) => t.toLowerCase() === preset.toLowerCase()
+          {(quickSuggestions || []).slice(0, 10).map((preset) => {
+            if (!preset || typeof preset !== 'string') return null;
+            const isSelected = (selectedTraits || []).some(
+              (t) => typeof t === 'string' && t.toLowerCase() === preset.toLowerCase()
             );
             if (isSelected) return null;
             return (

@@ -2,6 +2,7 @@ export type EntityCategory =
   | 'pc'
   | 'npc'
   | 'creature'
+  | 'peril'
   | 'spell'
   | 'item'
   | 'location'
@@ -456,6 +457,9 @@ export interface PerilFieldVisibility {
 export interface PerilAttributes {
   subcategories?: string[];
   perilKind: PerilKind;
+  perilType?: string; // Backwards-compatible alias
+  portraitImage?: string;
+  tokenImage?: string;
   level: number;
   rarity: 'Comum' | 'Incomum' | 'Raro' | 'Único';
   size?: 'Tiny' | 'Small' | 'Medium' | 'Large' | 'Huge' | 'Gargantuan';

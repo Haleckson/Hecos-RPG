@@ -176,6 +176,7 @@ type EntitySubscriber = (entities: HecosEntity[]) => void;
 type MapSubscriber = (maps: InteractiveMapData[]) => void;
 type FeatCategoriesSubscriber = (config: Record<string, string[]>) => void;
 export type SpellCategoriesSubscriber = (config: Record<string, string[]>) => void;
+export type ItemCategoriesSubscriber = (config: Record<string, string[]>) => void;
 
 export class HecosStorage {
   private static entitiesCache: HecosEntity[] | null = null;
@@ -184,6 +185,7 @@ export class HecosStorage {
   private static driveCache: GoogleDriveResource[] | null = null;
   private static featCategoriesCache: Record<string, string[]> | null = null;
   private static spellCategoriesCache: Record<string, string[]> | null = null;
+  private static itemCategoriesCache: Record<string, string[]> | null = null;
   private static usersCache: HecosUser[] | null = null;
   private static currentUserCache: HecosUser | null = null;
   private static folderPermissionsCache: Record<string, FolderPermission> | null = null;
@@ -193,6 +195,7 @@ export class HecosStorage {
   private static mapSubscribers = new Set<MapSubscriber>();
   private static featCategoriesSubscribers = new Set<FeatCategoriesSubscriber>();
   private static spellCategoriesSubscribers = new Set<SpellCategoriesSubscriber>();
+  private static itemCategoriesSubscribers = new Set<ItemCategoriesSubscriber>();
   private static userSubscribers = new Set<(user: HecosUser | null) => void>();
   private static usersListSubscribers = new Set<(users: HecosUser[]) => void>();
   private static folderPermissionsSubscribers = new Set<(perms: Record<string, FolderPermission>) => void>();
@@ -241,6 +244,28 @@ export class HecosStorage {
         sub(config);
       } catch (e) {
         console.warn("Error notifying spell categories subscriber:", e);
+      }
+    });
+  }
+
+  /**
+   * Subscribe to item subcategories configuration
+   */
+  static subscribeItemCategories(subscriber: ItemCategoriesSubscriber): () => void {
+    subscriber(this.getAllItemSubcategoriesConfig());
+    this.itemCategoriesSubscribers.add(subscriber);
+    return () => {
+      this.itemCategoriesSubscribers.delete(subscriber);
+    };
+  }
+
+  private static notifyItemCategoriesSubscribers(): void {
+    const config = this.getAllItemSubcategoriesConfig();
+    this.itemCategoriesSubscribers.forEach((sub) => {
+      try {
+        sub(config);
+      } catch (e) {
+        console.warn("Error notifying item categories subscriber:", e);
       }
     });
   }
@@ -1687,6 +1712,7 @@ export class HecosStorage {
     } catch (e) {
       console.warn("Error saving item categories config:", e);
     }
+    this.notifyItemCategoriesSubscribers();
     this.notifyEntitySubscribers();
   }
 
@@ -1715,12 +1741,15 @@ export class HecosStorage {
 
     const entities = this.getEntities();
     entities.forEach((ent) => {
-      if (ent.category === 'item') {
+      if (ent.category === 'item' || ent.itemData) {
         let updated = false;
-        let subcats = ent.subcategories || [];
+        let subcats = ent.subcategories || ent.itemData?.subcategories || [];
         if (subcats.includes(oldName)) {
           subcats = subcats.map((s) => (s === oldName ? trimmedNew : s));
           ent.subcategories = subcats;
+          if (ent.itemData) {
+            ent.itemData.subcategories = subcats;
+          }
           updated = true;
         }
         if (ent.subcategory === oldName) {
@@ -1744,12 +1773,15 @@ export class HecosStorage {
 
     const entities = this.getEntities();
     entities.forEach((ent) => {
-      if (ent.category === 'item') {
+      if (ent.category === 'item' || ent.itemData) {
         let updated = false;
-        let subcats = ent.subcategories || [];
+        let subcats = ent.subcategories || ent.itemData?.subcategories || [];
         if (subcats.includes(subcategoryName)) {
           subcats = subcats.filter((s) => s !== subcategoryName);
           ent.subcategories = subcats;
+          if (ent.itemData) {
+            ent.itemData.subcategories = subcats;
+          }
           updated = true;
         }
         if (ent.subcategory === subcategoryName) {
@@ -1769,12 +1801,28 @@ export class HecosStorage {
     if (!ent) return false;
     const cleanSubcats = Array.from(new Set(subcategories.map((s) => s.trim()).filter(Boolean)));
     ent.subcategories = cleanSubcats;
+    if (ent.itemData) {
+      ent.itemData.subcategories = cleanSubcats;
+    }
     ent.subcategory = (cleanSubcats && cleanSubcats[0]) || ent.subcategory || '';
     const currentTags = new Set(ent.tags || []);
     cleanSubcats.forEach((s) => currentTags.add(s));
     ent.tags = Array.from(currentTags);
     this.saveEntity(ent);
     return true;
+  }
+
+  static toggleItemSubcategory(itemId: string, subcategoryName: string): boolean {
+    const ent = this.getEntityById(itemId);
+    if (!ent) return false;
+    const current = ent.itemData?.subcategories || ent.subcategories || (ent.subcategory ? [ent.subcategory] : []);
+    const set = new Set(current);
+    if (set.has(subcategoryName)) {
+      set.delete(subcategoryName);
+    } else {
+      set.add(subcategoryName);
+    }
+    return this.assignItemSubcategories(itemId, Array.from(set));
   }
 
   /**
@@ -2311,6 +2359,16 @@ export class HecosStorage {
 
     // 1. Explicit item-level visibility
     if (item.visibility === 'all') {
+      // Check if granular peril field visibility restricts the name
+      const perilVis = (item as HecosEntity).perilData?.fieldVisibility;
+      if (perilVis) {
+        if (perilVis.name === 'gm') return false;
+        if (perilVis.name === 'custom') {
+          if (!user) return false;
+          const allowed = perilVis.allowedUsers?.name || [];
+          if (!allowed.includes(user.id)) return false;
+        }
+      }
       return true;
     }
     if (item.visibility === 'gm') {
@@ -2318,11 +2376,22 @@ export class HecosStorage {
     }
     if (item.visibility === 'custom') {
       if (!user) return false;
-      return Boolean(item.allowedUserIds?.some((id) =>
+      const isAllowed = Boolean(item.allowedUserIds?.some((id) =>
         id === user.id ||
         id.toLowerCase() === user.username.toLowerCase() ||
         id.toLowerCase() === user.name.toLowerCase()
       ));
+      if (!isAllowed) return false;
+      // Also check peril field visibility
+      const perilVis = (item as HecosEntity).perilData?.fieldVisibility;
+      if (perilVis) {
+        if (perilVis.name === 'gm') return false;
+        if (perilVis.name === 'custom') {
+          const allowed = perilVis.allowedUsers?.name || [];
+          if (!allowed.includes(user.id)) return false;
+        }
+      }
+      return true;
     }
 
     // 2. If item is a link to another entity (e.g. featEntityId or entityId)
@@ -2822,6 +2891,7 @@ export class HecosStorage {
     if (exactKey !== cleanKey) {
       all[exactKey] = entry;
     }
+    all[clean] = entry;
     this.customTraitsCache = all;
     try {
       localStorage.setItem(STORAGE_KEYS.CUSTOM_TRAITS, JSON.stringify(all));
@@ -2843,6 +2913,7 @@ export class HecosStorage {
     const all = { ...this.getCustomTraits() };
     delete all[cleanKey];
     delete all[exactKey];
+    delete all[clean];
     this.customTraitsCache = all;
     try {
       localStorage.setItem(STORAGE_KEYS.CUSTOM_TRAITS, JSON.stringify(all));

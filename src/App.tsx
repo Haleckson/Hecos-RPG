@@ -28,6 +28,7 @@ import { CategoryEntityExplorer } from './components/CategoryEntityExplorer';
 import { SpellCreateModal } from './components/SpellCreateModal';
 import { ItemCreateModal } from './components/ItemCreateModal';
 import { AncestryCard } from './components/AncestryCard';
+import { PerilCard } from './components/PerilCard';
 import { EntityCard } from './components/EntityCard';
 import { QuestBoard } from './components/QuestBoard';
 import { PerilCreateModal } from './components/PerilCreateModal';
@@ -195,6 +196,7 @@ export function App() {
   const [itemModalPresetSubcategory, setItemModalPresetSubcategory] = useState<string | undefined>(undefined);
 
   const [isPerilCreateModalOpen, setIsPerilCreateModalOpen] = useState(false);
+  const [editingPerilEntity, setEditingPerilEntity] = useState<HecosEntity | null>(null);
   const [isClassCreateModalOpen, setIsClassCreateModalOpen] = useState(false);
   const [classModalPresetKind, setClassModalPresetKind] = useState<'class' | 'archetype'>('class');
 
@@ -416,6 +418,7 @@ export function App() {
     }
 
     if (category === 'creature' || (category as any) === 'peril') {
+      setEditingPerilEntity(null);
       setIsPerilCreateModalOpen(true);
       return;
     }
@@ -533,7 +536,13 @@ export function App() {
       handleCreateFeatDirectly();
       return;
     }
-    if (presetCategoryOrSub === 'peril' || presetCategoryOrSub === 'creature') {
+    if (
+      presetCategoryOrSub === 'peril' ||
+      presetCategoryOrSub === 'creature' ||
+      presetCategoryOrSub === 'perigo' ||
+      presetCategoryOrSub === 'perigos'
+    ) {
+      setEditingPerilEntity(null);
       setIsPerilCreateModalOpen(true);
       return;
     }
@@ -574,6 +583,9 @@ export function App() {
     } else if (ent.category === 'item' || ent.itemData) {
       setEditingItemEntity(ent);
       setIsItemCreateModalOpen(true);
+    } else if (ent.category === 'peril' || ent.category === 'creature' || ent.perilData) {
+      setEditingPerilEntity(ent);
+      setIsPerilCreateModalOpen(true);
     } else {
       setSelectedEntityId(ent.id);
       setEditingEntity(ent);
@@ -899,7 +911,7 @@ export function App() {
                             {/* Group Items */}
                             {isGroupExpanded && (
                               <div className="pl-2 space-y-0.5 border-l border-zinc-800/60 ml-2">
-                                {group.items.map((child) => {
+                                {(group.items || []).map((child) => {
                                   const targetCat = child.categoryKey || child.id || category.id;
                                   const isChildSelected = (effectiveCategoryKey === targetCat || activeSubcategory === child.subcategory) && activeView === (child.viewType || 'entities');
                                   const ChildIcon = child.icon;
@@ -1496,13 +1508,24 @@ export function App() {
               <CategoryEntityExplorer
                 categoryKey={effectiveCategoryKey}
                 activeSubcategory={activeSubcategory}
-                onSelectEntity={handleNavigateEntity}
+                onSelectEntity={(id) => {
+                  const ent = entities.find((e) => e.id === id || e.slug === id);
+                  if (ent && (ent.category === 'peril' || ent.category === 'creature' || ent.perilData)) {
+                    setSelectedDrawerEntityId(ent.id);
+                    setIsEntityDrawerOpen(true);
+                  } else {
+                    handleNavigateEntity(id);
+                  }
+                }}
                 onEditEntity={(id) => {
                   const ent = entities.find((e) => e.id === id || e.slug === id);
                   if (ent) {
                     if (ent.category === 'spell') {
                       setEditingSpellEntity(ent);
                       setIsSpellCreateModalOpen(true);
+                    } else if (ent.category === 'peril' || ent.category === 'creature' || ent.perilData) {
+                      setEditingPerilEntity(ent);
+                      setIsPerilCreateModalOpen(true);
                     } else {
                       setEditingEntity(ent);
                       setActiveView('edit');
@@ -1695,9 +1718,13 @@ export function App() {
                     </div>
                   </div>
                 ) : (
-                  /* STANDARD CARDS GRID VIEW - Up to 5 cols on >=1080p, max 3 cols on <1080p */
+                  /* STANDARD CARDS GRID VIEW - Adaptive: 4 cols on >=1080p for Perils, 3 cols on <1080p */
                   <div
-                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 min-[1800px]:grid-cols-5 2xl:grid-cols-5 gap-3 sm:gap-3.5 items-stretch"
+                    className={
+                      effectiveCategoryKey === 'peril' || selectedCategoryKey === 'peril'
+                        ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 min-[1800px]:grid-cols-4 gap-3 sm:gap-4 items-stretch'
+                        : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 min-[1800px]:grid-cols-5 2xl:grid-cols-5 gap-3 sm:gap-3.5 items-stretch'
+                    }
                   >
                     {sortedCategoryEntities.map((item) => {
                       if (item.category === 'ancestry') {
@@ -1711,6 +1738,25 @@ export function App() {
                               if (ent) {
                                 setEditingEntity(ent);
                                 setActiveView('edit');
+                              }
+                            }}
+                            onDelete={handleDeleteEntity}
+                            isGmMode={isActualGm}
+                          />
+                        );
+                      }
+
+                      if (item.category === 'peril' || item.category === 'creature' || item.perilData) {
+                        return (
+                          <PerilCard
+                            key={item.id}
+                            entity={item}
+                            onSelect={handleNavigateEntity}
+                            onEdit={(id) => {
+                              const ent = entities.find((e) => e.id === id);
+                              if (ent) {
+                                setEditingPerilEntity(ent);
+                                setIsPerilCreateModalOpen(true);
                               }
                             }}
                             onDelete={handleDeleteEntity}
@@ -1833,11 +1879,28 @@ export function App() {
       {/* Robust PF2e Perils & Hazards Creation Modal */}
       <PerilCreateModal
         isOpen={isPerilCreateModalOpen}
-        onClose={() => setIsPerilCreateModalOpen(false)}
+        initialEntity={editingPerilEntity}
+        onClose={() => {
+          const edited = editingPerilEntity;
+          setIsPerilCreateModalOpen(false);
+          setEditingPerilEntity(null);
+          if (edited) {
+            window.dispatchEvent(
+              new CustomEvent('hecos:open-entity-drawer', {
+                detail: { entityId: edited.id, slug: edited.slug }
+              })
+            );
+          }
+        }}
         onSave={(newPerilEntity) => {
           refreshEntities();
-          handleNavigateEntity(newPerilEntity.id);
+          window.dispatchEvent(
+            new CustomEvent('hecos:open-entity-drawer', {
+              detail: { entityId: newPerilEntity.id, slug: newPerilEntity.slug }
+            })
+          );
           setIsPerilCreateModalOpen(false);
+          setEditingPerilEntity(null);
         }}
       />
 

@@ -948,13 +948,13 @@ export const FolderManagerModal: React.FC<FolderManagerModalProps> = ({
                                   </button>
                                 </div>
 
-                                {folder.entities.length === 0 ? (
+                                {!folder.entities || folder.entities.length === 0 ? (
                                   <p className="text-[11px] text-zinc-500 italic py-1">
                                     Nenhum {scopeDetails.singularEntity} vinculado a esta pasta ainda.
                                   </p>
                                 ) : (
                                   <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
-                                    {folder.entities.map((ent) => (
+                                    {(folder.entities || []).map((ent) => (
                                       <div
                                         key={ent.id}
                                         className="px-2 py-1 rounded-lg bg-zinc-900/90 border border-zinc-800 flex items-center justify-between gap-2 text-xs"

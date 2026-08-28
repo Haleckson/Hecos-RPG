@@ -488,6 +488,8 @@ export function getCategoryMeta(keyOrId?: string, subcategory?: string) {
     codex: 'Codex',
     creature: 'Perigos',
     criaturas: 'Perigos',
+    peril: 'Perigos',
+    perils: 'Perigos',
     perigos: 'Perigos',
     perigo: 'Perigos',
     spell: 'Feitiços',

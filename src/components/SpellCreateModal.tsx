@@ -1355,10 +1355,10 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
               {/* Traits & Traditions Chips */}
               <div className="flex flex-wrap gap-1.5">
                 <TraitBadge trait={spellData.rarity || 'Comum'} />
-                {spellData.traditions.map((trad) => (
+                {(spellData.traditions || []).map((trad) => (
                   <TraitBadge key={trad} trait={trad} />
                 ))}
-                {spellData.traits.map((tr) => (
+                {(spellData.traits || []).map((tr) => (
                   <TraitBadge key={tr} trait={tr} />
                 ))}
               </div>

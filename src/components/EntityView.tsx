@@ -335,7 +335,7 @@ export const EntityView: React.FC<EntityViewProps> = ({
                       </span>
                     </h3>
                     <div className="flex flex-wrap gap-1.5 mt-2">
-                      {entity.statblock.traits.map((tr) => (
+                      {(entity.statblock.traits || []).map((tr) => (
                         <span
                           key={tr}
                           className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-zinc-300"
@@ -374,7 +374,7 @@ export const EntityView: React.FC<EntityViewProps> = ({
                   <div className="space-y-2 pt-2 border-t border-zinc-800/80">
                     <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Ações de Combate</h4>
                     <div className="space-y-2">
-                      {entity.statblock.actions.map((act) => (
+                      {(entity.statblock.actions || []).map((act) => (
                         <div
                           key={act.id}
                           className="p-3 rounded-lg bg-black/40 border border-zinc-800/80 hover:border-zinc-700 transition-colors"

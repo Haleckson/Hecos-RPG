@@ -4,7 +4,10 @@ import { HecosStorage } from '../services/storage';
 import { getCategoryMeta } from '../utils/categories';
 import { EntityCard } from './EntityCard';
 import { AncestryCard } from './AncestryCard';
+import { PerilCard } from './PerilCard';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
+import { Tooltip } from './Tooltip';
+import { PerilTooltipCard } from './PerilTooltipCard';
 import { FolderManagerModal, FolderScope, FolderCategoryOption } from './FolderManagerModal';
 import {
   Search,
@@ -248,7 +251,7 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
       if (tab.id === 'all') return;
       counts[tab.id] = categoryEntities.filter((ent) => {
         if (categoryKey === 'peril') {
-          const pType = ent.perilData?.perilType || ent.category;
+          const pType = ent.perilData?.perilKind || ent.perilData?.perilType || (ent.category === 'creature' ? 'monster' : ent.category);
           if (tab.id === 'monsters') return pType === 'creature' || pType === 'monster' || ent.category === 'creature';
           if (tab.id === 'hazards_simple') return pType === 'hazard_simple';
           if (tab.id === 'hazards_complex') return pType === 'hazard_complex';
@@ -293,7 +296,7 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
       // 1. Tab Match
       if (selectedTab !== 'all') {
         if (categoryKey === 'peril') {
-          const pType = ent.perilData?.perilType || ent.category;
+          const pType = ent.perilData?.perilKind || ent.perilData?.perilType || (ent.category === 'creature' ? 'monster' : ent.category);
           if (selectedTab === 'monsters' && pType !== 'creature' && pType !== 'monster' && ent.category !== 'creature') return false;
           if (selectedTab === 'hazards_simple' && pType !== 'hazard_simple') return false;
           if (selectedTab === 'hazards_complex' && pType !== 'hazard_complex') return false;
@@ -566,11 +569,11 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => onCreateNewEntity(selectedFolder && selectedFolder !== '__none__' ? selectedFolder : categoryKey)}
+                  onClick={() => onCreateNewEntity(categoryKey === 'peril' || categoryKey === 'creature' ? 'peril' : (selectedFolder && selectedFolder !== '__none__' ? selectedFolder : categoryKey))}
                   className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-extrabold shadow-md transition-all cursor-pointer ${themeClasses.btnBg}`}
                 >
                   <Plus className="w-4 h-4 stroke-[3]" />
-                  <span>Novo em {meta.name}</span>
+                  <span>{categoryKey === 'peril' || categoryKey === 'creature' ? 'Perigo' : `Novo em ${meta.name}`}</span>
                 </button>
               </>
             )}
@@ -906,10 +909,10 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
           {isActualGm && (
             <button
               type="button"
-              onClick={() => onCreateNewEntity(selectedFolder && selectedFolder !== '__none__' ? selectedFolder : categoryKey)}
+              onClick={() => onCreateNewEntity(categoryKey === 'peril' || categoryKey === 'creature' ? 'peril' : (selectedFolder && selectedFolder !== '__none__' ? selectedFolder : categoryKey))}
               className={`px-4 py-2 text-xs font-bold rounded-xl shadow-md cursor-pointer transition-all ${themeClasses.btnBg}`}
             >
-              Criar Primeira Entrada em {meta.name}
+              {categoryKey === 'peril' || categoryKey === 'creature' ? 'Criar Primeiro Perigo' : `Criar Primeira Entrada em ${meta.name}`}
             </button>
           )}
         </div>
@@ -930,27 +933,60 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
               <tbody className="divide-y divide-zinc-800/60">
                 {sortedEntities.map((item) => {
                   const itemFolders = getEntityFolders(item);
+                  const isPerilItem = item.category === 'peril' || item.category === 'creature' || item.perilData;
 
                   return (
                     <tr
                       key={item.id}
-                      onClick={() => onSelectEntity(item.id)}
+                      onClick={() => {
+                        if (isPerilItem) {
+                          window.dispatchEvent(
+                            new CustomEvent('hecos:open-entity-drawer', {
+                              detail: { entityId: item.id, slug: item.slug }
+                            })
+                          );
+                        } else {
+                          onSelectEntity(item.id);
+                        }
+                      }}
                       className="hover:bg-zinc-900/50 transition-colors cursor-pointer group"
                     >
                       <td className="py-3 px-4 font-bold text-zinc-200 group-hover:text-cyan-300 transition-colors">
-                        <div className="flex items-center gap-2">
-                          <span>{item.title}</span>
-                          {item.subtitle && (
-                            <span className="text-zinc-500 font-normal text-[11px] truncate max-w-xs">
-                              ({item.subtitle})
-                            </span>
-                          )}
-                          {item.isSecret && (
-                            <span className="text-[9px] px-1 py-0.2 rounded bg-rose-950 text-rose-300 border border-rose-800 font-mono">
-                              GM
-                            </span>
-                          )}
-                        </div>
+                        {isPerilItem ? (
+                          <Tooltip
+                            content={<PerilTooltipCard peril={item} onSelectEntity={onSelectEntity} />}
+                            delay={200}
+                            placement="right"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="underline decoration-rose-500/40 decoration-dotted underline-offset-2">{item.title}</span>
+                              {item.subtitle && (
+                                <span className="text-zinc-500 font-normal text-[11px] truncate max-w-xs">
+                                  ({item.subtitle})
+                                </span>
+                              )}
+                              {item.isSecret && (
+                                <span className="text-[9px] px-1 py-0.2 rounded bg-rose-950 text-rose-300 border border-rose-800 font-mono">
+                                  GM
+                                </span>
+                              )}
+                            </div>
+                          </Tooltip>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span>{item.title}</span>
+                            {item.subtitle && (
+                              <span className="text-zinc-500 font-normal text-[11px] truncate max-w-xs">
+                                ({item.subtitle})
+                              </span>
+                            )}
+                            {item.isSecret && (
+                              <span className="text-[9px] px-1 py-0.2 rounded bg-rose-950 text-rose-300 border border-rose-800 font-mono">
+                                GM
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -1061,17 +1097,31 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
                     {list.length === 0 ? (
                       <p className="text-xs text-zinc-500 italic py-2">Nenhum item nesta pasta.</p>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                        {list.map((item) => (
-                          <EntityCard
-                            key={item.id}
-                            entity={item}
-                            onSelect={onSelectEntity}
-                            onEdit={onEditEntity}
-                            onDelete={onDeleteEntity}
-                            isGmMode={isActualGm}
-                          />
-                        ))}
+                      <div className={categoryKey === 'peril' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 min-[1800px]:grid-cols-4 gap-3 sm:gap-4' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3'}>
+                        {list.map((item) => {
+                          if (item.category === 'peril' || item.category === 'creature' || item.perilData) {
+                            return (
+                              <PerilCard
+                                key={item.id}
+                                entity={item}
+                                onSelect={onSelectEntity}
+                                onEdit={onEditEntity}
+                                onDelete={onDeleteEntity}
+                                isGmMode={isActualGm}
+                              />
+                            );
+                          }
+                          return (
+                            <EntityCard
+                              key={item.id}
+                              entity={item}
+                              onSelect={onSelectEntity}
+                              onEdit={onEditEntity}
+                              onDelete={onDeleteEntity}
+                              isGmMode={isActualGm}
+                            />
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -1099,17 +1149,31 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
 
               {expandedFolders.__none__ !== false && (
                 <div className="p-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                    {groupedByFolder.noFolderList.map((item) => (
-                      <EntityCard
-                        key={item.id}
-                        entity={item}
-                        onSelect={onSelectEntity}
-                        onEdit={onEditEntity}
-                        onDelete={onDeleteEntity}
-                        isGmMode={isActualGm}
-                      />
-                    ))}
+                  <div className={categoryKey === 'peril' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 min-[1800px]:grid-cols-4 gap-3 sm:gap-4' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3'}>
+                    {groupedByFolder.noFolderList.map((item) => {
+                      if (item.category === 'peril' || item.category === 'creature' || item.perilData) {
+                        return (
+                          <PerilCard
+                            key={item.id}
+                            entity={item}
+                            onSelect={onSelectEntity}
+                            onEdit={onEditEntity}
+                            onDelete={onDeleteEntity}
+                            isGmMode={isActualGm}
+                          />
+                        );
+                      }
+                      return (
+                        <EntityCard
+                          key={item.id}
+                          entity={item}
+                          onSelect={onSelectEntity}
+                          onEdit={onEditEntity}
+                          onDelete={onDeleteEntity}
+                          isGmMode={isActualGm}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -1118,11 +1182,23 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
         </div>
       ) : (
         /* STANDARD CARDS GRID VIEW */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 min-[1800px]:grid-cols-5 2xl:grid-cols-5 gap-3 sm:gap-3.5 items-stretch">
+        <div className={`grid ${categoryKey === 'peril' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 min-[1800px]:grid-cols-4 gap-3 sm:gap-4' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 min-[1800px]:grid-cols-5 2xl:grid-cols-5 gap-3 sm:gap-3.5'} items-stretch`}>
           {sortedEntities.map((item) => {
             if (item.category === 'ancestry') {
               return (
                 <AncestryCard
+                  key={item.id}
+                  entity={item}
+                  onSelect={onSelectEntity}
+                  onEdit={onEditEntity}
+                  onDelete={onDeleteEntity}
+                  isGmMode={isActualGm}
+                />
+              );
+            }
+            if (item.category === 'peril' || item.category === 'creature' || item.perilData) {
+              return (
+                <PerilCard
                   key={item.id}
                   entity={item}
                   onSelect={onSelectEntity}
