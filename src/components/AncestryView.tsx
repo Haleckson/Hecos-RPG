@@ -13,6 +13,7 @@ import { ImageUploadInput } from './ImageUploadInput';
 import { MultiImageAlbumUploader } from './MultiImageAlbumUploader';
 import { FeatCard } from './FeatCard';
 import { sortTraitsHierarchically } from '../utils/traitUtils';
+import { downloadImage, slugify } from '../services/imgbb';
 import {
   Swords,
   Dna,
@@ -54,7 +55,8 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  Camera
+  Camera,
+  Download
 } from 'lucide-react';
 
 interface AncestryViewProps {
@@ -263,7 +265,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
     <div className="space-y-6 text-zinc-100 font-sans w-full max-w-full overflow-hidden">
       {/* Optional Ancestry Cover Banner */}
       {entity.coverImage && (
-        <div className="relative h-48 sm:h-64 lg:h-72 w-full rounded-2xl overflow-hidden border border-[#272338] bg-[#0c0915] shadow-xl">
+        <div className="relative h-48 sm:h-64 lg:h-72 w-full rounded-2xl overflow-hidden border border-[#272338] bg-[#0c0915] shadow-xl group/banner">
           <AdjustableImage
             src={entity.coverImage}
             alt={entity.title}
@@ -272,6 +274,19 @@ IDIOMAS: ${data.languages || 'Humani'}`;
             containerClassName="relative w-full h-full overflow-hidden bg-[#0c0915]"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#0e0a17] via-[#0e0a17]/40 to-transparent pointer-events-none" />
+
+          {/* Download Cover Button */}
+          <div className="absolute top-3 right-3 z-10 opacity-80 group-hover/banner:opacity-100 transition-opacity">
+            <button
+              type="button"
+              onClick={() => downloadImage(entity.coverImage!, `ancestralidade-${slugify(entity.title)}-capa.webp`)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/75 hover:bg-black/90 border border-white/20 hover:border-cyan-400/60 text-white text-xs font-semibold backdrop-blur-md transition-all shadow-lg cursor-pointer"
+              title="Baixar imagem de capa (.webp)"
+            >
+              <Download className="w-3.5 h-3.5 text-cyan-300" />
+              <span>Baixar Capa (.webp)</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -650,9 +665,9 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                   </div>
                 ))
               ) : (
-                <p className="text-xs text-zinc-500 col-span-2 italic py-2">
+                <div className="text-xs text-zinc-500 col-span-2 italic py-2">
                   Nenhuma herança disponível com as permissões atuais.
-                </p>
+                </div>
               )}
             </div>
           </section>
@@ -900,6 +915,10 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                       onImagesUploaded={handleAddMultipleImagesToAlbum}
                       onCancel={() => setIsBulkUploadOpen(false)}
                       themeColor="purple"
+                      category="ancestralidade"
+                      entityName={data.name || entity.title}
+                      role="album"
+                      startIndex={(data.album || []).length + 1}
                     />
                   </div>
                 )}
@@ -930,6 +949,10 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                           value={newImageUrl}
                           onChange={(url) => setNewImageUrl(url)}
                           placeholder="https://exemplo.com/imagem-ancestralidade.jpg ou selecione um arquivo..."
+                          category="ancestralidade"
+                          entityName={data.name || entity.title}
+                          role="album"
+                          index={(data.album || []).length + 1}
                         />
                       </div>
 
@@ -1005,16 +1028,32 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                               <Maximize2 className="w-3 h-3" />
                               Ampliar
                             </span>
-                            {isActualGm && (
+                            <div className="flex items-center gap-1">
                               <button
                                 type="button"
-                                onClick={(e) => handleRemoveImageFromAlbum(img.id, e)}
-                                title="Remover imagem do álbum"
-                                className="p-1 rounded-lg bg-rose-950/90 text-rose-300 hover:bg-rose-900 border border-rose-600/50 hover:text-white transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  downloadImage(
+                                    img.url,
+                                    `ancestralidade-${slugify(entity.title)}-album-${String(idx + 1).padStart(2, '0')}.webp`
+                                  );
+                                }}
+                                title="Baixar imagem (.webp)"
+                                className="p-1 rounded-lg bg-black/80 text-cyan-300 hover:bg-cyan-900/80 border border-cyan-500/40 hover:text-white transition-colors cursor-pointer"
                               >
-                                <Trash2 className="w-3 h-3" />
+                                <Download className="w-3 h-3" />
                               </button>
-                            )}
+                              {isActualGm && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleRemoveImageFromAlbum(img.id, e)}
+                                  title="Remover imagem do álbum"
+                                  className="p-1 rounded-lg bg-rose-950/90 text-rose-300 hover:bg-rose-900 border border-rose-600/50 hover:text-white transition-colors cursor-pointer"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
 
@@ -1570,14 +1609,31 @@ IDIOMAS: ${data.languages || 'Humani'}`;
             className="relative max-w-5xl w-full max-h-[90vh] flex flex-col items-center justify-center"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Fechar */}
-            <button
-              type="button"
-              onClick={() => setSelectedImageIndex(null)}
-              className="absolute top-2 right-2 z-10 p-2.5 rounded-full bg-black/80 text-white hover:bg-rose-600 transition-colors shadow-lg cursor-pointer"
-            >
-              <X className="w-6 h-6" />
-            </button>
+            {/* Fechar e Download */}
+            <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  downloadImage(
+                    (data.album || [])[selectedImageIndex].url,
+                    `ancestralidade-${slugify(entity.title)}-album-${String(selectedImageIndex + 1).padStart(2, '0')}.webp`
+                  )
+                }
+                className="px-3.5 py-2 rounded-full bg-black/80 text-cyan-300 hover:bg-cyan-900 border border-cyan-500/50 hover:text-white transition-colors shadow-lg cursor-pointer flex items-center gap-1.5"
+                title="Baixar imagem (.webp)"
+              >
+                <Download className="w-4 h-4" />
+                <span className="text-xs font-semibold hidden sm:inline">Baixar (.webp)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedImageIndex(null)}
+                className="p-2.5 rounded-full bg-black/80 text-white hover:bg-rose-600 transition-colors shadow-lg cursor-pointer"
+                title="Fechar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
             {/* Navegação Anterior */}
             {(data.album || []).length > 1 && (

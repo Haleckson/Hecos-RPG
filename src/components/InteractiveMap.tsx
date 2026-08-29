@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { InteractiveMapData, MapPin, HecosEntity, ItemVisibility } from '../types';
 import { HecosStorage } from '../services/storage';
-import { uploadToImgBB } from '../services/imgbb';
+import { uploadToImgBB, downloadImage, slugify } from '../services/imgbb';
 import {
   Compass,
   MapPin as PinIcon,
@@ -34,7 +34,8 @@ import {
   FolderPlus,
   Check,
   Navigation,
-  Users
+  Users,
+  Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { renderContentWithMentions } from './MentionBadge';
@@ -390,7 +391,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity
 
     try {
       // First attempt ImgBB if key is configured, else fallback to Base64 Data URL
-      const res = await uploadToImgBB(file, `map_${file.name}`);
+      const res = await uploadToImgBB(file, {
+        category: 'mapa',
+        entityName: currentMap?.title || editMapTitle || 'mapa-hecos',
+        role: 'mapa',
+        originalFilename: file.name
+      });
       if (res.success && res.url) {
         setEditMapUrl(res.url);
         setMapImageUploadMsg('Imagem enviada com sucesso para ImgBB!');
@@ -959,6 +965,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
+          {currentMap?.imageUrl && (
+            <button
+              onClick={() => downloadImage(currentMap.imageUrl, `mapa-${slugify(currentMap.title || 'mapa')}-mapa.webp`)}
+              className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-300 hover:text-cyan-300 transition-colors"
+              title="Baixar Imagem do Mapa (.webp)"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Bottom Left Coordinate / Status Indicator */}
@@ -1294,7 +1309,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ onNavigateEntity
                   label="Imagem do Mapa em Alta Resolução"
                   placeholder="https://... ou faça upload direto para o ImgBB"
                   showPreview={true}
-                  previewHeight="h-36"
+                  category="mapa"
+                  entityName={currentMap?.title || editMapTitle || 'mapa-hecos'}
+                  role="mapa"
                 />
               </div>
 

@@ -93,6 +93,7 @@ export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNa
   if (entity.category === 'peril' || entity.category === 'creature' || entity.perilData) {
     return (
       <Tooltip
+        as="span"
         content={<PerilTooltipCard peril={entity} onSelectEntity={onNavigate} />}
         placement="top"
         delay={160}
@@ -180,6 +181,7 @@ export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNa
 
   return (
     <Tooltip
+      as="span"
       content={genericPreviewCard}
       placement="top"
       delay={160}

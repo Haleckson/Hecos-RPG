@@ -295,35 +295,8 @@ export const EntityView: React.FC<EntityViewProps> = ({
 
       {/* Main Content Layout */}
       <div className="p-6 sm:p-8 space-y-6">
-        {/* Specialized Views for Ancestry, Feat, Peril, and Class */}
-        {entity.category === 'ancestry' ? (
-          <AncestryView entity={entity} onEdit={onEdit} onNavigate={onNavigate} onTagClick={onTagClick} />
-        ) : entity.category === 'feat' ? (
-          <FeatView
-            entity={entity}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onNavigate={onNavigate}
-            onTagClick={onTagClick}
-          />
-        ) : entity.category === 'creature' || entity.category === 'peril' || entity.perilData ? (
-          <PerilView
-            entity={entity}
-            onEdit={onEdit}
-            onNavigate={onNavigate}
-            onTagClick={onTagClick}
-          />
-        ) : (entity.category === 'class' || entity.category === 'archetype' || entity.classData) ? (
-          <ClassView
-            entity={entity}
-            onEdit={onEdit}
-            onNavigate={onNavigate}
-            onTagClick={onTagClick}
-          />
-        ) : (
-          <>
-            {/* Pathfinder 2e Statblock (if available) */}
-            {entity.statblock && (
+        {/* Pathfinder 2e Statblock (if available) */}
+        {entity.statblock && (
               <div className="p-5 rounded-xl bg-[#110d1a] border-2 border-purple-900/60 shadow-lg space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 pb-3">
                   <div>
@@ -432,8 +405,6 @@ export const EntityView: React.FC<EntityViewProps> = ({
             <div className="pt-2">
               <RichContentRenderer content={entity.content} onNavigate={onNavigate} />
             </div>
-          </>
-        )}
 
         {/* Backlinks Section (Notion / Obsidian / World Anvil style) */}
         {backlinks.length > 0 && (

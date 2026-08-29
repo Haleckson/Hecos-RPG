@@ -126,7 +126,7 @@ export const TraitBadge: React.FC<TraitBadgeProps> = ({
 
   return (
     <>
-      <div className="relative inline-flex items-center group/trait-badge">
+      <span className="relative inline-flex items-center group/trait-badge">
         <span
           role={interactive ? 'button' : undefined}
           tabIndex={interactive ? 0 : undefined}
@@ -192,7 +192,7 @@ export const TraitBadge: React.FC<TraitBadgeProps> = ({
             </AnimatePresence>,
             document.body
           )}
-      </div>
+      </span>
 
       {/* Confirmation Modal for Trait Removal */}
       <AnimatePresence>

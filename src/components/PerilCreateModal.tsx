@@ -7,12 +7,16 @@ import {
   PerilAction,
   PerilFieldVisibility,
   ItemVisibility,
-  HecosUser
+  HecosUser,
+  PerilLootCurrency,
+  PerilLootItem,
+  PerilLootData
 } from '../types';
 import { HecosStorage } from '../services/storage';
 import { ImageUploadInput } from './ImageUploadInput';
 import { TraitInputCombobox } from './TraitInputCombobox';
 import { FolderManagerModal } from './FolderManagerModal';
+import { ItemPickerModal } from './ItemPickerModal';
 import {
   canonicalizeSizeName,
   canonicalizeRarityName,
@@ -45,7 +49,13 @@ import {
   Folder,
   FolderPlus,
   FolderTree,
-  AlertCircle
+  AlertCircle,
+  Coins,
+  Package,
+  Minus,
+  ExternalLink,
+  Layers,
+  Sparkle
 } from 'lucide-react';
 
 interface PerilCreateModalProps {
@@ -69,6 +79,7 @@ export type PerilTabId =
   | 'manifestation'
   | 'exorcism'
   | 'disable'
+  | 'loot'
   | 'lore'
   | 'visibility';
 
@@ -155,6 +166,16 @@ interface HorizontalTabItem {
   countBadge?: number;
 }
 
+const normalizeStringArray = (raw: unknown): string[] => {
+  if (Array.isArray(raw)) {
+    return raw.filter((t): t is string => typeof t === 'string' && Boolean(t.trim())).map((t) => t.trim());
+  }
+  if (typeof raw === 'string') {
+    return raw.split(',').map((t) => t.trim()).filter(Boolean);
+  }
+  return [];
+};
+
 export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
   isOpen,
   onClose,
@@ -162,8 +183,6 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
   initialEntity,
   entityToEdit
 }) => {
-  if (!isOpen) return null;
-
   const targetEntity = initialEntity || entityToEdit;
   const users = HecosStorage.getUsers();
   const initPeril = targetEntity?.perilData;
@@ -176,13 +195,13 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
   );
   const [level, setLevel] = useState<number>(initPeril?.level ?? targetEntity?.statblock?.level ?? 1);
   const [rarity, setRarity] = useState<'Comum' | 'Incomum' | 'Raro' | 'Único'>(
-    initPeril?.rarity || targetEntity?.statblock?.rarity || 'Comum'
+    (initPeril?.rarity || targetEntity?.statblock?.rarity || 'Comum') as 'Comum' | 'Incomum' | 'Raro' | 'Único'
   );
   const [size, setSize] = useState<'Tiny' | 'Small' | 'Medium' | 'Large' | 'Huge' | 'Gargantuan'>(
-    initPeril?.size || targetEntity?.statblock?.size || 'Medium'
+    (initPeril?.size || targetEntity?.statblock?.size || 'Medium') as 'Tiny' | 'Small' | 'Medium' | 'Large' | 'Huge' | 'Gargantuan'
   );
-  const [traitsInput, setTraitsInput] = useState(
-    (initPeril?.traits || targetEntity?.statblock?.traits || []).join(', ')
+  const [traits, setTraits] = useState<string[]>(() =>
+    normalizeStringArray(initPeril?.traits || targetEntity?.statblock?.traits || targetEntity?.traits)
   );
   const [stealthCheck, setStealthCheck] = useState(initPeril?.stealthCheck || '');
   const [portraitImage, setPortraitImage] = useState(
@@ -216,28 +235,32 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
 
   // Perception & Attributes (Monsters)
   const [perception, setPerception] = useState<string>(
-    initPeril?.perception !== undefined ? String(initPeril.perception) : '6'
+    initPeril?.perception !== undefined ? String(initPeril.perception) : ''
   );
   const [senses, setSenses] = useState(
-    initPeril?.senses || targetEntity?.statblock?.senses || 'Visão na Penumbra'
+    initPeril?.senses || targetEntity?.statblock?.senses || ''
   );
   const [languages, setLanguages] = useState(
-    (initPeril?.languages || ['Comum']).join(', ')
+    Array.isArray(initPeril?.languages)
+      ? initPeril.languages.join(', ')
+      : typeof initPeril?.languages === 'string'
+      ? initPeril.languages
+      : ''
   );
   const [skills, setSkills] = useState(
     initPeril?.skills
       ? Object.entries(initPeril.skills)
           .map(([k, v]) => `${k} +${v}`)
           .join(', ')
-      : 'Atletismo +7, Furtividade +5'
+      : ''
   );
   const [abilities, setAbilities] = useState(
     initPeril?.attributes || {
-      str: 3,
-      dex: 2,
-      con: 2,
-      int: -1,
-      wis: 1,
+      str: 0,
+      dex: 0,
+      con: 0,
+      int: 0,
+      wis: 0,
       cha: 0
     }
   );
@@ -248,35 +271,35 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
       ? String(initPeril.ac)
       : targetEntity?.statblock?.ac !== undefined
       ? String(targetEntity.statblock.ac)
-      : '16'
+      : ''
   );
   const [fort, setFort] = useState<string>(
     initPeril?.fort !== undefined
       ? String(initPeril.fort)
       : targetEntity?.statblock?.fort !== undefined
       ? String(targetEntity.statblock.fort)
-      : '7'
+      : ''
   );
   const [refSave, setRefSave] = useState<string>(
     initPeril?.ref !== undefined
       ? String(initPeril.ref)
       : targetEntity?.statblock?.ref !== undefined
       ? String(targetEntity.statblock.ref)
-      : '5'
+      : ''
   );
   const [will, setWill] = useState<string>(
     initPeril?.will !== undefined
       ? String(initPeril.will)
       : targetEntity?.statblock?.will !== undefined
       ? String(targetEntity.statblock.will)
-      : '4'
+      : ''
   );
   const [hp, setHp] = useState<string>(
     initPeril?.hp !== undefined
       ? String(initPeril.hp)
       : targetEntity?.statblock?.hp !== undefined
       ? String(targetEntity.statblock.hp)
-      : '20'
+      : ''
   );
   const [hardness, setHardness] = useState<string>(
     initPeril?.hardness !== undefined ? String(initPeril.hardness) : ''
@@ -285,43 +308,36 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
     initPeril?.brokenThreshold !== undefined ? String(initPeril.brokenThreshold) : ''
   );
   const [immunitiesInput, setImmunitiesInput] = useState(
-    (initPeril?.immunities || []).join(', ')
+    Array.isArray(initPeril?.immunities)
+      ? initPeril.immunities.join(', ')
+      : typeof initPeril?.immunities === 'string'
+      ? initPeril.immunities
+      : ''
   );
   const [weaknessesInput, setWeaknessesInput] = useState(
-    (initPeril?.weaknesses || []).join(', ')
+    Array.isArray(initPeril?.weaknesses)
+      ? initPeril.weaknesses.join(', ')
+      : typeof initPeril?.weaknesses === 'string'
+      ? initPeril.weaknesses
+      : ''
   );
   const [resistancesInput, setResistancesInput] = useState(
-    (initPeril?.resistances || []).join(', ')
+    Array.isArray(initPeril?.resistances)
+      ? initPeril.resistances.join(', ')
+      : typeof initPeril?.resistances === 'string'
+      ? initPeril.resistances
+      : ''
   );
 
   // Speed & Offense
   const [speed, setSpeed] = useState(
-    initPeril?.speed || targetEntity?.statblock?.speed || '25 pés (7,5m)'
+    initPeril?.speed || targetEntity?.statblock?.speed || ''
   );
   const [attacks, setAttacks] = useState<PerilAttack[]>(
-    initPeril?.attacks || [
-      {
-        id: 'atk-1',
-        name: 'Golpe de Garras',
-        type: 'melee',
-        bonus: 7,
-        traits: ['Ágil', 'Desarmado'],
-        damage: '1d6+3 cortante',
-        extraEffects: ''
-      }
-    ]
+    initPeril?.attacks || []
   );
   const [actions, setActions] = useState<PerilAction[]>(
-    initPeril?.actions || [
-      {
-        id: 'act-1',
-        name: 'Investida Selvagem',
-        cost: '2',
-        traits: ['Movimento'],
-        trigger: '',
-        effect: 'O perigo avança até o dobro do seu deslocamento e desfere um Golpe Corpo a Corpo.'
-      }
-    ]
+    initPeril?.actions || []
   );
 
   // Hazard Specifics
@@ -331,11 +347,27 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
 
   // Spells
   const [tradition, setTradition] = useState(initPeril?.spells?.tradition || 'Arcana');
-  const [spellDc, setSpellDc] = useState(initPeril?.spells?.dc ? String(initPeril.spells.dc) : '17');
+  const [spellDc, setSpellDc] = useState(initPeril?.spells?.dc ? String(initPeril.spells.dc) : '');
   const [spellAttack, setSpellAttack] = useState(
-    initPeril?.spells?.attack ? String(initPeril.spells.attack) : '7'
+    initPeril?.spells?.attack ? String(initPeril.spells.attack) : ''
   );
   const [spellsList, setSpellsList] = useState(initPeril?.spells?.spellsList || '');
+
+  // Loot & Treasure State
+  const [lootCurrency, setLootCurrency] = useState<PerilLootCurrency>({
+    cp: initPeril?.loot?.currency?.cp ?? '',
+    sp: initPeril?.loot?.currency?.sp ?? '',
+    gp: initPeril?.loot?.currency?.gp ?? '',
+    pp: initPeril?.loot?.currency?.pp ?? '',
+    custom: initPeril?.loot?.currency?.custom || ''
+  });
+  const [lootItems, setLootItems] = useState<PerilLootItem[]>(
+    initPeril?.loot?.items || []
+  );
+  const [lootNotes, setLootNotes] = useState<string>(
+    initPeril?.loot?.notes || ''
+  );
+  const [isItemPickerOpen, setIsItemPickerOpen] = useState(false);
 
   // Granular Field Visibility ("Olhinho")
   const [fieldVis, setFieldVis] = useState<PerilFieldVisibility>(
@@ -355,6 +387,7 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
       disableAndReset: 'gm',
       routine: 'gm',
       spells: 'gm',
+      loot: 'all',
       gmNotes: 'gm',
       allowedUsers: {}
     }
@@ -382,7 +415,7 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
     setLevel(peril?.level ?? targetEntity?.statblock?.level ?? 1);
     setRarity(canonicalizeRarityName(peril?.rarity || targetEntity?.statblock?.rarity || 'Comum'));
     setSize(canonicalizeSizeName(peril?.size || targetEntity?.statblock?.size || 'Médio'));
-    setTraitsInput((peril?.traits || targetEntity?.statblock?.traits || []).join(', '));
+    setTraits(normalizeStringArray(peril?.traits || targetEntity?.statblock?.traits || targetEntity?.traits));
     setStealthCheck(peril?.stealthCheck || '');
     setPortraitImage(targetEntity?.coverImage || peril?.portraitImage || '');
     setTokenImage(targetEntity?.icon || peril?.tokenImage || '');
@@ -396,23 +429,29 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
     setHecosLore(peril?.hecosLore || '');
     setGmNotes(peril?.gmNotes || '');
 
-    setPerception(peril?.perception !== undefined ? String(peril.perception) : '6');
-    setSenses(peril?.senses || targetEntity?.statblock?.senses || 'Visão na Penumbra');
-    setLanguages((peril?.languages || ['Comum']).join(', '));
+    setPerception(peril?.perception !== undefined ? String(peril.perception) : '');
+    setSenses(peril?.senses || targetEntity?.statblock?.senses || '');
+    setLanguages(
+      Array.isArray(peril?.languages)
+        ? peril.languages.join(', ')
+        : typeof peril?.languages === 'string'
+        ? peril.languages
+        : ''
+    );
     setSkills(
       peril?.skills
         ? Object.entries(peril.skills)
             .map(([k, v]) => `${k} +${v}`)
             .join(', ')
-        : 'Atletismo +7, Furtividade +5'
+        : ''
     );
     setAbilities(
       peril?.attributes || {
-        str: 3,
-        dex: 2,
-        con: 2,
-        int: -1,
-        wis: 1,
+        str: 0,
+        dex: 0,
+        con: 0,
+        int: 0,
+        wis: 0,
         cha: 0
       }
     );
@@ -422,77 +461,82 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
         ? String(peril.ac)
         : targetEntity?.statblock?.ac !== undefined
         ? String(targetEntity.statblock.ac)
-        : '16'
+        : ''
     );
     setFort(
       peril?.fort !== undefined
         ? String(peril.fort)
         : targetEntity?.statblock?.fort !== undefined
         ? String(targetEntity.statblock.fort)
-        : '7'
+        : ''
     );
     setRefSave(
       peril?.ref !== undefined
         ? String(peril.ref)
         : targetEntity?.statblock?.ref !== undefined
         ? String(targetEntity.statblock.ref)
-        : '5'
+        : ''
     );
     setWill(
       peril?.will !== undefined
         ? String(peril.will)
         : targetEntity?.statblock?.will !== undefined
         ? String(targetEntity.statblock.will)
-        : '4'
+        : ''
     );
     setHp(
       peril?.hp !== undefined
         ? String(peril.hp)
         : targetEntity?.statblock?.hp !== undefined
         ? String(targetEntity.statblock.hp)
-        : '20'
+        : ''
     );
     setHardness(peril?.hardness !== undefined ? String(peril.hardness) : '');
     setBrokenThreshold(peril?.brokenThreshold !== undefined ? String(peril.brokenThreshold) : '');
-    setImmunitiesInput((peril?.immunities || []).join(', '));
-    setWeaknessesInput((peril?.weaknesses || []).join(', '));
-    setResistancesInput((peril?.resistances || []).join(', '));
+    setImmunitiesInput(
+      Array.isArray(peril?.immunities)
+        ? peril.immunities.join(', ')
+        : typeof peril?.immunities === 'string'
+        ? peril.immunities
+        : ''
+    );
+    setWeaknessesInput(
+      Array.isArray(peril?.weaknesses)
+        ? peril.weaknesses.join(', ')
+        : typeof peril?.weaknesses === 'string'
+        ? peril.weaknesses
+        : ''
+    );
+    setResistancesInput(
+      Array.isArray(peril?.resistances)
+        ? peril.resistances.join(', ')
+        : typeof peril?.resistances === 'string'
+        ? peril.resistances
+        : ''
+    );
 
-    setSpeed(peril?.speed || targetEntity?.statblock?.speed || '25 pés (7,5m)');
-    setAttacks(
-      peril?.attacks || [
-        {
-          id: 'atk-1',
-          name: 'Golpe de Garras',
-          type: 'melee',
-          bonus: 7,
-          traits: ['Ágil', 'Desarmado'],
-          damage: '1d6+3 cortante',
-          extraEffects: ''
-        }
-      ]
-    );
-    setActions(
-      peril?.actions || [
-        {
-          id: 'act-1',
-          name: 'Investida Selvagem',
-          cost: '2',
-          traits: ['Movimento'],
-          trigger: '',
-          effect: 'O perigo avança até o dobro do seu deslocamento e desfere um Golpe Corpo a Corpo.'
-        }
-      ]
-    );
+    setSpeed(peril?.speed || targetEntity?.statblock?.speed || '');
+    setAttacks(peril?.attacks || []);
+    setActions(peril?.actions || []);
 
     setDisable(peril?.disable || '');
     setResetCondition(peril?.reset || '');
     setRoutine(peril?.routine || '');
 
     setTradition(peril?.spells?.tradition || 'Arcana');
-    setSpellDc(peril?.spells?.dc ? String(peril.spells.dc) : '17');
-    setSpellAttack(peril?.spells?.attack ? String(peril.spells.attack) : '7');
+    setSpellDc(peril?.spells?.dc ? String(peril.spells.dc) : '');
+    setSpellAttack(peril?.spells?.attack ? String(peril.spells.attack) : '');
     setSpellsList(peril?.spells?.spellsList || '');
+
+    setLootCurrency({
+      cp: peril?.loot?.currency?.cp ?? '',
+      sp: peril?.loot?.currency?.sp ?? '',
+      gp: peril?.loot?.currency?.gp ?? '',
+      pp: peril?.loot?.currency?.pp ?? '',
+      custom: peril?.loot?.currency?.custom || ''
+    });
+    setLootItems(peril?.loot?.items || []);
+    setLootNotes(peril?.loot?.notes || '');
 
     setFieldVis(
       peril?.fieldVisibility || {
@@ -511,6 +555,7 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
         disableAndReset: 'gm',
         routine: 'gm',
         spells: 'gm',
+        loot: 'all',
         gmNotes: 'gm',
         allowedUsers: {}
       }
@@ -521,6 +566,11 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
     setActiveTab('basics');
   }, [isOpen, targetEntity]);
 
+  // Total count of loot entries for tab badge
+  const lootCount =
+    lootItems.length +
+    ((lootCurrency.cp || lootCurrency.sp || lootCurrency.gp || lootCurrency.pp || (lootCurrency.custom && lootCurrency.custom.trim())) ? 1 : 0);
+
   // Compute allowed tabs based on selected perilKind
   const getTabsForKind = (kind: PerilKind): HorizontalTabItem[] => {
     switch (kind) {
@@ -529,6 +579,7 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
           { id: 'basics', label: 'Dados Básicos', icon: Skull },
           { id: 'stats', label: 'Defesas & Atributos', icon: Shield },
           { id: 'attacks', label: 'Golpes & Ações', icon: Swords, countBadge: attacks.length + actions.length },
+          { id: 'loot', label: 'Tesouro & Loot', icon: Coins, countBadge: lootCount > 0 ? lootCount : undefined },
           { id: 'lore', label: 'Lore & Segredos', icon: BookOpen },
           { id: 'visibility', label: 'Revelação', icon: Eye }
         ];
@@ -538,6 +589,7 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
           { id: 'structure', label: 'Dureza & Estrutura', icon: Shield },
           { id: 'reaction', label: 'Gatilho & Reação', icon: Zap, countBadge: actions.length + attacks.length },
           { id: 'disable', label: 'Desativação & Reset', icon: Key },
+          { id: 'loot', label: 'Tesouro & Loot', icon: Coins, countBadge: lootCount > 0 ? lootCount : undefined },
           { id: 'lore', label: 'Descrição & Lore', icon: BookOpen },
           { id: 'visibility', label: 'Revelação', icon: Eye }
         ];
@@ -547,6 +599,7 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
           { id: 'structure', label: 'Dureza & Estrutura', icon: Shield },
           { id: 'routine', label: 'Iniciativa & Rotina', icon: Clock, countBadge: actions.length + attacks.length },
           { id: 'disable', label: 'Desativação & Reset', icon: Key },
+          { id: 'loot', label: 'Tesouro & Loot', icon: Coins, countBadge: lootCount > 0 ? lootCount : undefined },
           { id: 'lore', label: 'Descrição & Lore', icon: BookOpen },
           { id: 'visibility', label: 'Revelação', icon: Eye }
         ];
@@ -555,6 +608,7 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
           { id: 'basics', label: 'Dados Básicos', icon: Flame },
           { id: 'effects', label: 'Efeitos & Salvamentos', icon: AlertCircle },
           { id: 'countermeasures', label: 'Superação & Abrigo', icon: Compass },
+          { id: 'loot', label: 'Tesouro & Loot', icon: Coins, countBadge: lootCount > 0 ? lootCount : undefined },
           { id: 'lore', label: 'Geografia & Lore', icon: BookOpen },
           { id: 'visibility', label: 'Revelação', icon: Eye }
         ];
@@ -564,6 +618,7 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
           { id: 'defenses', label: 'Defesas Espirituais', icon: Shield },
           { id: 'manifestation', label: 'Manifestação & Efeito', icon: Sparkles, countBadge: actions.length },
           { id: 'exorcism', label: 'Exorcismo & Descanso', icon: Key },
+          { id: 'loot', label: 'Tesouro & Relíquias', icon: Coins, countBadge: lootCount > 0 ? lootCount : undefined },
           { id: 'lore', label: 'História Trágica & Lore', icon: BookOpen },
           { id: 'visibility', label: 'Revelação', icon: Eye }
         ];
@@ -571,6 +626,7 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
         return [
           { id: 'basics', label: 'Dados Básicos', icon: AlertTriangle },
           { id: 'stats', label: 'Defesas & Atributos', icon: Shield },
+          { id: 'loot', label: 'Tesouro & Loot', icon: Coins, countBadge: lootCount > 0 ? lootCount : undefined },
           { id: 'lore', label: 'Descrição', icon: BookOpen },
           { id: 'visibility', label: 'Revelação', icon: Eye }
         ];
@@ -654,37 +710,99 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
     setActions(actions.filter((a) => a.id !== id));
   };
 
+  // Loot & Treasure Handlers
+  const handleAddLootItemManual = () => {
+    const newItem: PerilLootItem = {
+      id: `loot-${Date.now()}`,
+      name: 'Novo Item / Tesouro',
+      quantity: 1,
+      itemType: 'gear',
+      rarity: 'Comum',
+      level: 1,
+      price: '',
+      bulk: 'L',
+      traits: [],
+      notes: ''
+    };
+    setLootItems([...lootItems, newItem]);
+  };
+
+  const handleRemoveLootItem = (id: string) => {
+    setLootItems(lootItems.filter((i) => i.id !== id));
+  };
+
+  const handleUpdateLootItem = (id: string, updates: Partial<PerilLootItem>) => {
+    setLootItems(lootItems.map((i) => (i.id === id ? { ...i, ...updates } : i)));
+  };
+
+  const handleSelectItemsFromCompendium = (
+    selectedList: {
+      entity: HecosEntity;
+      parsedItem: any;
+      quantity: number | string;
+      notes?: string;
+    }[]
+  ) => {
+    const newLootItems: PerilLootItem[] = selectedList.map((item) => ({
+      id: `loot-${item.entity.id}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      itemId: item.entity.id,
+      name: item.entity.title,
+      quantity: item.quantity,
+      itemType: item.parsedItem.itemType || 'gear',
+      rarity: item.parsedItem.rarity || 'Comum',
+      level: item.parsedItem.level,
+      price: item.parsedItem.price,
+      bulk: item.parsedItem.bulk,
+      traits: item.parsedItem.traits || [],
+      icon: item.entity.icon || 'Package',
+      description: item.parsedItem.description || item.entity.subtitle,
+      notes: item.notes || ''
+    }));
+
+    setLootItems((prev) => [...prev, ...newLootItems]);
+  };
+
   const handleSave = () => {
     if (!name.trim()) {
       alert('Por favor, informe o nome do Perigo.');
       return;
     }
 
-    const cleanTraits = traitsInput
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean);
+    const cleanTraits = normalizeStringArray(traits);
+    const cleanImmunities = normalizeStringArray(immunitiesInput);
+    const cleanWeaknesses = normalizeStringArray(weaknessesInput);
+    const cleanResistances = normalizeStringArray(resistancesInput);
 
-    const cleanImmunities = immunitiesInput
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean);
+    const hasCurrency = Boolean(
+      lootCurrency.cp !== '' ||
+      lootCurrency.sp !== '' ||
+      lootCurrency.gp !== '' ||
+      lootCurrency.pp !== '' ||
+      (lootCurrency.custom && lootCurrency.custom.trim().length > 0)
+    );
 
-    const cleanWeaknesses = weaknessesInput
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean);
-
-    const cleanResistances = resistancesInput
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean);
+    const lootData: PerilLootData | undefined =
+      hasCurrency || lootItems.length > 0 || lootNotes.trim()
+        ? {
+            currency: hasCurrency
+              ? {
+                  cp: lootCurrency.cp !== '' ? lootCurrency.cp : undefined,
+                  sp: lootCurrency.sp !== '' ? lootCurrency.sp : undefined,
+                  gp: lootCurrency.gp !== '' ? lootCurrency.gp : undefined,
+                  pp: lootCurrency.pp !== '' ? lootCurrency.pp : undefined,
+                  custom: lootCurrency.custom?.trim() || undefined
+                }
+              : undefined,
+            items: lootItems.length > 0 ? lootItems : undefined,
+            notes: lootNotes.trim() || undefined
+          }
+        : undefined;
 
     const perilData: PerilAttributes = {
       perilKind,
       level,
       rarity,
-      size,
+      size: perilKind === 'monster' ? size : undefined,
       traits: cleanTraits,
       subcategories: selectedSubcategories,
       portraitImage: portraitImage.trim() || undefined,
@@ -692,8 +810,8 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
       stealthCheck: stealthCheck.trim() || undefined,
       perception: perception ? parseInt(perception, 10) : undefined,
       senses: senses.trim() || undefined,
-      languages: languages.split(',').map((l) => l.trim()).filter(Boolean),
-      skills: skills
+      languages: normalizeStringArray(languages),
+      skills: skills && typeof skills === 'string' && skills.trim()
         ? skills.split(',').reduce((acc, curr) => {
             const parts = curr.split('+');
             if (parts && parts.length === 2 && parts[0] && parts[1]) {
@@ -734,6 +852,7 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
       description: description.trim() || undefined,
       hecosLore: hecosLore.trim() || undefined,
       gmNotes: gmNotes.trim() || undefined,
+      loot: lootData,
       fieldVisibility: fieldVis
     };
 
@@ -770,12 +889,7 @@ ${gmNotes.trim() ? `\n:::gm\n**Notas Secretas do Mestre:**\n${gmNotes.trim()}\n:
       category: 'peril',
       subcategory: selectedSubcategories[0] || (perilKind === 'monster' ? 'Monstros' : 'Perigos'),
       subcategories: selectedSubcategories,
-      tags: [
-        'Perigo',
-        kindLabel,
-        `Nível ${level}`,
-        ...cleanTraits
-      ],
+      tags: cleanTraits,
       summary: summary.trim() || description.slice(0, 140) || `Perigo de nível ${level}.`,
       content: contentMarkdown,
       coverImage: portraitImage.trim() || undefined,
@@ -789,13 +903,15 @@ ${gmNotes.trim() ? `\n:::gm\n**Notas Secretas do Mestre:**\n${gmNotes.trim()}\n:
       statblock: {
         level,
         traits: cleanTraits,
+        rarity,
+        size: perilKind === 'monster' ? size : undefined,
         ac: ac ? parseInt(ac, 10) : undefined,
         hp: hp ? parseInt(hp, 10) : undefined,
         fort: fort ? parseInt(fort, 10) : undefined,
         ref: refSave ? parseInt(refSave, 10) : undefined,
         will: will ? parseInt(will, 10) : undefined,
         speed: perilKind === 'monster' ? speed : undefined,
-        senses: perilKind === 'monster' ? senses : undefined
+        senses: senses ? senses : undefined
       }
     };
 
@@ -838,6 +954,8 @@ ${gmNotes.trim() ? `\n:::gm\n**Notas Secretas do Mestre:**\n${gmNotes.trim()}\n:
 
   const selectedCategoryDef = CATEGORIES.find((c) => c.id === perilKind) || CATEGORIES[0];
   const CategoryIcon = selectedCategoryDef.icon;
+
+  if (!isOpen) return null;
 
   return (
     <div
@@ -1032,8 +1150,8 @@ ${gmNotes.trim() ? `\n:::gm\n**Notas Secretas do Mestre:**\n${gmNotes.trim()}\n:
                   </div>
                 </div>
 
-                {/* Rarity, Size & Traits */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* Rarity, Size (Only for monster) & Traits */}
+                <div className={`grid grid-cols-1 ${perilKind === 'monster' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-4`}>
                   <div>
                     <label className="block text-xs font-semibold text-zinc-300 mb-1">
                       Raridade
@@ -1049,29 +1167,41 @@ ${gmNotes.trim() ? `\n:::gm\n**Notas Secretas do Mestre:**\n${gmNotes.trim()}\n:
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                      Tamanho
-                    </label>
-                    <select
-                      value={size}
-                      onChange={(e) => setSize(e.target.value as any)}
-                      className="w-full px-3 py-2 text-xs bg-black/60 border border-zinc-800 rounded-xl text-zinc-100"
-                    >
-                      {CANONICAL_SIZES.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {perilKind === 'monster' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-300 mb-1">
+                        Tamanho da Criatura
+                      </label>
+                      <select
+                        value={size}
+                        onChange={(e) => setSize(e.target.value as any)}
+                        className="w-full px-3 py-2 text-xs bg-black/60 border border-zinc-800 rounded-xl text-zinc-100"
+                      >
+                        {CANONICAL_SIZES.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-xs font-semibold text-zinc-300 mb-1">
                       Traços & Tipos PF2e
                     </label>
                     <TraitInputCombobox
-                      value={traitsInput}
-                      onChange={setTraitsInput}
-                      placeholder="Ex: Fera, Mecânico, Armadilha, Mágico..."
+                      selectedTraits={traits}
+                      onChange={setTraits}
+                      placeholder={
+                        perilKind === 'monster'
+                          ? 'Ex: Fera, Morto-vivo, Aberração, Dragão...'
+                          : perilKind === 'hazard_simple'
+                          ? 'Ex: Mecânico, Armadilha, Fogo, Mágico...'
+                          : perilKind === 'hazard_complex'
+                          ? 'Ex: Mecânico, Mágico, Armadilha, Complexo...'
+                          : perilKind === 'environmental'
+                          ? 'Ex: Ambiental, Clima, Frio, Natural...'
+                          : 'Ex: Assombração, Espírito, Incorpóreo, Oculto...'
+                      }
                     />
                   </div>
                 </div>
@@ -1167,6 +1297,9 @@ ${gmNotes.trim() ? `\n:::gm\n**Notas Secretas do Mestre:**\n${gmNotes.trim()}\n:
                       onChange={setPortraitImage}
                       placeholder="URL da ilustração vertical ou envie arquivo..."
                       label="Retrato"
+                      category="perigo"
+                      entityName={name || 'perigo'}
+                      role="retrato"
                     />
                   </div>
 
@@ -1179,6 +1312,9 @@ ${gmNotes.trim() ? `\n:::gm\n**Notas Secretas do Mestre:**\n${gmNotes.trim()}\n:
                       onChange={setTokenImage}
                       placeholder="URL do token de mapa ou envie arquivo..."
                       label="Token"
+                      category="perigo"
+                      entityName={name || 'perigo'}
+                      role="token"
                     />
                   </div>
                 </div>
@@ -1739,10 +1875,10 @@ ${gmNotes.trim() ? `\n:::gm\n**Notas Secretas do Mestre:**\n${gmNotes.trim()}\n:
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <input
                           type="text"
-                          value={atk.traits.join(', ')}
+                          value={Array.isArray(atk.traits) ? atk.traits.join(', ') : typeof atk.traits === 'string' ? atk.traits : ''}
                           onChange={(e) => {
                             const updated = [...attacks];
-                            updated[index].traits = e.target.value.split(',').map((t) => t.trim()).filter(Boolean);
+                            updated[index].traits = normalizeStringArray(e.target.value);
                             setAttacks(updated);
                           }}
                           placeholder="Traços (ex: Ágil, Desarmado, Veneno)"
@@ -2075,17 +2211,19 @@ ${gmNotes.trim() ? `\n:::gm\n**Notas Secretas do Mestre:**\n${gmNotes.trim()}\n:
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs text-zinc-400 mb-1">CD de Salvamento</label>
-                      <input
-                        type="text"
-                        value={fort ? `Fortitude CD ${fort}` : 'Fortitude CD 20'}
-                        onChange={(e) => {
-                          const num = parseInt(e.target.value.replace(/\D/g, ''), 10) || 20;
-                          setFort(String(num));
-                        }}
-                        placeholder="Ex: Fortitude CD 22"
-                        className="w-full px-3 py-2 text-xs bg-black/60 border border-zinc-800 rounded-xl text-zinc-100 font-mono font-bold"
-                      />
+                      <label className="block text-xs text-zinc-400 mb-1">CD do Salvamento de Fortitude</label>
+                      <div className="flex items-center">
+                        <span className="px-3 py-2 text-xs bg-zinc-900 border border-r-0 border-zinc-800 rounded-l-xl text-zinc-400 font-mono">
+                          Fortitude CD
+                        </span>
+                        <input
+                          type="number"
+                          value={fort}
+                          onChange={(e) => setFort(e.target.value)}
+                          placeholder="20"
+                          className="w-full px-3 py-2 text-xs bg-black/60 border border-zinc-800 rounded-r-xl text-zinc-100 font-mono font-bold focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs text-zinc-400 mb-1">Intervalo / Frequência</label>
@@ -2311,6 +2449,309 @@ ${gmNotes.trim() ? `\n:::gm\n**Notas Secretas do Mestre:**\n${gmNotes.trim()}\n:
             )}
 
             {/* ───────────────────────────────────────────────────────────────── */}
+            {/* TAB: LOOT & TREASURE (For all categories) */}
+            {/* ───────────────────────────────────────────────────────────────── */}
+            {activeTab === 'loot' && (
+              <div className="space-y-5 animate-in fade-in duration-150">
+                {/* Currency Section */}
+                <div className="bg-[#110d1f] p-4 rounded-2xl border border-zinc-800/80 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                        <Coins className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-bold text-zinc-100 uppercase tracking-wider">
+                          Moedas & Riquezas em Dinheiro
+                        </h3>
+                        <p className="text-[11px] text-zinc-400">
+                          Quantias monetárias carregadas pelo perigo ou guardadas em seu covil.
+                        </p>
+                      </div>
+                    </div>
+                    {renderFieldEye('loot', 'Tesouro & Loot')}
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {/* Cobre */}
+                    <div className="bg-black/40 border border-amber-900/40 rounded-xl p-3 space-y-1.5 focus-within:border-amber-600 transition-colors">
+                      <div className="flex items-center justify-between text-xs font-bold text-amber-600">
+                        <span>Cobre (pc)</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-950/60 text-amber-500 border border-amber-800/40 font-mono">cp</span>
+                      </div>
+                      <input
+                        type="text"
+                        value={lootCurrency.cp ?? ''}
+                        onChange={(e) => setLootCurrency({ ...lootCurrency, cp: e.target.value })}
+                        placeholder="0"
+                        className="w-full text-sm font-semibold bg-transparent text-amber-200 placeholder-zinc-700 focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Prata */}
+                    <div className="bg-black/40 border border-slate-700/50 rounded-xl p-3 space-y-1.5 focus-within:border-slate-400 transition-colors">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+                        <span>Prata (pp)</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-900/80 text-slate-300 border border-slate-700/60 font-mono">sp</span>
+                      </div>
+                      <input
+                        type="text"
+                        value={lootCurrency.sp ?? ''}
+                        onChange={(e) => setLootCurrency({ ...lootCurrency, sp: e.target.value })}
+                        placeholder="0"
+                        className="w-full text-sm font-semibold bg-transparent text-slate-200 placeholder-zinc-700 focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Ouro */}
+                    <div className="bg-black/40 border border-amber-500/40 rounded-xl p-3 space-y-1.5 focus-within:border-amber-400 transition-colors shadow-sm shadow-amber-950/20">
+                      <div className="flex items-center justify-between text-xs font-bold text-amber-400">
+                        <span>Ouro (po)</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/60 text-amber-300 border border-amber-600/40 font-mono">gp</span>
+                      </div>
+                      <input
+                        type="text"
+                        value={lootCurrency.gp ?? ''}
+                        onChange={(e) => setLootCurrency({ ...lootCurrency, gp: e.target.value })}
+                        placeholder="0"
+                        className="w-full text-sm font-semibold bg-transparent text-amber-300 placeholder-zinc-700 focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Platina */}
+                    <div className="bg-black/40 border border-cyan-500/40 rounded-xl p-3 space-y-1.5 focus-within:border-cyan-400 transition-colors">
+                      <div className="flex items-center justify-between text-xs font-bold text-cyan-300">
+                        <span>Platina (pl)</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-700/50 font-mono">pp</span>
+                      </div>
+                      <input
+                        type="text"
+                        value={lootCurrency.pp ?? ''}
+                        onChange={(e) => setLootCurrency({ ...lootCurrency, pp: e.target.value })}
+                        placeholder="0"
+                        className="w-full text-sm font-semibold bg-transparent text-cyan-200 placeholder-zinc-700 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Riquezas Personalizadas / Gemas */}
+                  <div className="space-y-1.5 pt-1">
+                    <label className="text-[11px] font-semibold text-zinc-300 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      Gemas, Joias & Bens Valiosos Customizados
+                    </label>
+                    <input
+                      type="text"
+                      value={lootCurrency.custom ?? ''}
+                      onChange={(e) => setLootCurrency({ ...lootCurrency, custom: e.target.value })}
+                      placeholder="Ex: 2x Rubis lapidados (50 po cada), 1x Cálice de prata trabalhado com sinete nobre (35 po)..."
+                      className="w-full px-3 py-2 text-xs bg-black/60 border border-zinc-800 rounded-xl text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Items & Equipment Section */}
+                <div className="bg-[#110d1f] p-4 rounded-2xl border border-zinc-800/80 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        <Package className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-bold text-zinc-100 uppercase tracking-wider">
+                          Itens, Equipamentos & Relíquias
+                        </h3>
+                        <p className="text-[11px] text-zinc-400">
+                          Equipamentos do monstro, tesouros em baús ou peças extraíveis do perigo.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsItemPickerOpen(true)}
+                        className="px-3.5 py-1.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-zinc-950 font-bold text-xs rounded-xl shadow-md shadow-amber-950/40 flex items-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        <Coins className="w-3.5 h-3.5 text-zinc-950" />
+                        Puxar Itens do Compêndio
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleAddLootItemManual}
+                        className="px-3 py-1.5 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 text-xs font-medium rounded-xl border border-zinc-700/60 flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Item Manual
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Item List */}
+                  {lootItems.length === 0 ? (
+                    <div className="p-6 border border-dashed border-zinc-800 rounded-xl text-center space-y-3 bg-black/20">
+                      <div className="w-10 h-10 mx-auto rounded-full bg-zinc-900 flex items-center justify-center text-zinc-600">
+                        <Package className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-zinc-400">Nenhum item associado ao loot deste perigo.</p>
+                        <p className="text-[11px] text-zinc-600 mt-0.5">
+                          Clique em &quot;Puxar Itens do Compêndio&quot; para selecionar armas, armaduras, consumíveis e relíquias já cadastradas.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsItemPickerOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg text-xs font-medium transition-colors cursor-pointer"
+                      >
+                        <Coins className="w-3.5 h-3.5" />
+                        Explorar Itens Cadastrados
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {lootItems.map((item, idx) => (
+                        <div
+                          key={item.id || idx}
+                          className="bg-black/50 border border-zinc-800/90 rounded-xl p-3.5 space-y-3 hover:border-zinc-700 transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <input
+                                  type="text"
+                                  value={item.name}
+                                  onChange={(e) => handleUpdateLootItem(item.id, { name: e.target.value })}
+                                  placeholder="Nome do Item"
+                                  className="font-bold text-xs text-zinc-100 bg-transparent border-b border-transparent hover:border-zinc-700 focus:border-amber-500 focus:outline-none px-1 py-0.5"
+                                />
+
+                                {item.level !== undefined && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-zinc-800 text-zinc-300 border border-zinc-700">
+                                    Nível {item.level}
+                                  </span>
+                                )}
+
+                                {item.rarity && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950/40 text-amber-400 border border-amber-800/40">
+                                    {item.rarity}
+                                  </span>
+                                )}
+
+                                {item.price && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-900 text-amber-300 border border-zinc-800">
+                                    {item.price}
+                                  </span>
+                                )}
+
+                                {item.bulk && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-900 text-zinc-400 border border-zinc-800">
+                                    Vol: {item.bulk}
+                                  </span>
+                                )}
+
+                                {item.itemId && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-950/50 text-emerald-400 border border-emerald-800/40 flex items-center gap-1">
+                                    <ExternalLink className="w-2.5 h-2.5" /> Compêndio
+                                  </span>
+                                )}
+                              </div>
+
+                              {item.traits && item.traits.length > 0 && (
+                                <div className="flex flex-wrap gap-1 pt-1">
+                                  {item.traits.map((t, tIdx) => (
+                                    <span
+                                      key={tIdx}
+                                      className="px-1.5 py-0.5 rounded text-[9px] bg-zinc-900 text-zinc-400 border border-zinc-800"
+                                    >
+                                      {t}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Quantity Controls & Delete */}
+                            <div className="flex items-center gap-2 shrink-0">
+                              <div className="flex items-center bg-zinc-900/80 border border-zinc-700/80 rounded-lg p-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const current = typeof item.quantity === 'number' ? item.quantity : parseInt(String(item.quantity), 10) || 1;
+                                    if (current > 1) {
+                                      handleUpdateLootItem(item.id, { quantity: current - 1 });
+                                    }
+                                  }}
+                                  className="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded transition-colors"
+                                >
+                                  <Minus className="w-3 h-3" />
+                                </button>
+                                <input
+                                  type="text"
+                                  value={item.quantity ?? 1}
+                                  onChange={(e) => handleUpdateLootItem(item.id, { quantity: e.target.value })}
+                                  className="w-8 text-center text-xs font-bold text-zinc-200 bg-transparent focus:outline-none"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const current = typeof item.quantity === 'number' ? item.quantity : parseInt(String(item.quantity), 10) || 1;
+                                    handleUpdateLootItem(item.id, { quantity: current + 1 });
+                                  }}
+                                  className="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded transition-colors"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </button>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveLootItem(item.id)}
+                                className="p-1.5 text-zinc-500 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
+                                title="Remover item do loot"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Notes / Drop condition input */}
+                          <div className="pt-1">
+                            <input
+                              type="text"
+                              value={item.notes ?? ''}
+                              onChange={(e) => handleUpdateLootItem(item.id, { notes: e.target.value })}
+                              placeholder="Localização ou condição especial (Ex: Empunhado pelo chefe, 50% de chance de drop, baú trancado)..."
+                              className="w-full px-2.5 py-1 text-[11px] bg-black/60 border border-zinc-800/80 rounded-lg text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-amber-500/70"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Loot Notes & Harvest Rules */}
+                <div className="bg-[#110d1f] p-4 rounded-2xl border border-zinc-800/80 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-amber-400" />
+                      Regras de Coleta, Carcaça & Notas de Tesouro
+                    </label>
+                  </div>
+                  <textarea
+                    value={lootNotes}
+                    onChange={(e) => setLootNotes(e.target.value)}
+                    rows={3}
+                    placeholder="Ex: A carcaça do basilisco pode render até 2 frascos de sangue petrificante com um teste bem-sucedido de Sobrevivência ou Medicina CD 20. As escamas podem ser forjadas em um escudo robusto..."
+                    className="w-full px-3 py-2 text-xs bg-black/60 border border-zinc-800 rounded-xl text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* ───────────────────────────────────────────────────────────────── */}
             {/* TAB: LORE & SECRETS (For all categories) */}
             {/* ───────────────────────────────────────────────────────────────── */}
             {activeTab === 'lore' && (
@@ -2444,61 +2885,72 @@ ${gmNotes.trim() ? `\n:::gm\n**Notas Secretas do Mestre:**\n${gmNotes.trim()}\n:
                     Campos marcados como <strong>Oculto</strong> aparecem apenas para o GM ou como <code>???</code> para jogadores até que o Mestre os revele durante o combate.
                   </p>
 
-                  <div className="divide-y divide-zinc-800/60 border border-zinc-800/60 rounded-xl overflow-hidden text-xs">
-                    {[
-                      { key: 'acAndDefenses', label: 'Classe de Armadura (CA) & Salvamentos' },
-                      { key: 'hpAndHealth', label: 'Pontos de Vida (PV) & Saúde' },
-                      { key: 'hardnessAndBT', label: 'Dureza & Limiar de Quebra' },
-                      { key: 'sensesAndPerception', label: 'Percepção, Furtividade & Sentidos' },
-                      { key: 'attacksAndDamage', label: 'Golpes, Bônus de Ataque & Dano' },
-                      { key: 'actionsAndAbilities', label: 'Ações Especiais, Gatilhos & Reações' },
-                      { key: 'routine', label: 'Rotina de Combate em Iniciativa' },
-                      { key: 'disableAndReset', label: 'Mecanismos de Desativação & Exorcismo' },
-                      { key: 'weaknessesAndResistances', label: 'Fraquezas & Resistências' },
-                      { key: 'immunities', label: 'Imunidades da Criatura/Perigo' },
-                      { key: 'gmNotes', label: 'Notas Secretas do Mestre' }
-                    ].map((row) => (
-                      <div key={row.key} className="p-2.5 flex items-center justify-between bg-black/40 hover:bg-black/60">
-                        <span className="text-zinc-300 font-medium">{row.label}</span>
-                        {renderFieldEye(row.key as keyof PerilFieldVisibility, row.label)}
-                      </div>
-                    ))}
+                    <div className="divide-y divide-zinc-800/60 border border-zinc-800/60 rounded-xl overflow-hidden text-xs">
+                      {[
+                        { key: 'acAndDefenses', label: 'Classe de Armadura (CA) & Salvamentos' },
+                        { key: 'hpAndHealth', label: 'Pontos de Vida (PV) & Saúde' },
+                        { key: 'hardnessAndBT', label: 'Dureza & Limiar de Quebra' },
+                        { key: 'sensesAndPerception', label: 'Percepção, Furtividade & Sentidos' },
+                        { key: 'attacksAndDamage', label: 'Golpes, Bônus de Ataque & Dano' },
+                        { key: 'actionsAndAbilities', label: 'Ações Especiais, Gatilhos & Reações' },
+                        { key: 'routine', label: 'Rotina de Combate em Iniciativa' },
+                        { key: 'disableAndReset', label: 'Mecanismos de Desativação & Exorcismo' },
+                        { key: 'weaknessesAndResistances', label: 'Fraquezas & Resistências' },
+                        { key: 'immunities', label: 'Imunidades da Criatura/Perigo' },
+                        { key: 'loot', label: 'Tesouro, Moedas & Itens de Loot' },
+                        { key: 'gmNotes', label: 'Notas Secretas do Mestre' }
+                      ].map((row) => (
+                        <div key={row.key} className="p-2.5 flex items-center justify-between bg-black/40 hover:bg-black/60">
+                          <span className="text-zinc-300 font-medium">{row.label}</span>
+                          {renderFieldEye(row.key as keyof PerilFieldVisibility, row.label)}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          {/* Modal Footer */}
-          <div className="p-4 sm:p-5 border-t border-zinc-800/80 bg-[#0e0a19] flex items-center justify-between shrink-0">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
-            >
-              Cancelar
-            </button>
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 border-t border-zinc-800/80 bg-[#0e0a19] flex items-center justify-between shrink-0">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
 
-            <button
-              type="button"
-              onClick={handleSave}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-700 to-rose-600 hover:from-rose-600 hover:to-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-900/30 flex items-center gap-2 transition-all cursor-pointer"
-            >
-              <Check className="w-4 h-4" />
-              {targetEntity ? 'Salvar Alterações' : 'Criar Perigo'}
-            </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-700 to-rose-600 hover:from-rose-600 hover:to-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-900/30 flex items-center gap-2 transition-all cursor-pointer"
+              >
+                <Check className="w-4 h-4" />
+                {targetEntity ? 'Salvar Alterações' : 'Criar Perigo'}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Folder Manager Modal */}
-      {isFolderManagerOpen && (
-        <FolderManagerModal
-          isOpen={isFolderManagerOpen}
-          onClose={() => setIsFolderManagerOpen(false)}
-          scope="peril"
-        />
-      )}
-    </div>
-  );
-};
+        {/* Folder Manager Modal */}
+        {isFolderManagerOpen && (
+          <FolderManagerModal
+            isOpen={isFolderManagerOpen}
+            onClose={() => setIsFolderManagerOpen(false)}
+            scope="peril"
+          />
+        )}
+
+        {/* Item Picker Modal (Compendium integration) */}
+        {isItemPickerOpen && (
+          <ItemPickerModal
+            isOpen={isItemPickerOpen}
+            onClose={() => setIsItemPickerOpen(false)}
+            onSelectItems={handleSelectItemsFromCompendium}
+            title="Puxar Itens do Compêndio para o Loot"
+          />
+        )}
+      </div>
+    );
+  };

@@ -144,8 +144,9 @@ export interface PF2eItemAttributes {
 export interface PF2eStatblock {
   level: number;
   traits: string[];
+  rarity?: string;
   alignmentOrTradition?: string;
-  size?: 'Tiny' | 'Small' | 'Medium' | 'Large' | 'Huge' | 'Gargantuan';
+  size?: 'Tiny' | 'Small' | 'Medium' | 'Large' | 'Huge' | 'Gargantuan' | string;
   perception?: number;
   senses?: string;
   languages?: string[];
@@ -328,6 +329,8 @@ export interface AncestryAlbumImage {
 }
 
 export interface AncestryAttributes {
+  name?: string;
+  isVersatileHeritage?: boolean;
   subcategories?: string[];
   // Álbum & Galeria Visual (Subcategoria colapsável no topo de Lore)
   album?: AncestryAlbumImage[];
@@ -450,8 +453,39 @@ export interface PerilFieldVisibility {
   disableAndReset?: ItemVisibility;
   routine?: ItemVisibility;
   spells?: ItemVisibility;
+  loot?: ItemVisibility;
   gmNotes?: ItemVisibility;
   allowedUsers?: Record<string, string[]>;
+}
+
+export interface PerilLootCurrency {
+  cp?: number | string; // Peças de Cobre
+  sp?: number | string; // Peças de Prata
+  gp?: number | string; // Peças de Ouro
+  pp?: number | string; // Peças de Platina
+  custom?: string;      // Riquezas adicionais, gemas, joias ou descrição livre
+}
+
+export interface PerilLootItem {
+  id: string;
+  itemId?: string; // ID da entidade da categoria 'item'
+  name: string;
+  quantity?: number | string;
+  itemType?: ItemCategoryType;
+  rarity?: 'Comum' | 'Incomum' | 'Raro' | 'Único' | string;
+  level?: number;
+  price?: string;
+  bulk?: string;
+  traits?: string[];
+  icon?: string;
+  description?: string;
+  notes?: string; // ex: "Guardado na bolsa", "Empunhado", "No ninho"
+}
+
+export interface PerilLootData {
+  currency?: PerilLootCurrency;
+  items?: PerilLootItem[];
+  notes?: string; // Anotações gerais de tesouro
 }
 
 export interface PerilAttributes {
@@ -514,6 +548,9 @@ export interface PerilAttributes {
   hecosLore?: string;
   gmNotes?: string;
 
+  // Loot & Treasure
+  loot?: PerilLootData;
+
   // Field-level visibility settings
   fieldVisibility?: PerilFieldVisibility;
 }
@@ -547,6 +584,8 @@ export interface ClassArchetypeFeat {
 }
 
 export interface ClassAttributes {
+  level?: number;
+  isSpellcaster?: boolean;
   subcategories?: string[];
   kind: 'class' | 'archetype';
   hpPerLevel?: number; // e.g. 6, 8, 10, 12

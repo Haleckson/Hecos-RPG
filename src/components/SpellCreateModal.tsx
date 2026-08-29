@@ -14,6 +14,7 @@ import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { ColorPickerMenu } from './ColorPickerMenu';
 import { TraitInputCombobox } from './TraitInputCombobox';
 import { TraitBadge } from './TraitBadge';
+import { sortTraitsHierarchically } from '../utils/traitUtils';
 import {
   X,
   Sparkles,
@@ -1354,12 +1355,11 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
 
               {/* Traits & Traditions Chips */}
               <div className="flex flex-wrap gap-1.5">
-                <TraitBadge trait={spellData.rarity || 'Comum'} />
-                {(spellData.traditions || []).map((trad) => (
-                  <TraitBadge key={trad} trait={trad} />
-                ))}
-                {(spellData.traits || []).map((tr) => (
-                  <TraitBadge key={tr} trait={tr} />
+                {sortTraitsHierarchically(spellData.traits || [], {
+                  rarity: spellData.rarity || 'Comum',
+                  traditions: spellData.traditions || [],
+                }).map((t) => (
+                  <TraitBadge key={t} trait={t} />
                 ))}
               </div>
 

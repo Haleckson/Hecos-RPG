@@ -1,11 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { uploadToImgBB, getCustomImgBBKey, setCustomImgBBKey } from '../services/imgbb';
+import {
+  uploadToImgBB,
+  getCustomImgBBKey,
+  setCustomImgBBKey,
+  downloadImage,
+  generateSemanticImageName,
+  SemanticNamingOptions
+} from '../services/imgbb';
 import {
   Upload,
   Image as ImageIcon,
   Loader2,
   Check,
   Copy,
+  Download,
   X,
   ExternalLink,
   AlertCircle,
@@ -13,6 +21,7 @@ import {
   Key,
   FolderOpen,
   ClipboardPaste,
+  FileCheck,
   Eye
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -22,6 +31,9 @@ interface ImgBBUploadModalProps {
   onClose: () => void;
   onInsertImage?: (imageUrl: string, altText: string) => void;
   defaultAltText?: string;
+  category?: string;
+  entityName?: string;
+  role?: string;
 }
 
 export const ImgBBUploadModal: React.FC<ImgBBUploadModalProps> = ({
@@ -29,9 +41,14 @@ export const ImgBBUploadModal: React.FC<ImgBBUploadModalProps> = ({
   onClose,
   onInsertImage,
   defaultAltText = 'Ilustração de Hecos',
+  category = 'artigo',
+  entityName,
+  role = 'ilustracao',
 }) => {
   const [altText, setAltText] = useState(defaultAltText);
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [wasConvertedToWebP, setWasConvertedToWebP] = useState<boolean>(false);
   const [isUploading, setIsUploading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -49,8 +66,11 @@ export const ImgBBUploadModal: React.FC<ImgBBUploadModalProps> = ({
     if (isOpen) {
       setCustomKeyInput(getCustomImgBBKey());
       setErrorMsg(null);
+      if (defaultAltText && !altText) {
+        setAltText(defaultAltText);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, defaultAltText]);
 
   // Handle global paste when modal is open
   useEffect(() => {
@@ -74,7 +94,7 @@ export const ImgBBUploadModal: React.FC<ImgBBUploadModalProps> = ({
 
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [isOpen]);
+  }, [isOpen, altText, category, entityName, role]);
 
   if (!isOpen) return null;
 
@@ -89,12 +109,21 @@ export const ImgBBUploadModal: React.FC<ImgBBUploadModalProps> = ({
     setErrorMsg(null);
 
     try {
-      const cleanName = file.name ? file.name.replace(/\.[^/.]+$/, '') : altText;
-      const res = await uploadToImgBB(file, cleanName);
+      const semanticOpts: SemanticNamingOptions = {
+        category: category || 'artigo',
+        entityName: entityName || altText || 'ilustracao',
+        role: role || 'ilustracao',
+        originalFilename: file.name
+      };
+
+      const res = await uploadToImgBB(file, semanticOpts);
 
       if (res.success && res.url) {
         setUploadedUrl(res.url);
+        setUploadedFileName(res.fileName || generateSemanticImageName(semanticOpts));
+        setWasConvertedToWebP(Boolean(res.wasConvertedToWebP));
         if (!altText || altText === 'Ilustração de Hecos') {
+          const cleanName = file.name ? file.name.replace(/\.[^/.]+$/, '') : 'Ilustração';
           setAltText(cleanName);
         }
       } else {
@@ -139,6 +168,11 @@ export const ImgBBUploadModal: React.FC<ImgBBUploadModalProps> = ({
     setTimeout(() => setCopiedMarkdown(false), 2000);
   };
 
+  const handleDownload = () => {
+    if (!uploadedUrl) return;
+    downloadImage(uploadedUrl, uploadedFileName || `${altText || 'imagem'}.webp`);
+  };
+
   const handleInsert = () => {
     if (uploadedUrl && onInsertImage) {
       onInsertImage(uploadedUrl, altText || 'Imagem');
@@ -172,11 +206,11 @@ export const ImgBBUploadModal: React.FC<ImgBBUploadModalProps> = ({
                 <h3 className="text-base font-bold text-zinc-100 flex items-center gap-2">
                   <span>Upload de Imagem (ImgBB)</span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800/60 font-mono">
-                    Hospedagem Permanente
+                    WebP 100%
                   </span>
                 </h3>
                 <p className="text-xs text-zinc-400">
-                  Envie imagens do computador, arraste ou cole com Ctrl+V
+                  Conversão automática em WebP, nomenclatura padronizada e download
                 </p>
               </div>
             </div>
@@ -204,52 +238,58 @@ export const ImgBBUploadModal: React.FC<ImgBBUploadModalProps> = ({
             </div>
           </div>
 
-          {/* Custom API Key popdown */}
-          {showKeySettings && (
-            <div className="p-4 bg-[#181428] border-b border-purple-800/50 space-y-2 text-xs">
-              <div className="flex items-center justify-between text-purple-200 font-bold">
-                <span className="flex items-center gap-1.5">
-                  <Key className="w-3.5 h-3.5 text-purple-400" />
-                  <span>Chave de API ImgBB Pessoal (Opcional)</span>
-                </span>
-                <a
-                  href="https://api.imgbb.com/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-[10px] text-cyan-400 hover:underline flex items-center gap-0.5"
-                >
-                  <span>Obter chave grátis</span>
-                  <ExternalLink className="w-2.5 h-2.5" />
-                </a>
-              </div>
-              <p className="text-[11px] text-zinc-400">
-                O sistema já inclui chaves automáticas com rotação. Se desejar usar sua própria conta do ImgBB, insira sua chave abaixo:
-              </p>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={customKeyInput}
-                  onChange={(e) => setCustomKeyInput(e.target.value)}
-                  placeholder="Ex: 879c8465e668705b..."
-                  className="flex-1 px-3 py-1.5 rounded-lg bg-[#0e0d14] border border-zinc-700 text-xs font-mono text-zinc-100 placeholder-zinc-600 outline-none focus:border-purple-400"
-                />
-                <button
-                  type="button"
-                  onClick={handleSaveCustomKey}
-                  className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-colors"
-                >
-                  {savedKeyMessage ? 'Salvo!' : 'Salvar'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Body */}
+          {/* Modal Body */}
           <div className="p-5 space-y-4 overflow-y-auto flex-1">
-            {/* Alt / Title Field */}
+            {/* Custom API Key Collapsible Panel */}
+            {showKeySettings && (
+              <div className="p-3.5 rounded-xl bg-[#181424] border border-purple-500/40 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                    <Key className="w-3.5 h-3.5" /> Chave de API Personalizada (ImgBB)
+                  </span>
+                  <span className="text-[10px] text-zinc-500">Opcional</span>
+                </div>
+                <p className="text-[11px] text-zinc-400 leading-relaxed">
+                  O sistema possui rotação de chaves automáticas. Você pode inserir sua própria chave de API obtida em{' '}
+                  <a
+                    href="https://api.imgbb.com/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-purple-400 underline hover:text-purple-300"
+                  >
+                    api.imgbb.com
+                  </a>.
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="password"
+                    value={customKeyInput}
+                    onChange={(e) => setCustomKeyInput(e.target.value)}
+                    placeholder="Cole sua API Key aqui..."
+                    className="flex-1 px-3 py-1.5 rounded-lg bg-[#0e0d16] border border-zinc-700 text-xs text-zinc-200 placeholder-zinc-600 font-mono outline-none focus:border-purple-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveCustomKey}
+                    className="px-3 py-1.5 rounded-lg bg-purple-700 hover:bg-purple-600 text-xs font-bold text-purple-100 transition-colors"
+                  >
+                    {savedKeyMessage ? 'Salvo!' : 'Salvar'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Alt Text / Semantic Name input */}
             <div className="space-y-1">
-              <label className="text-xs font-bold text-zinc-300">
-                Descrição / Título da Imagem
+              <label className="text-xs font-bold text-zinc-300 flex items-center justify-between">
+                <span>Identificador / Título da Imagem</span>
+                <span className="text-[10px] text-purple-300 font-mono">
+                  {generateSemanticImageName({
+                    category: category || 'artigo',
+                    entityName: entityName || altText || 'imagem',
+                    role: role || 'ilustracao'
+                  })}
+                </span>
               </label>
               <input
                 type="text"
@@ -285,8 +325,8 @@ export const ImgBBUploadModal: React.FC<ImgBBUploadModalProps> = ({
                   <div className="py-4 flex flex-col items-center gap-3">
                     <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
                     <div className="space-y-0.5">
-                      <p className="text-sm font-bold text-zinc-200">Fazendo upload para ImgBB...</p>
-                      <p className="text-xs text-zinc-500">Aguarde a extração da URL permanente</p>
+                      <p className="text-sm font-bold text-zinc-200">Convertendo em WebP 100% e enviando ao ImgBB...</p>
+                      <p className="text-xs text-zinc-500">Aguarde a finalização e extração do link permanente</p>
                     </div>
                   </div>
                 ) : (
@@ -298,31 +338,37 @@ export const ImgBBUploadModal: React.FC<ImgBBUploadModalProps> = ({
                       Clique para selecionar ou arraste uma imagem aqui
                     </p>
                     <p className="text-xs text-zinc-500 mt-1 max-w-xs">
-                      Suporta PNG, JPG, JPEG, WEBP, GIF ou cole direto da área de transferência (<kbd className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[10px] text-zinc-300 font-mono">Ctrl+V</kbd>)
+                      Suporta PNG, JPG, JPEG, WEBP, GIF ou cole direto (<kbd className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[10px] text-zinc-300 font-mono">Ctrl+V</kbd>). Não-WebP será convertido em WebP 100%.
                     </p>
                     <div className="mt-4 flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/40 border border-cyan-800/40 text-[11px] text-cyan-300">
                       <Sparkles className="w-3 h-3" />
-                      <span>Upload direto e extração automática de link</span>
+                      <span>Nomeação padronizada e conversão WebP integrada</span>
                     </div>
                   </>
                 )}
               </div>
             ) : (
               /* Success / Result View */
-              <div className="space-y-3 p-4 rounded-2xl bg-[#13111e] border border-emerald-900/60 shadow-lg">
+              <div className="space-y-3.5 p-4 rounded-2xl bg-[#13111e] border border-emerald-900/60 shadow-lg">
                 <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-                  <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                    <Check className="w-4 h-4" /> Upload concluído com sucesso!
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                      <Check className="w-4 h-4" /> Upload concluído com sucesso!
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-700/60 text-emerald-300 font-mono">
+                      {wasConvertedToWebP ? 'Convertida em WebP 100%' : 'WebP Original'}
+                    </span>
+                  </div>
                   <button
                     type="button"
                     onClick={() => {
                       setUploadedUrl(null);
+                      setUploadedFileName(null);
                       fileInputRef.current?.click();
                     }}
                     className="text-xs text-cyan-400 hover:text-cyan-300 underline cursor-pointer"
                   >
-                    Enviar outra imagem
+                    Enviar outra
                   </button>
                 </div>
 
@@ -335,6 +381,14 @@ export const ImgBBUploadModal: React.FC<ImgBBUploadModalProps> = ({
                     className="max-h-48 object-contain rounded-lg"
                   />
                 </div>
+
+                {/* Semantic Filename Display */}
+                {uploadedFileName && (
+                  <div className="flex items-center justify-between text-xs px-3 py-1.5 rounded-xl bg-purple-950/40 border border-purple-900/50">
+                    <span className="text-zinc-400 text-[11px]">Arquivo Gerado:</span>
+                    <span className="font-mono text-purple-300 font-semibold">{uploadedFileName}</span>
+                  </div>
+                )}
 
                 {/* URL Result Box */}
                 <div className="space-y-1.5">
@@ -360,15 +414,25 @@ export const ImgBBUploadModal: React.FC<ImgBBUploadModalProps> = ({
                   </div>
                 </div>
 
-                {/* Markdown snippet */}
-                <div className="flex items-center justify-between pt-1">
+                {/* Action Buttons: Download & Markdown */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleDownload}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-600/50 text-emerald-300 text-xs font-bold transition-colors cursor-pointer"
+                    title="Baixar a imagem salva em WebP"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Baixar Imagem (.webp)</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={handleCopyMarkdown}
                     className="flex items-center gap-1.5 text-xs text-purple-300 hover:text-purple-200 font-mono transition-colors"
                   >
                     {copiedMarkdown ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>Copiar código Markdown `![alt](url)`</span>
+                    <span>Copiar Markdown `![alt](url)`</span>
                   </button>
                 </div>
               </div>

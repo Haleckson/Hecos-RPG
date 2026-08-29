@@ -11,6 +11,7 @@ import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { TraitBadge } from './TraitBadge';
 import { TraitInputCombobox } from './TraitInputCombobox';
+import { sortTraitsHierarchically } from '../utils/traitUtils';
 import { FolderManagerModal } from './FolderManagerModal';
 import {
   Package,
@@ -448,8 +449,7 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
             <VisibilityBadgeMenu
               visibility={visibility}
               allowedUserIds={allowedUserIds}
-              isGmMode={true}
-              onVisibilityChange={(newVis, newAllowed) => {
+              onChange={(newVis, newAllowed) => {
                 setVisibility(newVis);
                 setAllowedUserIds(newAllowed);
               }}
@@ -1261,14 +1261,10 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
                 </div>
 
                 <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                  <TraitBadge trait={itemData.rarity || 'Comum'} />
-                  {(itemData.traits || []).map((tr) => (
-                    <span
-                      key={tr}
-                      className="px-2.5 py-1 rounded text-xs font-bold uppercase bg-amber-950 text-amber-300 border border-amber-800"
-                    >
-                      {tr}
-                    </span>
+                  {sortTraitsHierarchically(itemData.traits || [], {
+                    rarity: itemData.rarity || 'Comum',
+                  }).map((tr) => (
+                    <TraitBadge key={tr} trait={tr} />
                   ))}
                 </div>
               </div>

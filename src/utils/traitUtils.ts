@@ -32,6 +32,55 @@ export const CANONICAL_SIZES: Array<'Minúsculo' | 'Pequeno' | 'Médio' | 'Grand
 ];
 
 /**
+ * Checks whether a given string is a pseudo-trait / category header rather than a genuine rule trait.
+ * Filters out "Nível X", "Perigo", "Perigo Simples", "Monstro", "Assombração", "Perigo Complexo", "Perigo Ambiental", "PF2e", etc.
+ */
+export function isPseudoTrait(traitName: string | undefined | null): boolean {
+  if (!traitName || typeof traitName !== 'string') return true;
+  const clean = traitName.trim();
+  if (!clean) return true;
+  const norm = clean.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  // 1. Level patterns like "Nível 1", "Nivel 2", "Level 3", "Nv 4", "Nvl 5"
+  if (/^(nivel|level|nv|nvl)\s*\d+$/i.test(norm)) return true;
+
+  // 2. Generic peril kinds, category headers or meta tags that are not PF2e rule traits
+  const pseudoKeywords = [
+    'perigo',
+    'perigos',
+    'perigoso',
+    'perigoso simples',
+    'perigosos simples',
+    'perigo simples',
+    'perigos simples',
+    'perigo complexo',
+    'perigos complexos',
+    'perigo ambiental',
+    'perigos ambientais',
+    'perigosos ambientais',
+    'monstro',
+    'monstros',
+    'criatura',
+    'criaturas',
+    'hazard',
+    'hazards',
+    'simple hazard',
+    'complex hazard',
+    'environmental hazard',
+    'monster',
+    'monsters',
+    'creature',
+    'creatures',
+    'pf2e',
+    'hecos',
+  ];
+
+  if (pseudoKeywords.includes(norm)) return true;
+
+  return false;
+}
+
+/**
  * Normalizes size strings into canonical Portuguese standard:
  * Minúsculo, Pequeno, Médio, Grande, Enorme, Gigantesco
  */
@@ -90,6 +139,10 @@ export function canonicalizeTraitName(traitName: string | undefined | null): str
   if (norm === 'divina' || norm === 'divine') return 'Divina';
   if (norm === 'oculta' || norm === 'occult') return 'Oculta';
   if (norm === 'primal') return 'Primal';
+  if (norm === 'e. fisica' || norm === 'energia fisica') return 'E. Física';
+  if (norm === 'e. meta' || norm === 'e. metafisica' || norm === 'energia metafisica') return 'E. Metafísica';
+  if (norm === 'm. organica' || norm === 'materia organica') return 'M. Orgânica';
+  if (norm === 'm. inorganica' || norm === 'materia inorganica') return 'M. Inorgânica';
 
   // Return formatted display
   return clean.charAt(0).toUpperCase() + clean.slice(1);
@@ -106,12 +159,13 @@ export function getTraitCanonicalKey(traitName: string | undefined | null): stri
 
 /**
  * Standard categories for Traits in Hecos & PF2e, ordered by canonical hierarchy:
- * [Raridade] -> [Tradições de Hecos] -> [Tamanho] -> [Outros Traits em Ordem Alfabética]
+ * [Raridade] -> [Tamanho] -> [Tradição de Magia] -> [Outros Traits em Ordem Alfabética]
  */
 export const TRAIT_CATEGORIES: string[] = [
   'Raridade',
-  'Tradições de Hecos',
   'Tamanho',
+  'Tradições de Hecos',
+  'Tradição de Magia',
   'Ações e Atividades',
   'Ancestralidade e Herança',
   'Classe',
@@ -120,28 +174,35 @@ export const TRAIT_CATEGORIES: string[] = [
   'Dano e Elementos',
   'Equipamento e Itens',
   'Extra',
-  'Magias e Tradições',
+  'Escolas e Magias',
 ];
 
 /**
  * Returns the tier for a trait category name:
  * 1: Raridade
- * 2: Tradição / Tradições de Hecos
- * 3: Tamanho
+ * 2: Tamanho
+ * 3: Tradição de Magia / Tradições de Hecos
  * 4: Outras Categorias (Ordem Alfabética)
  */
 export function getTraitCategoryTier(categoryName: string): number {
   if (!categoryName || typeof categoryName !== 'string') return 4;
   const norm = categoryName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
   if (norm === 'raridade' || norm === 'rarity') return 1;
-  if (norm.includes('tradicao') || norm.includes('tradic') || norm.includes('tradition')) return 2;
-  if (norm === 'tamanho' || norm === 'size') return 3;
+  if (norm === 'tamanho' || norm === 'size') return 2;
+  if (
+    norm.includes('tradicao') ||
+    norm.includes('tradic') ||
+    norm.includes('tradition') ||
+    norm === 'tradicoes de hecos'
+  ) {
+    return 3;
+  }
   return 4;
 }
 
 /**
  * Sorts any list of trait category names following the canonical hierarchy:
- * [Raridade] + [Tradição] + [Tamanho] + [Outros em Ordem Alfabética]
+ * [Raridade] + [Tamanho] + [Tradição de Magia] + [Outros em Ordem Alfabética]
  */
 export function sortTraitCategories(categories: string[]): string[] {
   return [...categories].sort((a, b) => {
@@ -273,24 +334,28 @@ export const DEFAULT_TRAIT_DESCRIPTIONS: Record<string, TraitDefinition> = {
   escuridao: { category: 'Dano e Elementos', description: 'Efeitos de penumbra profunda, sombras vivas e supressão de luz.', color: 'border-zinc-800 bg-[#0c0914] text-purple-300' },
   escuridão: { category: 'Dano e Elementos', description: 'Efeitos de penumbra profunda, sombras vivas e supressão de luz.', color: 'border-zinc-800 bg-[#0c0914] text-purple-300' },
   sombrio: { category: 'Dano e Elementos', description: 'Conectado à energia umbrosa e à penumbra perpétua de Hecos.', color: 'border-purple-900/80 bg-purple-950/80 text-purple-200' },
-  mental: { category: 'Magias e Tradições', description: 'Afeta diretamente a mente, psique ou pensamentos do alvo.', color: 'border-indigo-700/80 bg-indigo-950/80 text-indigo-300' },
-  emocao: { category: 'Magias e Tradições', description: 'Altera o estado emocional (medo, coragem, fúria, desespero).', color: 'border-pink-700/80 bg-pink-950/80 text-pink-300' },
-  emoção: { category: 'Magias e Tradições', description: 'Altera o estado emocional (medo, coragem, fúria, desespero).', color: 'border-pink-700/80 bg-pink-950/80 text-pink-300' },
+  arcana: { category: 'Tradição de Magia', description: 'Tradição mágica acadêmica e racional baseada nas leis universais e na lógica do cosmos.', color: 'border-blue-700/80 bg-blue-950/80 text-blue-300' },
+  divina: { category: 'Tradição de Magia', description: 'Tradição mágica devocional canalizada através de divindades, fé e energias cósmicas.', color: 'border-yellow-700/80 bg-yellow-950/80 text-yellow-300' },
+  oculta: { category: 'Tradição de Magia', description: 'Tradição mágica esotérica ligada à mente, alma, mistérios ocultos e realidades insondáveis.', color: 'border-purple-700/80 bg-purple-950/80 text-purple-300' },
+  primal: { category: 'Tradição de Magia', description: 'Tradição mágica instintiva conectada às forças da natureza, aos elementos e à vida animal.', color: 'border-emerald-700/80 bg-emerald-950/80 text-emerald-300' },
+  mental: { category: 'Escolas e Magias', description: 'Afeta diretamente a mente, psique ou pensamentos do alvo.', color: 'border-indigo-700/80 bg-indigo-950/80 text-indigo-300' },
+  emocao: { category: 'Escolas e Magias', description: 'Altera o estado emocional (medo, coragem, fúria, desespero).', color: 'border-pink-700/80 bg-pink-950/80 text-pink-300' },
+  emoção: { category: 'Escolas e Magias', description: 'Altera o estado emocional (medo, coragem, fúria, desespero).', color: 'border-pink-700/80 bg-pink-950/80 text-pink-300' },
   medo: { category: 'Condições', description: 'Efeito mental que pode impor a condição Amedrontado.', color: 'border-rose-800 bg-rose-950 text-rose-300' },
-  cura: { category: 'Magias e Tradições', description: 'Restaura Pontos de Vida ou remove aflições de criaturas vivas.', color: 'border-emerald-700/80 bg-emerald-950/80 text-emerald-300' },
+  cura: { category: 'Escolas e Magias', description: 'Restaura Pontos de Vida ou remove aflições de criaturas vivas.', color: 'border-emerald-700/80 bg-emerald-950/80 text-emerald-300' },
   veneno: { category: 'Condições', description: 'Toxinas, peçonhas e miasmas biológicos ou alquímicos.', color: 'border-emerald-800 bg-emerald-950 text-emerald-400' },
-  necromancia: { category: 'Magias e Tradições', description: 'Manipulação das energias da vida, morte e não-vida.', color: 'border-zinc-700 bg-black text-rose-300' },
-  evocacao: { category: 'Magias e Tradições', description: 'Manifestação direta de energia elemental e forças brutas.', color: 'border-rose-700 bg-rose-950/70 text-rose-200' },
-  evocação: { category: 'Magias e Tradições', description: 'Manifestação direta de energia elemental e forças brutas.', color: 'border-rose-700 bg-rose-950/70 text-rose-200' },
-  transmutacao: { category: 'Magias e Tradições', description: 'Alteração da forma física, matéria e propriedades corporais.', color: 'border-cyan-700 bg-cyan-950/70 text-cyan-200' },
-  transmutação: { category: 'Magias e Tradições', description: 'Alteração da forma física, matéria e propriedades corporais.', color: 'border-cyan-700 bg-cyan-950/70 text-cyan-200' },
-  ilusao: { category: 'Magias e Tradições', description: 'Enganação sensorial visual, sonora ou olfativa.', color: 'border-violet-700 bg-violet-950/70 text-violet-300' },
-  ilusão: { category: 'Magias e Tradições', description: 'Enganação sensorial visual, sonora ou olfativa.', color: 'border-violet-700 bg-violet-950/70 text-violet-300' },
-  abjuracao: { category: 'Magias e Tradições', description: 'Magias protetivas, barreiras, contrafeitiços e santuários.', color: 'border-blue-700 bg-blue-950/70 text-blue-300' },
-  abjuração: { category: 'Magias e Tradições', description: 'Magias protetivas, barreiras, contrafeitiços e santuários.', color: 'border-blue-700 bg-blue-950/70 text-blue-300' },
-  adivinhacao: { category: 'Magias e Tradições', description: 'Revelação de segredos, presságios e visão remota.', color: 'border-cyan-600 bg-cyan-950 text-cyan-300' },
-  adivinhação: { category: 'Magias e Tradições', description: 'Revelação de segredos, presságios e visão remota.', color: 'border-cyan-600 bg-cyan-950 text-cyan-300' },
-  encantamento: { category: 'Magias e Tradições', description: 'Influência mental, comandos imperativos e fascínio.', color: 'border-pink-800 bg-pink-950 text-pink-300' },
+  necromancia: { category: 'Escolas e Magias', description: 'Manipulação das energias da vida, morte e não-vida.', color: 'border-zinc-700 bg-black text-rose-300' },
+  evocacao: { category: 'Escolas e Magias', description: 'Manifestação direta de energia elemental e forças brutas.', color: 'border-rose-700 bg-rose-950/70 text-rose-200' },
+  evocação: { category: 'Escolas e Magias', description: 'Manifestação direta de energia elemental e forças brutas.', color: 'border-rose-700 bg-rose-950/70 text-rose-200' },
+  transmutacao: { category: 'Escolas e Magias', description: 'Alteração da forma física, matéria e propriedades corporais.', color: 'border-cyan-700 bg-cyan-950/70 text-cyan-200' },
+  transmutação: { category: 'Escolas e Magias', description: 'Alteração da forma física, matéria e propriedades corporais.', color: 'border-cyan-700 bg-cyan-950/70 text-cyan-200' },
+  ilusao: { category: 'Escolas e Magias', description: 'Enganação sensorial visual, sonora ou olfativa.', color: 'border-violet-700 bg-violet-950/70 text-violet-300' },
+  ilusão: { category: 'Escolas e Magias', description: 'Enganação sensorial visual, sonora ou olfativa.', color: 'border-violet-700 bg-violet-950/70 text-violet-300' },
+  abjuracao: { category: 'Escolas e Magias', description: 'Magias protetivas, barreiras, contrafeitiços e santuários.', color: 'border-blue-700 bg-blue-950/70 text-blue-300' },
+  abjuração: { category: 'Escolas e Magias', description: 'Magias protetivas, barreiras, contrafeitiços e santuários.', color: 'border-blue-700 bg-blue-950/70 text-blue-300' },
+  adivinhacao: { category: 'Escolas e Magias', description: 'Revelação de segredos, presságios e visão remota.', color: 'border-cyan-600 bg-cyan-950 text-cyan-300' },
+  adivinhação: { category: 'Escolas e Magias', description: 'Revelação de segredos, presságios e visão remota.', color: 'border-cyan-600 bg-cyan-950 text-cyan-300' },
+  encantamento: { category: 'Escolas e Magias', description: 'Influência mental, comandos imperativos e fascínio.', color: 'border-pink-800 bg-pink-950 text-pink-300' },
   concentracao: { category: 'Ações e Atividades', description: 'Exige foco contínuo; pode ser interrompido por reações com ataque de oportunidade.', color: 'border-amber-700/80 bg-amber-950/80 text-amber-200' },
   concentração: { category: 'Ações e Atividades', description: 'Exige foco contínuo; pode ser interrompido por reações com ataque de oportunidade.', color: 'border-amber-700/80 bg-amber-950/80 text-amber-200' },
   manipular: { category: 'Ações e Atividades', description: 'Movimento físico com as mãos ou corpo; provoca reações contra manipulação.', color: 'border-orange-700/80 bg-orange-950/80 text-orange-200' },
@@ -378,13 +443,16 @@ export function extractEntityAllTraits(ent: HecosEntity): string[] {
     if (Array.isArray(val)) {
       val.forEach((item) => {
         if (typeof item === 'string' && item.trim()) {
-          result.add(item.trim());
+          const clean = item.trim();
+          if (!isPseudoTrait(clean)) {
+            result.add(clean);
+          }
         }
       });
     } else if (typeof val === 'string') {
       val.split(',').forEach((item) => {
         const trimmed = item.trim();
-        if (trimmed) result.add(trimmed);
+        if (trimmed && !isPseudoTrait(trimmed)) result.add(trimmed);
       });
     }
   };
@@ -497,21 +565,30 @@ export function isRarityTrait(traitName: string): boolean {
 
 export function isTraditionTrait(traitName: string): boolean {
   if (!traitName || typeof traitName !== 'string') return false;
-  const clean = traitName.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  if (CORE_TRADITIONS.some(t => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '') === clean)) return true;
+  const clean = traitName.trim();
+  if (!clean) return false;
+  const norm = clean.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (CORE_TRADITIONS.some((t) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '') === norm)) return true;
   const info = getTraitInfo(traitName);
+  if (info.isTradition) return true;
+  const cat = info.category.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   return (
-    info.isTradition ||
-    info.category.toLowerCase().includes('tradiç') ||
-    info.category.toLowerCase().includes('tradic') ||
-    info.category.toLowerCase().includes('tradition')
+    cat === 'tradicoes de hecos' ||
+    cat === 'tradicao de magia' ||
+    cat === 'tradicoes de magia' ||
+    cat === 'tradicoes magicas' ||
+    cat === 'tradicao magica' ||
+    cat === 'tradicoes' ||
+    cat === 'tradicao' ||
+    cat === 'tradition' ||
+    cat === 'traditions'
   );
 }
 
 export function isSizeTrait(traitName: string): boolean {
   if (!traitName || typeof traitName !== 'string') return false;
   const clean = traitName.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  if (CORE_SIZES.some(s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') === clean)) return true;
+  if (CORE_SIZES.some((s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') === clean)) return true;
   const info = getTraitInfo(traitName);
   return info.category.toLowerCase() === 'tamanho' || info.category.toLowerCase() === 'size';
 }
@@ -519,36 +596,37 @@ export function isSizeTrait(traitName: string): boolean {
 /**
  * Returns hierarchy tier for sorting traits:
  * 1: [Raridade]
- * 2: [Tradição]
- * 3: [Tamanho]
+ * 2: [Tamanho]
+ * 3: [Tradição de Magia]
  * 4: [Outros Traits em Ordem Alfabética]
  */
 export function getTraitHierarchyTier(traitName: string): number {
   if (isRarityTrait(traitName)) return 1;
-  if (isTraditionTrait(traitName)) return 2;
-  if (isSizeTrait(traitName)) return 3;
+  if (isSizeTrait(traitName)) return 2;
+  if (isTraditionTrait(traitName)) return 3;
   return 4;
 }
 
 /**
  * Sorts any list of traits following the strict canonical hierarchy:
- * [Raridade] + [Tradição] + [Tamanho] + [Outros Traits em Ordem Alfabética]
+ * [Raridade] -> [Tamanho] -> [Tradição de Magia] -> [Outros Traits em Ordem Alfabética]
  * Strictly deduplicates entries (e.g., 'Medium' and 'Médio', 'Comum' and 'common').
  */
 export function sortTraitsHierarchically(
-  traits: (string | undefined | null)[],
+  traits?: (string | undefined | null)[] | string | null,
   options?: {
     rarity?: string;
-    traditions?: string[];
     size?: string;
+    traditions?: string[] | string;
   }
 ): string[] {
   const map = new Map<string, string>(); // canonical key -> display canonical name
 
-  const add = (t?: string | null) => {
+  const add = (t?: unknown) => {
     if (!t || typeof t !== 'string') return;
     const clean = t.trim();
     if (!clean) return;
+    if (isPseudoTrait(clean)) return;
     const canonicalName = canonicalizeTraitName(clean);
     const key = getTraitCanonicalKey(canonicalName);
     if (!key) return;
@@ -559,13 +637,21 @@ export function sortTraitsHierarchically(
 
   // Add explicit options if provided (Canonicalized)
   if (options?.rarity) add(options.rarity);
-  if (options?.traditions) {
-    options.traditions.forEach(add);
-  }
   if (options?.size) add(options.size);
+  if (options?.traditions) {
+    if (Array.isArray(options.traditions)) {
+      options.traditions.forEach(add);
+    } else if (typeof options.traditions === 'string') {
+      options.traditions.split(',').forEach(add);
+    }
+  }
 
-  // Add all other passed traits
-  traits.forEach(add);
+  // Add all other passed traits (handles array or comma-separated string)
+  if (Array.isArray(traits)) {
+    traits.forEach(add);
+  } else if (typeof traits === 'string') {
+    traits.split(',').forEach(add);
+  }
 
   const uniqueTraits = Array.from(map.values());
 
@@ -586,11 +672,13 @@ export function sortTraitsHierarchically(
         if (norm === 'incomum' || norm === 'uncommon') return 3;
         return 4; // comum / common
       };
-      return rarityRank(a) - rarityRank(b);
+      const diff = rarityRank(a) - rarityRank(b);
+      if (diff !== 0) return diff;
+      return a.localeCompare(b, 'pt-BR', { sensitivity: 'base' });
     }
 
-    // Within Tier 3 (Size): minúsculo -> pequeno -> médio -> grande -> enorme -> gigantesco
-    if (tierA === 3) {
+    // Within Tier 2 (Size): minúsculo -> pequeno -> médio -> grande -> enorme -> gigantesco
+    if (tierA === 2) {
       const sizeRank = (s: string) => {
         const norm = s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         if (norm === 'minusculo' || norm === 'tiny') return 1;
@@ -600,10 +688,12 @@ export function sortTraitsHierarchically(
         if (norm === 'enorme' || norm === 'huge') return 5;
         return 6; // gigantesco, imenso, gargantuesco, gargantuan
       };
-      return sizeRank(a) - sizeRank(b);
+      const diff = sizeRank(a) - sizeRank(b);
+      if (diff !== 0) return diff;
+      return a.localeCompare(b, 'pt-BR', { sensitivity: 'base' });
     }
 
-    // Within Tier 2 (Traditions) and Tier 4 (Other Traits): alphabetical order
+    // Within Tier 3 (Traditions of Magic) and Tier 4 (Other Traits): alphabetical order
     return a.localeCompare(b, 'pt-BR', { sensitivity: 'base' });
   });
 }

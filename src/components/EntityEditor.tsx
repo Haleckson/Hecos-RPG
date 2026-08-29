@@ -484,12 +484,18 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
     if (file && file.type.startsWith('image/')) {
       e.preventDefault();
       setIsUploading(true);
-      setUploadMessage(`Enviando ${file.name} para o ImgBB...`);
+      setUploadMessage(`Enviando ${file.name} para o ImgBB (WebP)...`);
       try {
-        const res = await uploadToImgBB(file, file.name.replace(/\.[^/.]+$/, ''));
+        const res = await uploadToImgBB(file, {
+          category: category || 'artigo',
+          entityName: title || 'conteudo',
+          role: 'ilustracao',
+          originalFilename: file.name
+        });
         if (res.success && res.url) {
           setUploadMessage('Imagem enviada com sucesso!');
-          const imgMarkdown = `\n\n![${file.name.replace(/\.[^/.]+$/, '')}](${res.url})\n\n`;
+          const label = res.fileName || file.name.replace(/\.[^/.]+$/, '');
+          const imgMarkdown = `\n\n![${label}](${res.url})\n\n`;
           insertSnippet(imgMarkdown);
           if (!coverImage) {
             setCoverImage(res.url);
@@ -517,12 +523,17 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
         if (file) {
           e.preventDefault();
           setIsUploading(true);
-          setUploadMessage('Enviando imagem colada para o ImgBB...');
+          setUploadMessage('Enviando imagem colada para o ImgBB (WebP)...');
           try {
-            const res = await uploadToImgBB(file, `screenshot-${Date.now()}`);
+            const res = await uploadToImgBB(file, {
+              category: category || 'artigo',
+              entityName: title || 'conteudo',
+              role: 'screenshot'
+            });
             if (res.success && res.url) {
               setUploadMessage('Imagem colada enviada com sucesso!');
-              const imgMarkdown = `\n\n![Imagem Colada](${res.url})\n\n`;
+              const label = res.fileName || 'Imagem Colada';
+              const imgMarkdown = `\n\n![${label}](${res.url})\n\n`;
               insertSnippet(imgMarkdown);
               if (!coverImage) {
                 setCoverImage(res.url);
@@ -548,13 +559,19 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
     if (!file) return;
 
     setIsUploading(true);
-    setUploadMessage('Enviando imagem para ImgBB...');
+    setUploadMessage('Enviando imagem para ImgBB (WebP)...');
 
     try {
-      const res = await uploadToImgBB(file, file.name.replace(/\.[^/.]+$/, ''));
+      const res = await uploadToImgBB(file, {
+        category: category || 'artigo',
+        entityName: title || 'conteudo',
+        role: 'ilustracao',
+        originalFilename: file.name
+      });
       if (res.success && res.url) {
         setUploadMessage('Imagem enviada com sucesso!');
-        const imgMarkdown = `\n\n![${file.name}](${res.url})\n\n`;
+        const label = res.fileName || file.name;
+        const imgMarkdown = `\n\n![${label}](${res.url})\n\n`;
         insertSnippet(imgMarkdown);
         if (!coverImage) {
           setCoverImage(res.url);
@@ -791,18 +808,18 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
       </div>
 
       {/* Metadata Configuration Bar */}
-      {/* Metadata Configuration Bar */}
       <div className="p-3.5 bg-[#0d0b14] border-b border-zinc-800/80 space-y-3">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center">
-          <div className="md:col-span-1 flex items-center justify-start">
+          <div className="md:col-span-3 flex items-center justify-start min-w-0">
             <IconPicker
               value={icon}
               onChange={setIcon}
               category={category}
+              entityName={title || 'entidade'}
             />
           </div>
 
-          <div className="md:col-span-7">
+          <div className="md:col-span-6">
             <input
               type="text"
               value={title}
@@ -888,6 +905,9 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
               onChange={setCoverImage}
               placeholder="URL ou Upload ImgBB..."
               showPreview={false}
+              category={category || 'artigo'}
+              entityName={title || 'entidade'}
+              role="capa"
             />
           </div>
         </div>

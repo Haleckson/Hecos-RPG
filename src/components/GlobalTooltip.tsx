@@ -27,34 +27,70 @@ export const GlobalTooltip: React.FC = () => {
   const showTimeoutRef = useRef<number | null>(null);
   const currentTargetRef = useRef<HTMLElement | null>(null);
 
-  // Compute pixel-perfect coordinates without fractional subpixels
+  // Compute pixel-perfect coordinates without overlapping target or cursor
   useLayoutEffect(() => {
     if (!tooltip.visible || !tooltipRef.current) return;
 
     const el = tooltipRef.current;
     const width = el.offsetWidth;
     const height = el.offsetHeight;
+    const GAP = 8;
+    const PADDING = 8;
+    const targetRect = tooltip.targetRect;
 
     let left = 0;
     let top = 0;
+    let placement = tooltip.placement;
 
-    if (tooltip.placement === 'top') {
-      left = tooltip.x - width / 2;
-      top = tooltip.y - height;
-    } else if (tooltip.placement === 'bottom') {
-      left = tooltip.x - width / 2;
-      top = tooltip.y;
-    } else if (tooltip.placement === 'left') {
-      left = tooltip.x - width;
-      top = tooltip.y - height / 2;
-    } else if (tooltip.placement === 'right') {
-      left = tooltip.x;
-      top = tooltip.y - height / 2;
+    if (targetRect) {
+      // If requested top but no room above, flip to bottom
+      if (placement === 'top' && targetRect.top - GAP - height < PADDING) {
+        placement = 'bottom';
+      } else if (placement === 'bottom' && targetRect.bottom + GAP + height > window.innerHeight - PADDING) {
+        placement = 'top';
+      }
+
+      if (placement === 'top') {
+        left = targetRect.left + (targetRect.width - width) / 2;
+        top = targetRect.top - GAP - height;
+      } else if (placement === 'bottom') {
+        left = targetRect.left + (targetRect.width - width) / 2;
+        top = targetRect.bottom + GAP;
+      } else if (placement === 'left') {
+        left = targetRect.left - GAP - width;
+        top = targetRect.top + (targetRect.height - height) / 2;
+      } else if (placement === 'right') {
+        left = targetRect.right + GAP;
+        top = targetRect.top + (targetRect.height - height) / 2;
+      }
+    } else {
+      if (placement === 'top') {
+        left = tooltip.x - width / 2;
+        top = tooltip.y - height;
+      } else if (placement === 'bottom') {
+        left = tooltip.x - width / 2;
+        top = tooltip.y;
+      } else if (placement === 'left') {
+        left = tooltip.x - width;
+        top = tooltip.y - height / 2;
+      } else if (placement === 'right') {
+        left = tooltip.x;
+        top = tooltip.y - height / 2;
+      }
     }
 
     // Clamp inside viewport
-    const clampedLeft = Math.max(8, Math.min(window.innerWidth - width - 8, left));
-    const clampedTop = Math.max(8, Math.min(window.innerHeight - height - 8, top));
+    const clampedLeft = Math.max(PADDING, Math.min(window.innerWidth - width - PADDING, left));
+    let clampedTop = Math.max(PADDING, Math.min(window.innerHeight - height - PADDING, top));
+
+    // Anti-overlap safeguard: if clampedTop would overlap targetRect, push away
+    if (targetRect) {
+      if (placement === 'top' && clampedTop + height > targetRect.top - GAP) {
+        clampedTop = targetRect.top - GAP - height;
+      } else if (placement === 'bottom' && clampedTop < targetRect.bottom + GAP) {
+        clampedTop = targetRect.bottom + GAP;
+      }
+    }
 
     setCoords({
       left: Math.round(clampedLeft),

@@ -54,7 +54,7 @@ export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
   inline = false,
 }) => {
   if (!content || !content.trim()) {
-    return inline ? null : <p className="text-zinc-500 italic text-sm">Nenhum conteúdo adicionado ainda.</p>;
+    return inline ? null : <div className="text-zinc-500 italic text-sm">Nenhum conteúdo adicionado ainda.</div>;
   }
 
   if (inline) {
@@ -605,11 +605,11 @@ export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
         continue;
       }
 
-      // 12. Standard Paragraph
+      // 12. Standard Paragraph (render as div to avoid invalid HTML nesting when content has block elements)
       elements.push(
-        <p key={`p-${i}`} className="text-zinc-200 text-sm leading-relaxed my-1">
+        <div key={`p-${i}`} className="text-zinc-200 text-sm leading-relaxed my-1">
           {renderContentWithMentions(line, onNavigate)}
-        </p>
+        </div>
       );
       i++;
     }

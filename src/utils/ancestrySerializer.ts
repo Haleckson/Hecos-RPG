@@ -187,11 +187,11 @@ export function serializeAncestryToHTML(title: string, data: AncestryAttributes)
           (h) => `
         <div style="margin-bottom: 14px; padding: 12px 14px; background-color: #0e0d14; border: 1px solid #272438; border-radius: 8px;">
           <h3 style="margin: 0 0 6px 0; color: #b19ecc; font-size: 16px; font-weight: 700;">${h.name || '[Nome da Herança]'}</h3>
-          <p style="margin: 0; color: #d4d4d8; font-size: 14px; line-height: 1.6;">${h.description || ''}</p>
+          <div style="margin: 0; color: #d4d4d8; font-size: 14px; line-height: 1.6;">${h.description || ''}</div>
         </div>`
         )
         .join('\n')
-    : '<p style="color: #71717a; font-style: italic; font-size: 13px;">Nenhuma herança específica cadastrada.</p>';
+    : '<div style="color: #71717a; font-style: italic; font-size: 13px;">Nenhuma herança específica cadastrada.</div>';
 
   // Format Feats Section
   const formatFeatsForRank = (rankNum: 1 | 5 | 9 | 13 | 17, featsList: AncestryFeat[] = []) => {
@@ -204,9 +204,9 @@ export function serializeAncestryToHTML(title: string, data: AncestryAttributes)
         const prereq = f.prerequisites ? ` <br/><span style="color: #a1a1aa; font-size: 12px;"><em>Pré-requisitos:</em> ${f.prerequisites}</span>` : '';
         return `
         <div style="margin-bottom: 10px; padding: 10px 12px; background-color: #0e0d14; border: 1px solid #1f2a30; border-radius: 8px;">
-          <p style="margin: 0; color: #d4d4d8; font-size: 14px; line-height: 1.6;">
+          <div style="margin: 0; color: #d4d4d8; font-size: 14px; line-height: 1.6;">
             <strong style="color: #74b6c2;">${f.name}</strong>${actionTag}${traitsTag}: ${f.description}${prereq}
-          </p>
+          </div>
         </div>`;
       })
       .join('\n');

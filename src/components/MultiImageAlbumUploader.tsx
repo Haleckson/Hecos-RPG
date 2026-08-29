@@ -1,11 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { uploadToImgBB, uploadMultipleToImgBB, ImgBBUploadResult } from '../services/imgbb';
+import {
+  uploadToImgBB,
+  uploadMultipleToImgBB,
+  downloadImage,
+  generateSemanticImageName,
+  ImgBBUploadResult,
+  SemanticNamingOptions
+} from '../services/imgbb';
 import {
   Upload,
   Images,
   Image as ImageIcon,
   Loader2,
   Check,
+  Download,
   X,
   AlertCircle,
   Sparkles,
@@ -27,6 +35,8 @@ export interface PendingAlbumUploadItem {
   progress?: number;
   error?: string;
   previewUrl?: string;
+  fileName?: string;
+  wasConverted?: boolean;
 }
 
 interface MultiImageAlbumUploaderProps {
@@ -37,6 +47,10 @@ interface MultiImageAlbumUploaderProps {
   themeColor?: 'purple' | 'cyan' | 'amber';
   maxFiles?: number;
   inline?: boolean;
+  category?: string;
+  entityName?: string;
+  role?: string;
+  startIndex?: number;
 }
 
 export const MultiImageAlbumUploader: React.FC<MultiImageAlbumUploaderProps> = ({
@@ -47,6 +61,10 @@ export const MultiImageAlbumUploader: React.FC<MultiImageAlbumUploaderProps> = (
   themeColor = 'purple',
   maxFiles = 50,
   inline = false,
+  category = 'ancestralidade',
+  entityName,
+  role = 'album',
+  startIndex = 1,
 }) => {
   const [items, setItems] = useState<PendingAlbumUploadItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -218,14 +236,29 @@ export const MultiImageAlbumUploader: React.FC<MultiImageAlbumUploaderProps> = (
       );
 
       try {
-        const cleanName = item.file?.name ? item.file.name.replace(/\.[^/.]+$/, '') : undefined;
-        const res: ImgBBUploadResult = await uploadToImgBB(item.file!, cleanName);
+        const itemIndex = (startIndex || 1) + currentCompleted;
+        const semanticOpts: SemanticNamingOptions = {
+          category: category || 'ancestralidade',
+          entityName: entityName || 'album',
+          role: role || 'album',
+          index: itemIndex,
+          originalFilename: item.file?.name
+        };
+
+        const res: ImgBBUploadResult = await uploadToImgBB(item.file!, semanticOpts);
 
         if (res.success && res.url) {
           setItems((prev) =>
             prev.map((it) =>
               it.id === item.id
-                ? { ...it, status: 'success', url: res.url!, error: undefined }
+                ? {
+                    ...it,
+                    status: 'success',
+                    url: res.url!,
+                    fileName: res.fileName,
+                    wasConverted: res.wasConvertedToWebP,
+                    error: undefined
+                  }
                 : it
             )
           );
@@ -478,16 +511,28 @@ export const MultiImageAlbumUploader: React.FC<MultiImageAlbumUploaderProps> = (
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex items-center justify-between gap-1">
                     <span className="text-[11px] font-bold text-zinc-200 truncate font-mono">
-                      #{idx + 1} {item.file?.name || 'URL Externa'}
+                      #{idx + 1} {item.fileName || item.file?.name || 'URL Externa'}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => removeItem(item.id)}
-                      className="text-zinc-500 hover:text-rose-400 p-0.5 rounded transition-colors"
-                      title="Remover"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      {item.status === 'success' && (
+                        <button
+                          type="button"
+                          onClick={() => downloadImage(item.url, item.fileName || `album-${idx + 1}.webp`)}
+                          className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-cyan-300 transition-colors"
+                          title="Baixar imagem (.webp)"
+                        >
+                          <Download className="w-3 h-3" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeItem(item.id)}
+                        className="text-zinc-500 hover:text-rose-400 p-0.5 rounded transition-colors"
+                        title="Remover"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   <input
@@ -502,9 +547,14 @@ export const MultiImageAlbumUploader: React.FC<MultiImageAlbumUploaderProps> = (
                     <p className="text-[10px] text-rose-400 truncate">{item.error || 'Erro no envio'}</p>
                   )}
                   {item.status === 'success' && (
-                    <p className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
-                      <Check className="w-2.5 h-2.5" /> Pronta para o álbum
-                    </p>
+                    <div className="flex items-center justify-between gap-1 text-[10px]">
+                      <span className="text-emerald-400 font-mono flex items-center gap-1">
+                        <Check className="w-2.5 h-2.5" /> Pronta
+                      </span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-950/70 border border-purple-800/40 text-purple-300 font-mono">
+                        {item.wasConverted ? 'WebP 100%' : 'WebP'}
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -526,6 +576,22 @@ export const MultiImageAlbumUploader: React.FC<MultiImageAlbumUploaderProps> = (
             </div>
 
             <div className="flex items-center gap-2">
+              {successfulCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const ready = items.filter((it) => it.status === 'success' && it.url);
+                    ready.forEach((it, i) => {
+                      setTimeout(() => downloadImage(it.url, it.fileName || `album-${i + 1}.webp`), i * 300);
+                    });
+                  }}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-cyan-300 text-xs font-semibold transition-colors cursor-pointer"
+                  title="Baixar todas as imagens prontas"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Baixar Prontas ({successfulCount})</span>
+                </button>
+              )}
               {onCancel && (
                 <button
                   type="button"

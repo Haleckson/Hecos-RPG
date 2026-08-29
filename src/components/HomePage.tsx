@@ -4,6 +4,7 @@ import { HecosStorage } from '../services/storage';
 import { getCategoryMeta } from '../utils/categories';
 import { EntityIcon } from './EntityIcon';
 import { TraitBadge } from './TraitBadge';
+import { extractEntityAllTraits } from '../utils/traitUtils';
 import { RichContentRenderer } from './RichContentRenderer';
 import {
   Sparkles,
@@ -426,21 +427,25 @@ export function HomePage({
                   </div>
 
                   {/* Tags / Traits footer */}
-                  {(((entity.traits || []).length > 0) || ((entity.tags || []).length > 0)) && (
-                    <div className="flex items-center gap-1 flex-wrap pt-3 mt-3 border-t border-zinc-800/60">
-                      {(entity.traits || []).slice(0, 2).map((tr) => (
-                        <TraitBadge key={`rec-trait-${tr}`} trait={tr} />
-                      ))}
-                      {(entity.tags || []).slice(0, 2).map((tg) => (
-                        <span
-                          key={`rec-tag-${tg}`}
-                          className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-900 text-purple-300 border border-zinc-800 font-mono"
-                        >
-                          #{tg}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  {(() => {
+                    const cardTraits = extractEntityAllTraits(entity);
+                    if (cardTraits.length === 0 && (entity.tags || []).length === 0) return null;
+                    return (
+                      <div className="flex items-center gap-1 flex-wrap pt-3 mt-3 border-t border-zinc-800/60">
+                        {cardTraits.slice(0, 2).map((tr) => (
+                          <TraitBadge key={`rec-trait-${tr}`} trait={tr} />
+                        ))}
+                        {(entity.tags || []).slice(0, 2).map((tg) => (
+                          <span
+                            key={`rec-tag-${tg}`}
+                            className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-900 text-purple-300 border border-zinc-800 font-mono"
+                          >
+                            #{tg}
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}

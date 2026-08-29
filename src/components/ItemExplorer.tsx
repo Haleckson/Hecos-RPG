@@ -1433,8 +1433,8 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
       {/* Delete Item Confirmation Modal */}
       <ConfirmDeleteModal
         isOpen={Boolean(pendingDeleteItem)}
-        title={`Excluir "${pendingDeleteItem?.title || 'Item'}"`}
-        message="Tem certeza que deseja mover este item para a lixeira? Você poderá restaurá-lo depois se necessário."
+        title="Excluir Item"
+        itemName={pendingDeleteItem?.title || 'este item'}
         confirmLabel="Mover para a Lixeira"
         onConfirm={confirmDeleteItem}
         onCancel={() => setPendingDeleteItem(null)}

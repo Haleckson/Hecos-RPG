@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { HecosEntity, PerilAttributes, PerilFieldVisibility, ItemVisibility } from '../types';
 import { HecosStorage } from '../services/storage';
 import { RichContentRenderer } from './RichContentRenderer';
@@ -37,7 +37,11 @@ import {
   Target,
   Activity,
   CheckCircle2,
-  ShieldAlert
+  ShieldAlert,
+  Coins,
+  Package,
+  ExternalLink,
+  ChevronDown
 } from 'lucide-react';
 
 interface PerilViewProps {
@@ -54,6 +58,7 @@ export const PerilView: React.FC<PerilViewProps> = ({
   onTagClick
 }) => {
   const [currentEntity, setCurrentEntity] = useState<HecosEntity>(entity);
+  const [isGmSecretExpanded, setIsGmSecretExpanded] = useState<boolean>(false);
 
   useEffect(() => {
     setCurrentEntity(entity);
@@ -75,6 +80,31 @@ export const PerilView: React.FC<PerilViewProps> = ({
 
   const peril = currentEntity.perilData;
   const fieldVis = peril?.fieldVisibility || {};
+
+  // Extract GM notes from perilData, entity, or parse from markdown content
+  const gmSecretNotes = useMemo(() => {
+    if (peril?.gmNotes && peril.gmNotes.trim()) return peril.gmNotes.trim();
+    if (currentEntity.gmNotes && currentEntity.gmNotes.trim()) return currentEntity.gmNotes.trim();
+
+    if (currentEntity.content) {
+      const match =
+        currentEntity.content.match(/:::gm(?:-only)?\s*([\s\S]*?):::/i) ||
+        currentEntity.content.match(/:::secret\s*([\s\S]*?):::/i);
+      if (match && match[1]) {
+        return match[1].replace(/^\*\*Notas Secretas do Mestre:\*\*\s*/i, '').trim();
+      }
+    }
+    return '';
+  }, [peril?.gmNotes, currentEntity.gmNotes, currentEntity.content]);
+
+  // Remove :::gm and :::secret blocks from content so it isn't rendered twice at the bottom
+  const cleanContentForBottom = useMemo(() => {
+    if (!currentEntity.content) return '';
+    return currentEntity.content
+      .replace(/:::gm(?:-only)?\s*[\s\S]*?:::/gi, '')
+      .replace(/:::secret\s*[\s\S]*?:::/gi, '')
+      .trim();
+  }, [currentEntity.content]);
 
   // Check if a specific field is visible to current user
   const isFieldVisible = (fieldKey: keyof PerilFieldVisibility): boolean => {
@@ -141,7 +171,7 @@ export const PerilView: React.FC<PerilViewProps> = ({
   const isEnvironmental = kind === 'environmental';
   const isHaunt = kind === 'haunt';
   const rarity = peril?.rarity || currentEntity.statblock?.rarity || 'Comum';
-  const size = peril?.size || currentEntity.statblock?.size;
+  const size = isMonster ? (peril?.size || currentEntity.statblock?.size || 'Médio') : (peril?.size || undefined);
 
   // Portrait and Token Images
   const portraitImage = currentEntity.coverImage || peril?.portraitImage;
@@ -171,15 +201,15 @@ export const PerilView: React.FC<PerilViewProps> = ({
   const KindIcon = kindBadge.icon;
 
   return (
-    <div id="peril-view-container" className="max-w-6xl mx-auto text-zinc-200 space-y-6 pb-12">
+    <div id="peril-view-container" className="w-full text-zinc-200 space-y-6 pb-12">
       {/* ═════════════════════════════════════════════════════════════════════════ */}
       {/* LAYOUT PRINCIPAL: COLUNA ESQUERDA (IMAGENS) + COLUNA DIREITA (CONTEÚDO)   */}
       {/* ═════════════════════════════════════════════════════════════════════════ */}
-      <div className="flex flex-col md:flex-row items-start gap-6 lg:gap-8">
+      <div className="flex flex-col lg:flex-row items-start gap-6 lg:gap-8 w-full">
         {/* ─────────────────────────────────────────────────────────────────────── */}
-        {/* COLUNA ESQUERDA: RETRATO VERTICAL + TOKEN 1:1 LOGO ABAIXO               */}
+        {/* COLUNA ESQUERDA: RETRATO VERTICAL + TOKEN 1:1 NA MARGEM ESQUERDA       */}
         {/* ─────────────────────────────────────────────────────────────────────── */}
-        <div className="w-full md:w-80 lg:w-88 shrink-0 space-y-4">
+        <div className="w-full lg:w-72 xl:w-80 shrink-0 space-y-4">
           {/* 1. RETRATO (ORIENTAÇÃO DE RETRATO - FORMATO RETÂNGULO VERTICAL) */}
           <div className="rounded-3xl bg-[#0f0a1c] border border-rose-900/50 overflow-hidden shadow-2xl relative">
             <div className="p-2.5 bg-[#170e28] border-b border-zinc-800/80 flex items-center justify-between">
@@ -303,9 +333,6 @@ export const PerilView: React.FC<PerilViewProps> = ({
                     Nível {isFieldVisible('level') ? level : '???'}
                   </span>
                 </Tooltip>
-
-                {rarity && <TraitBadge trait={rarity} />}
-                {size && <TraitBadge trait={size} />}
               </div>
 
               {onEdit && isActualGm && (
@@ -322,6 +349,57 @@ export const PerilView: React.FC<PerilViewProps> = ({
               )}
             </div>
 
+            {/* ENTRADA SECRETA DO GM (COLAPSÁVEL - ACIMA DO NOME DO PERIGO) */}
+            {isActualGm && gmSecretNotes && (
+              <div className="rounded-2xl bg-[#170c18] border-2 border-amber-500/70 shadow-[0_0_20px_rgba(245,158,11,0.15)] overflow-hidden transition-all">
+                <button
+                  type="button"
+                  onClick={() => setIsGmSecretExpanded(!isGmSecretExpanded)}
+                  className="w-full px-4 py-3 bg-amber-950/30 hover:bg-amber-950/50 flex items-center justify-between gap-3 text-left transition-colors cursor-pointer border-b border-amber-500/20"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/40 shrink-0">
+                      <EyeOff className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-xs text-amber-300 font-mono uppercase tracking-wider">
+                          Entrada Secreta — Visível Apenas para o GM
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono font-bold">
+                          CONFIDENCIAL GM
+                        </span>
+                      </div>
+                      {!isGmSecretExpanded && (
+                        <p className="text-[11px] text-zinc-400 truncate mt-0.5 max-w-md">
+                          {gmSecretNotes.slice(0, 100)}...
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[11px] font-mono text-amber-400/80 hidden sm:inline">
+                      {isGmSecretExpanded ? 'Recolher' : 'Expandir'}
+                    </span>
+                    <div className={`p-1 rounded-md bg-black/40 text-amber-300 transition-transform duration-200 ${isGmSecretExpanded ? 'rotate-180' : ''}`}>
+                      <ChevronDown className="w-4 h-4" />
+                    </div>
+                  </div>
+                </button>
+
+                {isGmSecretExpanded && (
+                  <div className="p-4 bg-black/40 space-y-2 text-xs leading-relaxed text-zinc-200 border-t border-amber-500/20">
+                    <RichContentRenderer
+                      content={gmSecretNotes}
+                      onNavigate={onNavigate}
+                      isGmMode={true}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
             <div>
               <h1 className="text-3xl sm:text-4xl font-black text-zinc-100 font-serif tracking-tight flex items-center flex-wrap gap-2">
                 <span>{isFieldVisible('name') ? currentEntity.title : 'Entidade Desconhecida (Nome Oculto)'}</span>
@@ -332,11 +410,15 @@ export const PerilView: React.FC<PerilViewProps> = ({
               )}
             </div>
 
-            {/* Traços */}
+            {/* Traços - Estritamente Raridade, Tamanho (se aplicável), e Traços Oficiais/Escolhidos */}
             <div className="flex items-center gap-1.5 flex-wrap pt-1">
               {isFieldVisible('typeAndTraits') ? (
                 sortTraitsHierarchically(
-                  peril?.traits || currentEntity.statblock?.traits || ['PF2e'],
+                  (peril?.traits && peril.traits.length > 0)
+                    ? peril.traits
+                    : (currentEntity.statblock?.traits && currentEntity.statblock.traits.length > 0)
+                    ? currentEntity.statblock.traits
+                    : [],
                   {
                     rarity,
                     size
@@ -366,1046 +448,1088 @@ export const PerilView: React.FC<PerilViewProps> = ({
 
             {/* ────────────────── 1. CRIATURA / MONSTRO ────────────────── */}
             {isMonster && (
-              <>
-                {/* Percepção, Sentidos & Perícias */}
-                <div className="p-4 rounded-2xl bg-[#120e20] border border-zinc-800/80 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                      <Eye className="w-3.5 h-3.5 text-cyan-400" />
-                      Percepção & Sentidos
-                    </span>
-                    {renderEyeToggle('sensesAndPerception', 'Percepção')}
-                  </div>
-
-                  {isFieldVisible('sensesAndPerception') ? (
-                    <div className="text-xs text-zinc-300 space-y-1.5">
-                      <div>
-                        <strong className="text-zinc-100">Percepção:</strong>{' '}
-                        <span className="font-mono text-cyan-300 font-bold">
-                          {peril?.perception !== undefined ? `+${peril.perception}` : '+0'}
-                        </span>
-                        {'; '}
-                        <span className="text-zinc-300">{peril?.senses || currentEntity.statblock?.senses || 'Visão Padrão'}</span>
-                      </div>
-
-                      {peril?.stealthCheck && (
-                        <div>
-                          <strong className="text-zinc-100">Furtividade / Detecção:</strong>{' '}
-                          <span className="text-amber-300 font-mono">{peril.stealthCheck}</span>
-                        </div>
-                      )}
-
-                      {peril?.languages && peril.languages.length > 0 && (
-                        <div>
-                          <strong className="text-zinc-100">Idiomas:</strong> {peril.languages.join(', ')}
-                        </div>
-                      )}
-
-                      {peril?.skills && Object.keys(peril.skills).length > 0 && (
-                        <div>
-                          <strong className="text-zinc-100">Perícias:</strong>{' '}
-                          {Object.entries(peril.skills)
-                            .map(([k, v]) => `${k} +${v}`)
-                            .join(', ')}
-                        </div>
-                      )}
-
-                      {peril?.attributes && (
-                        <div className="pt-2 border-t border-zinc-800/60 flex items-center gap-3 flex-wrap text-[11px] font-mono text-zinc-400">
-                          <span>FOR <strong className="text-zinc-200">{peril.attributes.str >= 0 ? `+${peril.attributes.str}` : peril.attributes.str}</strong></span>
-                          <span>DES <strong className="text-zinc-200">{peril.attributes.dex >= 0 ? `+${peril.attributes.dex}` : peril.attributes.dex}</strong></span>
-                          <span>CON <strong className="text-zinc-200">{peril.attributes.con >= 0 ? `+${peril.attributes.con}` : peril.attributes.con}</strong></span>
-                          <span>INT <strong className="text-zinc-200">{peril.attributes.int >= 0 ? `+${peril.attributes.int}` : peril.attributes.int}</strong></span>
-                          <span>SAB <strong className="text-zinc-200">{peril.attributes.wis >= 0 ? `+${peril.attributes.wis}` : peril.attributes.wis}</strong></span>
-                          <span>CAR <strong className="text-zinc-200">{peril.attributes.cha >= 0 ? `+${peril.attributes.cha}` : peril.attributes.cha}</strong></span>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-zinc-500 italic">
-                      🔒 Sentidos e Percepção ocultos (faça um teste de Recordar Conhecimento).
-                    </div>
-                  )}
-                </div>
-
-                {/* Defesas & Saúde */}
-                <div className="p-4 rounded-2xl bg-[#120e20] border border-zinc-800/80 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                      <Shield className="w-3.5 h-3.5 text-rose-400" />
-                      Defesas & Saúde
-                    </span>
-                    <div className="flex items-center gap-2">
-                      {renderEyeToggle('acAndDefenses', 'CA & Saves')}
-                      {renderEyeToggle('hpAndHealth', 'PV')}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
-                    <div className="bg-black/50 p-2.5 rounded-xl border border-zinc-800 text-center">
-                      <div className="text-[10px] uppercase font-mono text-zinc-500">CA</div>
-                      <div className="text-base font-bold text-zinc-100 mt-0.5">
-                        {isFieldVisible('acAndDefenses') ? peril?.ac || currentEntity.statblock?.ac || '—' : '???'}
-                      </div>
-                    </div>
-
-                    <div className="bg-black/50 p-2.5 rounded-xl border border-zinc-800 text-center">
-                      <div className="text-[10px] uppercase font-mono text-zinc-500">Fortitude</div>
-                      <div className="text-base font-bold text-zinc-100 mt-0.5">
-                        {isFieldVisible('acAndDefenses')
-                          ? peril?.fort !== undefined
-                            ? `+${peril.fort}`
-                            : '—'
-                          : '???'}
-                      </div>
-                    </div>
-
-                    <div className="bg-black/50 p-2.5 rounded-xl border border-zinc-800 text-center">
-                      <div className="text-[10px] uppercase font-mono text-zinc-500">Reflexos</div>
-                      <div className="text-base font-bold text-zinc-100 mt-0.5">
-                        {isFieldVisible('acAndDefenses')
-                          ? peril?.ref !== undefined
-                            ? `+${peril.ref}`
-                            : '—'
-                          : '???'}
-                      </div>
-                    </div>
-
-                    <div className="bg-black/50 p-2.5 rounded-xl border border-zinc-800 text-center">
-                      <div className="text-[10px] uppercase font-mono text-zinc-500">Vontade</div>
-                      <div className="text-base font-bold text-zinc-100 mt-0.5">
-                        {isFieldVisible('acAndDefenses')
-                          ? peril?.will !== undefined
-                            ? `+${peril.will}`
-                            : '—'
-                          : '???'}
-                      </div>
-                    </div>
-
-                    <div className="bg-rose-950/40 p-2.5 rounded-xl border border-rose-800/60 text-center col-span-2 sm:col-span-1">
-                      <div className="text-[10px] uppercase font-mono text-rose-400">PV (HP)</div>
-                      <div className="text-base font-black text-rose-200 mt-0.5">
-                        {isFieldVisible('hpAndHealth') ? `${peril?.hp || currentEntity.statblock?.hp || '—'} PV` : '??? PV'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Deslocamento */}
-                  {peril?.speed && (
-                    <div className="pt-1 text-xs text-zinc-300 flex items-center gap-1.5">
-                      <Footprints className="w-3.5 h-3.5 text-emerald-400" />
-                      <strong className="text-zinc-100">Deslocamento:</strong>{' '}
-                      <span>{peril.speed}</span>
-                    </div>
-                  )}
-
-                  {/* Dureza, Imunidades, Fraquezas, Resistências */}
-                  <div className="pt-2 border-t border-zinc-800/60 space-y-1.5 text-xs text-zinc-300">
-                    {peril?.hardness !== undefined && (
-                      <div>
-                        <strong className="text-zinc-100">Dureza:</strong>{' '}
-                        {isFieldVisible('hardnessAndBT') ? peril.hardness : '???'} (Limite de Quebra: {peril.brokenThreshold || '—'})
-                        {renderEyeToggle('hardnessAndBT', 'Dureza')}
-                      </div>
-                    )}
-
-                    {peril?.immunities && peril.immunities.length > 0 && (
-                      <div>
-                        <strong className="text-zinc-100">Imunidades:</strong>{' '}
-                        {isFieldVisible('immunities') ? peril.immunities.join(', ') : '🔒 Oculto'}
-                        {renderEyeToggle('immunities', 'Imunidades')}
-                      </div>
-                    )}
-
-                    {peril?.weaknesses && peril.weaknesses.length > 0 && (
-                      <div>
-                        <strong className="text-zinc-100">Fraquezas:</strong>{' '}
-                        {isFieldVisible('weaknessesAndResistances') ? (
-                          <span className="text-rose-300 font-semibold">{peril.weaknesses.join(', ')}</span>
-                        ) : (
-                          '🔒 Oculto'
-                        )}
-                        {renderEyeToggle('weaknessesAndResistances', 'Fraquezas')}
-                      </div>
-                    )}
-
-                    {peril?.resistances && peril.resistances.length > 0 && (
-                      <div>
-                        <strong className="text-zinc-100">Resistências:</strong>{' '}
-                        {isFieldVisible('weaknessesAndResistances') ? (
-                          <span className="text-cyan-300 font-semibold">{peril.resistances.join(', ')}</span>
-                        ) : (
-                          '🔒 Oculto'
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Golpes & Ataques */}
-                {peril?.attacks && peril.attacks.length > 0 && (
-                  <div className="p-4 rounded-2xl bg-[#120e20] border border-zinc-800/80 space-y-3">
+              <div className="space-y-4">
+                {/* LINHA 1: PERCEPÇÃO & DEFESAS LADO A LADO EM TELAS LARGAS */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+                  {/* Percepção, Sentidos & Perícias */}
+                  <div className="p-4 rounded-2xl bg-[#120e20] border border-zinc-800/80 space-y-2 h-full">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                        <Swords className="w-3.5 h-3.5 text-amber-400" />
-                        Golpes & Ataques
+                        <Eye className="w-3.5 h-3.5 text-cyan-400" />
+                        Percepção & Sentidos
                       </span>
-                      {renderEyeToggle('attacksAndDamage', 'Ataques')}
+                      {renderEyeToggle('sensesAndPerception', 'Percepção')}
                     </div>
 
-                    {isFieldVisible('attacksAndDamage') ? (
-                      <div className="space-y-2">
-                        {(peril?.attacks || []).map((atk) => (
-                          <div key={atk.id} className="p-3 rounded-xl bg-black/50 border border-zinc-800 text-xs">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-bold text-zinc-100">
-                                {atk.type === 'melee' ? 'Corpo a Corpo [1 ação]' : 'À Distância [1 ação]'} {atk.name}
-                              </span>
-                              <span className="font-mono text-cyan-300 font-bold">+{atk.bonus}</span>
-                              {atk.traits && atk.traits.length > 0 && (
-                                <span className="text-zinc-400 text-[11px]">({atk.traits.join(', ')})</span>
-                              )}
-                            </div>
-                            <div className="text-zinc-300 mt-1">
-                              <strong>Dano:</strong> <span className="text-rose-300 font-mono font-bold">{atk.damage}</span>
-                              {atk.extraEffects && <span className="text-zinc-400"> mais {atk.extraEffects}</span>}
-                            </div>
+                    {isFieldVisible('sensesAndPerception') ? (
+                      <div className="text-xs text-zinc-300 space-y-1.5">
+                        <div>
+                          <strong className="text-zinc-100">Percepção:</strong>{' '}
+                          <span className="font-mono text-cyan-300 font-bold">
+                            {peril?.perception !== undefined ? `+${peril.perception}` : '+0'}
+                          </span>
+                          {'; '}
+                          <span className="text-zinc-300">{peril?.senses || currentEntity.statblock?.senses || 'Visão Padrão'}</span>
+                        </div>
+
+                        {peril?.stealthCheck && (
+                          <div>
+                            <strong className="text-zinc-100">Furtividade / Detecção:</strong>{' '}
+                            <span className="text-amber-300 font-mono">{peril.stealthCheck}</span>
                           </div>
-                        ))}
+                        )}
+
+                        {peril?.languages && peril.languages.length > 0 && (
+                          <div>
+                            <strong className="text-zinc-100">Idiomas:</strong> {peril.languages.join(', ')}
+                          </div>
+                        )}
+
+                        {peril?.skills && Object.keys(peril.skills).length > 0 && (
+                          <div>
+                            <strong className="text-zinc-100">Perícias:</strong>{' '}
+                            {Object.entries(peril.skills)
+                              .map(([k, v]) => `${k} +${v}`)
+                              .join(', ')}
+                          </div>
+                        )}
+
+                        {peril?.attributes && (
+                          <div className="pt-2 border-t border-zinc-800/60 flex items-center gap-3 flex-wrap text-[11px] font-mono text-zinc-400">
+                            <span>FOR <strong className="text-zinc-200">{peril.attributes.str >= 0 ? `+${peril.attributes.str}` : peril.attributes.str}</strong></span>
+                            <span>DES <strong className="text-zinc-200">{peril.attributes.dex >= 0 ? `+${peril.attributes.dex}` : peril.attributes.dex}</strong></span>
+                            <span>CON <strong className="text-zinc-200">{peril.attributes.con >= 0 ? `+${peril.attributes.con}` : peril.attributes.con}</strong></span>
+                            <span>INT <strong className="text-zinc-200">{peril.attributes.int >= 0 ? `+${peril.attributes.int}` : peril.attributes.int}</strong></span>
+                            <span>SAB <strong className="text-zinc-200">{peril.attributes.wis >= 0 ? `+${peril.attributes.wis}` : peril.attributes.wis}</strong></span>
+                            <span>CAR <strong className="text-zinc-200">{peril.attributes.cha >= 0 ? `+${peril.attributes.cha}` : peril.attributes.cha}</strong></span>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="text-xs text-zinc-500 italic">
-                        🔒 Dados de ataque e dano ocultos pelo Mestre.
+                        🔒 Sentidos e Percepção ocultos (faça um teste de Recordar Conhecimento).
                       </div>
                     )}
                   </div>
-                )}
 
-                {/* Magias (Spellcasting) */}
-                {peril?.spells && (
-                  <div className="p-4 rounded-2xl bg-[#120e20] border border-purple-900/40 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                        <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                        Magias ({peril.spells.tradition})
-                      </span>
-                      {renderEyeToggle('spells', 'Magias')}
-                    </div>
-
-                    {isFieldVisible('spells') ? (
-                      <div className="text-xs text-zinc-300 space-y-2">
-                        <div className="flex items-center gap-4 text-zinc-200 font-mono">
-                          <span>CD de Magia: <strong className="text-purple-300">{peril.spells.dc}</strong></span>
-                          <span>Ataque de Magia: <strong className="text-purple-300">+{peril.spells.attack}</strong></span>
-                        </div>
-                        <p className="whitespace-pre-line text-zinc-300 bg-black/40 p-2.5 rounded-xl border border-zinc-800">
-                          {peril.spells.spellsList}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="text-xs text-zinc-500 italic">
-                        🔒 Tradição e lista de magias ocultas pelo Mestre.
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Ações Especiais & Reações */}
-                {peril?.actions && peril.actions.length > 0 && (
-                  <div className="p-4 rounded-2xl bg-[#120e20] border border-zinc-800/80 space-y-3">
+                  {/* Defesas & Saúde */}
+                  <div className="p-4 rounded-2xl bg-[#120e20] border border-zinc-800/80 space-y-3 h-full">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                        <Zap className="w-3.5 h-3.5 text-purple-400" />
-                        Ações Especiais & Reações
+                        <Shield className="w-3.5 h-3.5 text-rose-400" />
+                        Defesas & Saúde
                       </span>
-                      {renderEyeToggle('actionsAndAbilities', 'Ações')}
+                      <div className="flex items-center gap-2">
+                        {renderEyeToggle('acAndDefenses', 'CA & Saves')}
+                        {renderEyeToggle('hpAndHealth', 'PV')}
+                      </div>
                     </div>
 
-                    {isFieldVisible('actionsAndAbilities') ? (
-                      <div className="space-y-2">
-                        {(peril?.actions || []).map((act) => (
-                          <div key={act.id} className="p-3 rounded-xl bg-black/50 border border-zinc-800 text-xs space-y-1.5">
-                            <div className="font-bold text-zinc-100 flex items-center gap-1.5 flex-wrap">
-                              <span className="text-amber-400 font-mono font-bold px-1.5 py-0.5 rounded bg-amber-950/60 border border-amber-800/60 text-[11px]">
-                                [{act.cost}]
-                              </span>
-                              <span className="text-sm">{act.name}</span>
-                              {act.traits && act.traits.length > 0 && (
-                                <span className="text-zinc-400 text-[11px] font-normal">({act.traits.join(', ')})</span>
-                              )}
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+                      <div className="bg-black/50 p-2.5 rounded-xl border border-zinc-800 text-center">
+                        <div className="text-[10px] uppercase font-mono text-zinc-500">CA</div>
+                        <div className="text-base font-bold text-zinc-100 mt-0.5">
+                          {isFieldVisible('acAndDefenses') ? peril?.ac || currentEntity.statblock?.ac || '—' : '???'}
+                        </div>
+                      </div>
+
+                      <div className="bg-black/50 p-2.5 rounded-xl border border-zinc-800 text-center">
+                        <div className="text-[10px] uppercase font-mono text-zinc-500">Fortitude</div>
+                        <div className="text-base font-bold text-zinc-100 mt-0.5">
+                          {isFieldVisible('acAndDefenses')
+                            ? peril?.fort !== undefined
+                              ? `+${peril.fort}`
+                              : '—'
+                            : '???'}
+                        </div>
+                      </div>
+
+                      <div className="bg-black/50 p-2.5 rounded-xl border border-zinc-800 text-center">
+                        <div className="text-[10px] uppercase font-mono text-zinc-500">Reflexos</div>
+                        <div className="text-base font-bold text-zinc-100 mt-0.5">
+                          {isFieldVisible('acAndDefenses')
+                            ? peril?.ref !== undefined
+                              ? `+${peril.ref}`
+                              : '—'
+                            : '???'}
+                        </div>
+                      </div>
+
+                      <div className="bg-black/50 p-2.5 rounded-xl border border-zinc-800 text-center">
+                        <div className="text-[10px] uppercase font-mono text-zinc-500">Vontade</div>
+                        <div className="text-base font-bold text-zinc-100 mt-0.5">
+                          {isFieldVisible('acAndDefenses')
+                            ? peril?.will !== undefined
+                              ? `+${peril.will}`
+                              : '—'
+                            : '???'}
+                        </div>
+                      </div>
+
+                      <div className="bg-rose-950/40 p-2.5 rounded-xl border border-rose-800/60 text-center col-span-2 sm:col-span-1">
+                        <div className="text-[10px] uppercase font-mono text-rose-400">PV</div>
+                        <div className="text-base font-black text-rose-200 mt-0.5">
+                          {isFieldVisible('hpAndHealth') ? `${peril?.hp || currentEntity.statblock?.hp || '—'} PV` : '??? PV'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Deslocamento */}
+                    {peril?.speed && (
+                      <div className="pt-1 text-xs text-zinc-300 flex items-center gap-1.5">
+                        <Footprints className="w-3.5 h-3.5 text-emerald-400" />
+                        <strong className="text-zinc-100">Deslocamento:</strong>{' '}
+                        <span>{peril.speed}</span>
+                      </div>
+                    )}
+
+                    {/* Dureza, Imunidades, Fraquezas, Resistências */}
+                    <div className="pt-2 border-t border-zinc-800/60 space-y-1.5 text-xs text-zinc-300">
+                      {peril?.hardness !== undefined && (
+                        <div>
+                          <strong className="text-zinc-100">Dureza:</strong>{' '}
+                          {isFieldVisible('hardnessAndBT') ? peril.hardness : '???'} (Limite de Quebra: {peril.brokenThreshold || '—'})
+                          {renderEyeToggle('hardnessAndBT', 'Dureza')}
+                        </div>
+                      )}
+
+                      {peril?.immunities && peril.immunities.length > 0 && (
+                        <div>
+                          <strong className="text-zinc-100">Imunidades:</strong>{' '}
+                          {isFieldVisible('immunities') ? peril.immunities.join(', ') : '🔒 Oculto'}
+                          {renderEyeToggle('immunities', 'Imunidades')}
+                        </div>
+                      )}
+
+                      {peril?.weaknesses && peril.weaknesses.length > 0 && (
+                        <div>
+                          <strong className="text-zinc-100">Fraquezas:</strong>{' '}
+                          {isFieldVisible('weaknessesAndResistances') ? (
+                            <span className="text-rose-300 font-semibold">{peril.weaknesses.join(', ')}</span>
+                          ) : (
+                            '🔒 Oculto'
+                          )}
+                          {renderEyeToggle('weaknessesAndResistances', 'Fraquezas')}
+                        </div>
+                      )}
+
+                      {peril?.resistances && peril.resistances.length > 0 && (
+                        <div>
+                          <strong className="text-zinc-100">Resistências:</strong>{' '}
+                          {isFieldVisible('weaknessesAndResistances') ? (
+                            <span className="text-cyan-300 font-semibold">{peril.resistances.join(', ')}</span>
+                          ) : (
+                            '🔒 Oculto'
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* LINHA 2: ATAQUES & AÇÕES/MAGIAS LADO A LADO EM TELAS LARGAS */}
+                {((peril?.attacks && peril.attacks.length > 0) || peril?.spells || (peril?.actions && peril.actions.length > 0)) && (
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+                    {/* Golpes & Ataques + Magias */}
+                    <div className="space-y-4">
+                      {peril?.attacks && peril.attacks.length > 0 && (
+                        <div className="p-4 rounded-2xl bg-[#120e20] border border-zinc-800/80 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                              <Swords className="w-3.5 h-3.5 text-amber-400" />
+                              Golpes & Ataques
+                            </span>
+                            {renderEyeToggle('attacksAndDamage', 'Ataques')}
+                          </div>
+
+                          {isFieldVisible('attacksAndDamage') ? (
+                            <div className="space-y-2">
+                              {(peril?.attacks || []).map((atk) => (
+                                <div key={atk.id} className="p-3 rounded-xl bg-black/50 border border-zinc-800 text-xs">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-bold text-zinc-100">
+                                      {atk.type === 'melee' ? 'Corpo a Corpo [1 ação]' : 'À Distância [1 ação]'} {atk.name}
+                                    </span>
+                                    <span className="font-mono text-cyan-300 font-bold">+{atk.bonus}</span>
+                                    {atk.traits && atk.traits.length > 0 && (
+                                      <span className="text-zinc-400 text-[11px]">({atk.traits.join(', ')})</span>
+                                    )}
+                                  </div>
+                                  <div className="text-zinc-300 mt-1">
+                                    <strong>Dano:</strong> <span className="text-rose-300 font-mono font-bold">{atk.damage}</span>
+                                    {atk.extraEffects && <span className="text-zinc-400"> mais {atk.extraEffects}</span>}
+                                  </div>
+                                </div>
+                              ))}
                             </div>
-                            {act.trigger && (
-                              <div className="text-amber-300/90 text-[11px]">
-                                <strong>Gatilho:</strong> {act.trigger}
+                          ) : (
+                            <div className="text-xs text-zinc-500 italic">
+                              🔒 Dados de ataque e dano ocultos pelo Mestre.
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Magias (Spellcasting) */}
+                      {peril?.spells && (
+                        <div className="p-4 rounded-2xl bg-[#120e20] border border-purple-900/40 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                              <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                              Magias ({peril.spells.tradition})
+                            </span>
+                            {renderEyeToggle('spells', 'Magias')}
+                          </div>
+
+                          {isFieldVisible('spells') ? (
+                            <div className="text-xs text-zinc-300 space-y-2">
+                              <div className="flex items-center gap-4 text-zinc-200 font-mono">
+                                <span>CD de Magia: <strong className="text-purple-300">{peril.spells.dc}</strong></span>
+                                <span>Ataque de Magia: <strong className="text-purple-300">+{peril.spells.attack}</strong></span>
                               </div>
-                            )}
-                            <p className="text-zinc-300 leading-relaxed">{act.effect}</p>
+                              <p className="whitespace-pre-line text-zinc-300 bg-black/40 p-2.5 rounded-xl border border-zinc-800">
+                                {peril.spells.spellsList}
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="text-xs text-zinc-500 italic">
+                              🔒 Tradição e lista de magias ocultas pelo Mestre.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Ações Especiais & Reações */}
+                    {peril?.actions && peril.actions.length > 0 && (
+                      <div className="p-4 rounded-2xl bg-[#120e20] border border-zinc-800/80 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                            <Zap className="w-3.5 h-3.5 text-purple-400" />
+                            Ações Especiais & Reações
+                          </span>
+                          {renderEyeToggle('actionsAndAbilities', 'Ações')}
+                        </div>
+
+                        {isFieldVisible('actionsAndAbilities') ? (
+                          <div className="space-y-2">
+                            {(peril?.actions || []).map((act) => (
+                              <div key={act.id} className="p-3 rounded-xl bg-black/50 border border-zinc-800 text-xs space-y-1.5">
+                                <div className="font-bold text-zinc-100 flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-amber-400 font-mono font-bold px-1.5 py-0.5 rounded bg-amber-950/60 border border-amber-800/60 text-[11px]">
+                                    [{act.cost}]
+                                  </span>
+                                  <span className="text-sm">{act.name}</span>
+                                  {act.traits && act.traits.length > 0 && (
+                                    <span className="text-zinc-400 text-[11px] font-normal">({act.traits.join(', ')})</span>
+                                  )}
+                                </div>
+                                {act.trigger && (
+                                  <div className="text-amber-300/90 text-[11px]">
+                                    <strong>Gatilho:</strong> {act.trigger}
+                                  </div>
+                                )}
+                                <p className="text-zinc-300 leading-relaxed">{act.effect}</p>
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-xs text-zinc-500 italic">
-                        🔒 Habilidades e ações especiais ocultas.
+                        ) : (
+                          <div className="text-xs text-zinc-500 italic">
+                            🔒 Habilidades e ações especiais ocultas.
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
                 )}
-              </>
+              </div>
             )}
 
             {/* ────────────────── 2. PERIGO SIMPLES (HAZARD SIMPLE) ────────────────── */}
             {isSimpleHazard && (
-              <>
-                {/* Detecção & Furtividade */}
-                <div className="p-4 rounded-2xl bg-[#120e20] border border-amber-900/30 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                      <Eye className="w-3.5 h-3.5 text-amber-400" />
-                      Detecção & Furtividade
-                    </span>
-                    {renderEyeToggle('sensesAndPerception', 'Detecção')}
-                  </div>
-
-                  {isFieldVisible('sensesAndPerception') ? (
-                    <div className="text-xs text-zinc-300 space-y-1.5">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <strong className="text-zinc-100">Furtividade / CD de Detecção:</strong>
-                        <span className="px-2.5 py-0.5 rounded-lg bg-amber-950/60 text-amber-200 border border-amber-800/50 font-mono font-bold">
-                          {peril?.stealthCheck || 'Percepção CD 15 (treinado) ou Furtividade +5'}
-                        </span>
-                      </div>
-                      {peril?.senses && (
-                        <div>
-                          <strong className="text-zinc-100">Sentidos do Perigo:</strong>{' '}
-                          <span className="text-zinc-300">{peril.senses}</span>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-zinc-500 italic">
-                      🔒 Dados de detecção ocultos (faça um teste de Percepção para notar a armadilha).
-                    </div>
-                  )}
-                </div>
-
-                {/* Desativação (Disable Device) */}
-                <div className="p-4 rounded-2xl bg-amber-950/20 border border-amber-700/60 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                      <Wrench className="w-3.5 h-3.5 text-amber-400" />
-                      Desativação (Disable Device)
-                    </span>
-                    {renderEyeToggle('disableAndReset', 'Desativação')}
-                  </div>
-
-                  {isFieldVisible('disableAndReset') ? (
-                    <div className="p-3 rounded-xl bg-black/50 border border-amber-800/50 text-xs text-amber-100 leading-relaxed font-sans">
-                      {peril?.disable || 'Ladinagem ou teste apropriado para desarmar o mecanismo.'}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-zinc-500 italic">
-                      🔒 Métodos de desativação ocultos (teste de Ladinagem ou Percepção para deduzir).
-                    </div>
-                  )}
-                </div>
-
-                {/* Defesas Estruturais & Integridade */}
-                <div className="p-4 rounded-2xl bg-[#120e20] border border-zinc-800/80 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                      <Shield className="w-3.5 h-3.5 text-rose-400" />
-                      Defesas Estruturais & Integridade
-                    </span>
-                    <div className="flex items-center gap-2">
-                      {renderEyeToggle('hardnessAndBT', 'Dureza')}
-                      {renderEyeToggle('hpAndHealth', 'PV')}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                    <div className="bg-black/50 p-2.5 rounded-xl border border-zinc-800 text-center">
-                      <div className="text-[10px] uppercase font-mono text-zinc-500">Dureza</div>
-                      <div className="text-base font-bold text-amber-300 mt-0.5 font-mono">
-                        {isFieldVisible('hardnessAndBT') ? peril?.hardness ?? '—' : '???'}
-                      </div>
-                    </div>
-
-                    <div className="bg-black/50 p-2.5 rounded-xl border border-zinc-800 text-center">
-                      <div className="text-[10px] uppercase font-mono text-zinc-500">Limite Quebra (LT)</div>
-                      <div className="text-base font-bold text-zinc-300 mt-0.5 font-mono">
-                        {isFieldVisible('hardnessAndBT') ? peril?.brokenThreshold ?? '—' : '???'}
-                      </div>
-                    </div>
-
-                    <div className="bg-rose-950/40 p-2.5 rounded-xl border border-rose-800/60 text-center">
-                      <div className="text-[10px] uppercase font-mono text-rose-400">PV Estrutural</div>
-                      <div className="text-base font-black text-rose-200 mt-0.5 font-mono">
-                        {isFieldVisible('hpAndHealth') ? (peril?.hp ? `${peril.hp} PV` : '—') : '??? PV'}
-                      </div>
-                    </div>
-
-                    <div className="bg-black/50 p-2.5 rounded-xl border border-zinc-800 text-center">
-                      <div className="text-[10px] uppercase font-mono text-zinc-500">CA</div>
-                      <div className="text-base font-bold text-zinc-100 mt-0.5 font-mono">
-                        {isFieldVisible('acAndDefenses') ? peril?.ac ?? '—' : '???'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Imunidades & Fraquezas */}
-                  <div className="pt-2 border-t border-zinc-800/60 space-y-1 text-xs text-zinc-300">
-                    <div>
-                      <strong className="text-zinc-100">Imunidades:</strong>{' '}
-                      {isFieldVisible('immunities')
-                        ? peril?.immunities && peril.immunities.length > 0
-                          ? peril.immunities.join(', ')
-                          : 'Imunidades de objeto (acertos críticos, dano mental, veneno, sono, atordoamento)'
-                        : '🔒 Oculto'}
-                    </div>
-
-                    {peril?.weaknesses && peril.weaknesses.length > 0 && (
-                      <div>
-                        <strong className="text-rose-400">Fraquezas:</strong>{' '}
-                        {isFieldVisible('weaknessesAndResistances') ? (
-                          <span className="text-rose-300 font-semibold">{peril.weaknesses.join(', ')}</span>
-                        ) : (
-                          '🔒 Oculto'
-                        )}
-                      </div>
-                    )}
-
-                    {peril?.resistances && peril.resistances.length > 0 && (
-                      <div>
-                        <strong className="text-cyan-400">Resistências:</strong>{' '}
-                        {isFieldVisible('weaknessesAndResistances') ? (
-                          <span className="text-cyan-300 font-semibold">{peril.resistances.join(', ')}</span>
-                        ) : (
-                          '🔒 Oculto'
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Gatilho & Reação de Disparo */}
-                {(peril?.routine || (peril?.actions && peril.actions.length > 0) || (peril?.attacks && peril.attacks.length > 0)) && (
-                  <div className="p-4 rounded-2xl bg-[#120e20] border border-rose-900/40 space-y-3">
+              <div className="space-y-4">
+                {/* Linha 1: Detecção & Desativação lado a lado */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+                  {/* Detecção & Furtividade */}
+                  <div className="p-4 rounded-2xl bg-[#120e20] border border-amber-900/30 space-y-2 h-full">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-rose-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                        <Zap className="w-3.5 h-3.5 text-rose-400" />
-                        Gatilho & Reação de Disparo
+                      <span className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                        <Eye className="w-3.5 h-3.5 text-amber-400" />
+                        Detecção & Furtividade
                       </span>
-                      {renderEyeToggle('actionsAndAbilities', 'Reação')}
+                      {renderEyeToggle('sensesAndPerception', 'Detecção')}
                     </div>
 
-                    {isFieldVisible('actionsAndAbilities') ? (
-                      <div className="space-y-2 text-xs">
-                        {peril?.routine && (
-                          <div className="p-3 rounded-xl bg-black/50 border border-zinc-800 text-zinc-200 leading-relaxed">
-                            <strong className="text-rose-300 font-mono">Efeito de Disparo: </strong>
-                            {peril.routine}
+                    {isFieldVisible('sensesAndPerception') ? (
+                      <div className="text-xs text-zinc-300 space-y-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <strong className="text-zinc-100">Furtividade / CD de Detecção:</strong>
+                          <span className="px-2.5 py-0.5 rounded-lg bg-amber-950/60 text-amber-200 border border-amber-800/50 font-mono font-bold">
+                            {peril?.stealthCheck || 'Percepção CD 15 (treinado) ou Furtividade +5'}
+                          </span>
+                        </div>
+                        {peril?.senses && (
+                          <div>
+                            <strong className="text-zinc-100">Sentidos do Perigo:</strong>{' '}
+                            <span className="text-zinc-300">{peril.senses}</span>
                           </div>
                         )}
-
-                        {peril?.attacks && peril.attacks.map((atk) => (
-                          <div key={atk.id} className="p-2.5 rounded-xl bg-black/40 border border-zinc-800 flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-zinc-100">[Reação] {atk.name}</span>
-                            <span className="font-mono text-cyan-300 font-bold">+{atk.bonus}</span>
-                            <span className="text-rose-300 font-mono font-semibold">{atk.damage}</span>
-                            {atk.extraEffects && <span className="text-zinc-400">({atk.extraEffects})</span>}
-                          </div>
-                        ))}
-
-                        {peril?.actions && peril.actions.map((act) => (
-                          <div key={act.id} className="p-2.5 rounded-xl bg-black/40 border border-zinc-800 space-y-1">
-                            <div className="font-bold text-zinc-100 flex items-center gap-2">
-                              <span className="text-amber-400 font-mono">[{act.cost}]</span>
-                              <span>{act.name}</span>
-                            </div>
-                            {act.trigger && (
-                              <div className="text-amber-300/90 text-[11px]">
-                                <strong>Gatilho:</strong> {act.trigger}
-                              </div>
-                            )}
-                            <p className="text-zinc-300">{act.effect}</p>
-                          </div>
-                        ))}
                       </div>
                     ) : (
                       <div className="text-xs text-zinc-500 italic">
-                        🔒 Gatilho e efeito de disparo ocultos.
+                        🔒 Dados de detecção ocultos (faça um teste de Percepção para notar a armadilha).
                       </div>
                     )}
                   </div>
-                )}
 
-                {/* Reset / Rearme */}
-                {peril?.reset && (
-                  <div className="p-3.5 rounded-2xl bg-[#0f0b1a] border border-zinc-800/80 flex items-start gap-2.5 text-xs text-zinc-300">
-                    <RotateCcw className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="text-zinc-100 font-mono">Rearme & Reset: </strong>
-                      <span>{peril.reset}</span>
+                  {/* Desativação (Disable Device) */}
+                  <div className="p-4 rounded-2xl bg-amber-950/20 border border-amber-700/60 space-y-2 h-full">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                        <Wrench className="w-3.5 h-3.5 text-amber-400" />
+                        Desativação (Disable Device)
+                      </span>
+                      {renderEyeToggle('disableAndReset', 'Desativação')}
+                    </div>
+
+                    {isFieldVisible('disableAndReset') ? (
+                      <div className="p-3 rounded-xl bg-black/50 border border-amber-800/50 text-xs text-amber-100 leading-relaxed font-sans">
+                        {peril?.disable || 'Ladinagem ou teste apropriado para desarmar o mecanismo.'}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-zinc-500 italic">
+                        🔒 Métodos de desativação ocultos (teste de Ladinagem ou Percepção para deduzir).
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Linha 2: Defesas & Gatilho lado a lado */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+                  {/* Defesas Estruturais & Integridade */}
+                  <div className="p-4 rounded-2xl bg-[#120e20] border border-zinc-800/80 space-y-3 h-full">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                        <Shield className="w-3.5 h-3.5 text-rose-400" />
+                        Defesas Estruturais & Integridade
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {renderEyeToggle('hardnessAndBT', 'Dureza')}
+                        {renderEyeToggle('hpAndHealth', 'PV')}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                      <div className="bg-black/50 p-2.5 rounded-xl border border-zinc-800 text-center">
+                        <div className="text-[10px] uppercase font-mono text-zinc-500">Dureza</div>
+                        <div className="text-base font-bold text-amber-300 mt-0.5 font-mono">
+                          {isFieldVisible('hardnessAndBT') ? peril?.hardness ?? '—' : '???'}
+                        </div>
+                      </div>
+
+                      <div className="bg-black/50 p-2.5 rounded-xl border border-zinc-800 text-center">
+                        <div className="text-[10px] uppercase font-mono text-zinc-500">Limite Quebra (LT)</div>
+                        <div className="text-base font-bold text-zinc-300 mt-0.5 font-mono">
+                          {isFieldVisible('hardnessAndBT') ? peril?.brokenThreshold ?? '—' : '???'}
+                        </div>
+                      </div>
+
+                      <div className="bg-rose-950/40 p-2.5 rounded-xl border border-rose-800/60 text-center">
+                        <div className="text-[10px] uppercase font-mono text-rose-400">PV Estrutural</div>
+                        <div className="text-base font-black text-rose-200 mt-0.5 font-mono">
+                          {isFieldVisible('hpAndHealth') ? (peril?.hp ? `${peril.hp} PV` : '—') : '??? PV'}
+                        </div>
+                      </div>
+
+                      <div className="bg-black/50 p-2.5 rounded-xl border border-zinc-800 text-center">
+                        <div className="text-[10px] uppercase font-mono text-zinc-500">CA</div>
+                        <div className="text-base font-bold text-zinc-100 mt-0.5 font-mono">
+                          {isFieldVisible('acAndDefenses') ? peril?.ac ?? '—' : '???'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Imunidades & Fraquezas */}
+                    <div className="pt-2 border-t border-zinc-800/60 space-y-1 text-xs text-zinc-300">
+                      <div>
+                        <strong className="text-zinc-100">Imunidades:</strong>{' '}
+                        {isFieldVisible('immunities')
+                          ? peril?.immunities && peril.immunities.length > 0
+                            ? peril.immunities.join(', ')
+                            : 'Imunidades de objeto (acertos críticos, dano mental, veneno, sono, atordoamento)'
+                          : '🔒 Oculto'}
+                      </div>
+
+                      {peril?.weaknesses && peril.weaknesses.length > 0 && (
+                        <div>
+                          <strong className="text-rose-400">Fraquezas:</strong>{' '}
+                          {isFieldVisible('weaknessesAndResistances') ? (
+                            <span className="text-rose-300 font-semibold">{peril.weaknesses.join(', ')}</span>
+                          ) : (
+                            '🔒 Oculto'
+                          )}
+                        </div>
+                      )}
+
+                      {peril?.resistances && peril.resistances.length > 0 && (
+                        <div>
+                          <strong className="text-cyan-400">Resistências:</strong>{' '}
+                          {isFieldVisible('weaknessesAndResistances') ? (
+                            <span className="text-cyan-300 font-semibold">{peril.resistances.join(', ')}</span>
+                          ) : (
+                            '🔒 Oculto'
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
-              </>
+
+                  {/* Gatilho & Reação de Disparo */}
+                  <div className="space-y-4">
+                    {(peril?.routine || (peril?.actions && peril.actions.length > 0) || (peril?.attacks && peril.attacks.length > 0)) && (
+                      <div className="p-4 rounded-2xl bg-[#120e20] border border-rose-900/40 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-rose-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                            <Zap className="w-3.5 h-3.5 text-rose-400" />
+                            Gatilho & Reação de Disparo
+                          </span>
+                          {renderEyeToggle('actionsAndAbilities', 'Reação')}
+                        </div>
+
+                        {isFieldVisible('actionsAndAbilities') ? (
+                          <div className="space-y-2 text-xs">
+                            {peril?.routine && (
+                              <div className="p-3 rounded-xl bg-black/50 border border-zinc-800 text-zinc-200 leading-relaxed">
+                                <strong className="text-rose-300 font-mono">Efeito de Disparo: </strong>
+                                {peril.routine}
+                              </div>
+                            )}
+
+                            {peril?.attacks && peril.attacks.map((atk) => (
+                              <div key={atk.id} className="p-2.5 rounded-xl bg-black/40 border border-zinc-800 flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-zinc-100">[Reação] {atk.name}</span>
+                                <span className="font-mono text-cyan-300 font-bold">+{atk.bonus}</span>
+                                <span className="text-rose-300 font-mono font-semibold">{atk.damage}</span>
+                                {atk.extraEffects && <span className="text-zinc-400">({atk.extraEffects})</span>}
+                              </div>
+                            ))}
+
+                            {peril?.actions && peril.actions.map((act) => (
+                              <div key={act.id} className="p-2.5 rounded-xl bg-black/40 border border-zinc-800 space-y-1">
+                                <div className="font-bold text-zinc-100 flex items-center gap-2">
+                                  <span className="text-amber-400 font-mono">[{act.cost}]</span>
+                                  <span>{act.name}</span>
+                                </div>
+                                {act.trigger && (
+                                  <div className="text-amber-300/90 text-[11px]">
+                                    <strong>Gatilho:</strong> {act.trigger}
+                                  </div>
+                                )}
+                                <p className="text-zinc-300">{act.effect}</p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-zinc-500 italic">
+                            🔒 Gatilho e efeito de disparo ocultos.
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Reset / Rearme */}
+                    {peril?.reset && (
+                      <div className="p-3.5 rounded-2xl bg-[#0f0b1a] border border-zinc-800/80 flex items-start gap-2.5 text-xs text-zinc-300">
+                        <RotateCcw className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="text-zinc-100 font-mono">Rearme & Reset: </strong>
+                          <span>{peril.reset}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* ────────────────── 3. PERIGO COMPLEXO (HAZARD COMPLEX) ────────────────── */}
             {isComplexHazard && (
-              <>
-                {/* Iniciativa & Detecção */}
-                <div className="p-4 rounded-2xl bg-[#120e20] border border-cyan-900/30 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                      <Zap className="w-3.5 h-3.5 text-cyan-400" />
-                      Iniciativa & Detecção
-                    </span>
-                    {renderEyeToggle('sensesAndPerception', 'Iniciativa')}
-                  </div>
+              <div className="space-y-4">
+                {/* Linha 1: Iniciativa & Desativação Tática */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+                  {/* Iniciativa & Detecção */}
+                  <div className="p-4 rounded-2xl bg-[#120e20] border border-cyan-900/30 space-y-2 h-full">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                        <Zap className="w-3.5 h-3.5 text-cyan-400" />
+                        Iniciativa & Detecção
+                      </span>
+                      {renderEyeToggle('sensesAndPerception', 'Iniciativa')}
+                    </div>
 
-                  {isFieldVisible('sensesAndPerception') ? (
-                    <div className="text-xs text-zinc-300 space-y-1.5">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <strong className="text-zinc-100">Furtividade / Iniciativa:</strong>
-                        <span className="px-2.5 py-0.5 rounded-lg bg-cyan-950/60 text-cyan-200 border border-cyan-800/50 font-mono font-bold">
-                          {peril?.stealthCheck || 'Furtividade +15 (ou rola iniciativa)'}
-                        </span>
-                      </div>
-                      {peril?.senses && (
-                        <div>
-                          <strong className="text-zinc-100">Sentidos:</strong>{' '}
-                          <span className="text-zinc-300">{peril.senses}</span>
+                    {isFieldVisible('sensesAndPerception') ? (
+                      <div className="text-xs text-zinc-300 space-y-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <strong className="text-zinc-100">Furtividade / Iniciativa:</strong>
+                          <span className="px-2.5 py-0.5 rounded-lg bg-cyan-950/60 text-cyan-200 border border-cyan-800/50 font-mono font-bold">
+                            {peril?.stealthCheck || 'Furtividade +15 (ou rola iniciativa)'}
+                          </span>
                         </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-zinc-500 italic">
-                      🔒 Iniciativa oculta até o início do combate tático.
-                    </div>
-                  )}
-                </div>
-
-                {/* Desativação em Encontro Tático */}
-                <div className="p-4 rounded-2xl bg-amber-950/20 border border-amber-700/60 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                      <Wrench className="w-3.5 h-3.5 text-amber-400" />
-                      Desativação em Encontro Tático
-                    </span>
-                    {renderEyeToggle('disableAndReset', 'Desativação')}
-                  </div>
-
-                  {isFieldVisible('disableAndReset') ? (
-                    <div className="p-3 rounded-xl bg-black/50 border border-amber-800/50 text-xs text-amber-100 leading-relaxed font-sans">
-                      {peril?.disable || 'Ladinagem ou perícias mágicas durante o combate com sucessos progressivos.'}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-zinc-500 italic">
-                      🔒 Métodos de desativação tática ocultos pelo Mestre.
-                    </div>
-                  )}
-                </div>
-
-                {/* Defesas Estruturais & Salvamentos */}
-                <div className="p-4 rounded-2xl bg-[#120e20] border border-zinc-800/80 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                      <Shield className="w-3.5 h-3.5 text-rose-400" />
-                      Defesas Estruturais & Salvamentos
-                    </span>
-                    <div className="flex items-center gap-2">
-                      {renderEyeToggle('acAndDefenses', 'CA & Saves')}
-                      {renderEyeToggle('hardnessAndBT', 'Dureza')}
-                      {renderEyeToggle('hpAndHealth', 'PV')}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 text-xs">
-                    <div className="bg-black/50 p-2 rounded-xl border border-zinc-800 text-center">
-                      <div className="text-[10px] uppercase font-mono text-zinc-500">CA</div>
-                      <div className="text-sm font-bold text-zinc-100 mt-0.5 font-mono">
-                        {isFieldVisible('acAndDefenses') ? peril?.ac ?? '—' : '???'}
-                      </div>
-                    </div>
-
-                    <div className="bg-black/50 p-2 rounded-xl border border-zinc-800 text-center">
-                      <div className="text-[10px] uppercase font-mono text-zinc-500">Fort</div>
-                      <div className="text-sm font-bold text-zinc-100 mt-0.5 font-mono">
-                        {isFieldVisible('acAndDefenses') ? (peril?.fort !== undefined ? `+${peril.fort}` : '—') : '???'}
-                      </div>
-                    </div>
-
-                    <div className="bg-black/50 p-2 rounded-xl border border-zinc-800 text-center">
-                      <div className="text-[10px] uppercase font-mono text-zinc-500">Ref</div>
-                      <div className="text-sm font-bold text-zinc-100 mt-0.5 font-mono">
-                        {isFieldVisible('acAndDefenses') ? (peril?.ref !== undefined ? `+${peril.ref}` : '—') : '???'}
-                      </div>
-                    </div>
-
-                    <div className="bg-black/50 p-2 rounded-xl border border-zinc-800 text-center">
-                      <div className="text-[10px] uppercase font-mono text-zinc-500">Dureza</div>
-                      <div className="text-sm font-bold text-amber-300 mt-0.5 font-mono">
-                        {isFieldVisible('hardnessAndBT') ? peril?.hardness ?? '—' : '???'}
-                      </div>
-                    </div>
-
-                    <div className="bg-black/50 p-2 rounded-xl border border-zinc-800 text-center">
-                      <div className="text-[10px] uppercase font-mono text-zinc-500">LT</div>
-                      <div className="text-sm font-bold text-zinc-300 mt-0.5 font-mono">
-                        {isFieldVisible('hardnessAndBT') ? peril?.brokenThreshold ?? '—' : '???'}
-                      </div>
-                    </div>
-
-                    <div className="bg-rose-950/40 p-2 rounded-xl border border-rose-800/60 text-center">
-                      <div className="text-[10px] uppercase font-mono text-rose-400">PV</div>
-                      <div className="text-sm font-black text-rose-200 mt-0.5 font-mono">
-                        {isFieldVisible('hpAndHealth') ? (peril?.hp ? `${peril.hp}` : '—') : '???'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Imunidades & Fraquezas */}
-                  <div className="pt-2 border-t border-zinc-800/60 space-y-1 text-xs text-zinc-300">
-                    <div>
-                      <strong className="text-zinc-100">Imunidades:</strong>{' '}
-                      {isFieldVisible('immunities')
-                        ? peril?.immunities && peril.immunities.length > 0
-                          ? peril.immunities.join(', ')
-                          : 'Imunidades de objeto (acertos críticos, dano mental, veneno, sono)'
-                        : '🔒 Oculto'}
-                    </div>
-
-                    {peril?.weaknesses && peril.weaknesses.length > 0 && (
-                      <div>
-                        <strong className="text-rose-400">Fraquezas:</strong>{' '}
-                        {isFieldVisible('weaknessesAndResistances') ? (
-                          <span className="text-rose-300 font-semibold">{peril.weaknesses.join(', ')}</span>
-                        ) : (
-                          '🔒 Oculto'
-                        )}
-                      </div>
-                    )}
-
-                    {peril?.resistances && peril.resistances.length > 0 && (
-                      <div>
-                        <strong className="text-cyan-400">Resistências:</strong>{' '}
-                        {isFieldVisible('weaknessesAndResistances') ? (
-                          <span className="text-cyan-300 font-semibold">{peril.resistances.join(', ')}</span>
-                        ) : (
-                          '🔒 Oculto'
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Rotina de Combate (Turno do Perigo) */}
-                <div className="p-4 rounded-2xl bg-orange-950/20 border border-orange-700/60 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-orange-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                      <Activity className="w-3.5 h-3.5 text-orange-400" />
-                      Rotina de Combate (Turno do Perigo)
-                    </span>
-                    {renderEyeToggle('routine', 'Rotina')}
-                  </div>
-
-                  {isFieldVisible('routine') ? (
-                    <div className="space-y-2 text-xs">
-                      {peril?.routine && (
-                        <div className="p-3 rounded-xl bg-black/50 border border-orange-900/50 text-zinc-200 leading-relaxed font-sans">
-                          {peril.routine}
-                        </div>
-                      )}
-
-                      {peril?.attacks && peril.attacks.map((atk) => (
-                        <div key={atk.id} className="p-2.5 rounded-xl bg-black/40 border border-zinc-800 flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-zinc-100">[1 ação] {atk.name}</span>
-                          <span className="font-mono text-cyan-300 font-bold">+{atk.bonus}</span>
-                          <span className="text-rose-300 font-mono font-semibold">{atk.damage}</span>
-                          {atk.extraEffects && <span className="text-zinc-400">({atk.extraEffects})</span>}
-                        </div>
-                      ))}
-
-                      {peril?.actions && peril.actions.map((act) => (
-                        <div key={act.id} className="p-2.5 rounded-xl bg-black/40 border border-zinc-800 space-y-1">
-                          <div className="font-bold text-zinc-100 flex items-center gap-2">
-                            <span className="text-orange-400 font-mono">[{act.cost}]</span>
-                            <span>{act.name}</span>
+                        {peril?.senses && (
+                          <div>
+                            <strong className="text-zinc-100">Sentidos:</strong>{' '}
+                            <span className="text-zinc-300">{peril.senses}</span>
                           </div>
-                          {act.trigger && (
-                            <div className="text-amber-300/90 text-[11px]">
-                              <strong>Gatilho:</strong> {act.trigger}
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-zinc-500 italic">
+                        🔒 Iniciativa oculta até o início do combate tático.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Desativação em Encontro Tático */}
+                  <div className="p-4 rounded-2xl bg-amber-950/20 border border-amber-700/60 space-y-2 h-full">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                        <Wrench className="w-3.5 h-3.5 text-amber-400" />
+                        Desativação em Encontro Tático
+                      </span>
+                      {renderEyeToggle('disableAndReset', 'Desativação')}
+                    </div>
+
+                    {isFieldVisible('disableAndReset') ? (
+                      <div className="p-3 rounded-xl bg-black/50 border border-amber-800/50 text-xs text-amber-100 leading-relaxed font-sans">
+                        {peril?.disable || 'Ladinagem ou perícias mágicas durante o combate com sucessos progressivos.'}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-zinc-500 italic">
+                        🔒 Métodos de desativação tática ocultos pelo Mestre.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Linha 2: Defesas Estruturais & Rotina de Combate */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+                  {/* Defesas Estruturais & Salvamentos */}
+                  <div className="p-4 rounded-2xl bg-[#120e20] border border-zinc-800/80 space-y-3 h-full">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                        <Shield className="w-3.5 h-3.5 text-rose-400" />
+                        Defesas Estruturais & Salvamentos
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {renderEyeToggle('acAndDefenses', 'CA & Saves')}
+                        {renderEyeToggle('hardnessAndBT', 'Dureza')}
+                        {renderEyeToggle('hpAndHealth', 'PV')}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 text-xs">
+                      <div className="bg-black/50 p-2 rounded-xl border border-zinc-800 text-center">
+                        <div className="text-[10px] uppercase font-mono text-zinc-500">CA</div>
+                        <div className="text-sm font-bold text-zinc-100 mt-0.5 font-mono">
+                          {isFieldVisible('acAndDefenses') ? peril?.ac ?? '—' : '???'}
+                        </div>
+                      </div>
+
+                      <div className="bg-black/50 p-2 rounded-xl border border-zinc-800 text-center">
+                        <div className="text-[10px] uppercase font-mono text-zinc-500">Fort</div>
+                        <div className="text-sm font-bold text-zinc-100 mt-0.5 font-mono">
+                          {isFieldVisible('acAndDefenses') ? (peril?.fort !== undefined ? `+${peril.fort}` : '—') : '???'}
+                        </div>
+                      </div>
+
+                      <div className="bg-black/50 p-2 rounded-xl border border-zinc-800 text-center">
+                        <div className="text-[10px] uppercase font-mono text-zinc-500">Ref</div>
+                        <div className="text-sm font-bold text-zinc-100 mt-0.5 font-mono">
+                          {isFieldVisible('acAndDefenses') ? (peril?.ref !== undefined ? `+${peril.ref}` : '—') : '???'}
+                        </div>
+                      </div>
+
+                      <div className="bg-black/50 p-2 rounded-xl border border-zinc-800 text-center">
+                        <div className="text-[10px] uppercase font-mono text-zinc-500">Dureza</div>
+                        <div className="text-sm font-bold text-amber-300 mt-0.5 font-mono">
+                          {isFieldVisible('hardnessAndBT') ? peril?.hardness ?? '—' : '???'}
+                        </div>
+                      </div>
+
+                      <div className="bg-black/50 p-2 rounded-xl border border-zinc-800 text-center">
+                        <div className="text-[10px] uppercase font-mono text-zinc-500">LT</div>
+                        <div className="text-sm font-bold text-zinc-300 mt-0.5 font-mono">
+                          {isFieldVisible('hardnessAndBT') ? peril?.brokenThreshold ?? '—' : '???'}
+                        </div>
+                      </div>
+
+                      <div className="bg-rose-950/40 p-2 rounded-xl border border-rose-800/60 text-center">
+                        <div className="text-[10px] uppercase font-mono text-rose-400">PV</div>
+                        <div className="text-sm font-black text-rose-200 mt-0.5 font-mono">
+                          {isFieldVisible('hpAndHealth') ? (peril?.hp ? `${peril.hp}` : '—') : '???'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Imunidades & Fraquezas */}
+                    <div className="pt-2 border-t border-zinc-800/60 space-y-1 text-xs text-zinc-300">
+                      <div>
+                        <strong className="text-zinc-100">Imunidades:</strong>{' '}
+                        {isFieldVisible('immunities')
+                          ? peril?.immunities && peril.immunities.length > 0
+                            ? peril.immunities.join(', ')
+                            : 'Imunidades de objeto (acertos críticos, dano mental, veneno, sono)'
+                          : '🔒 Oculto'}
+                      </div>
+
+                      {peril?.weaknesses && peril.weaknesses.length > 0 && (
+                        <div>
+                          <strong className="text-rose-400">Fraquezas:</strong>{' '}
+                          {isFieldVisible('weaknessesAndResistances') ? (
+                            <span className="text-rose-300 font-semibold">{peril.weaknesses.join(', ')}</span>
+                          ) : (
+                            '🔒 Oculto'
+                          )}
+                        </div>
+                      )}
+
+                      {peril?.resistances && peril.resistances.length > 0 && (
+                        <div>
+                          <strong className="text-cyan-400">Resistências:</strong>{' '}
+                          {isFieldVisible('weaknessesAndResistances') ? (
+                            <span className="text-cyan-300 font-semibold">{peril.resistances.join(', ')}</span>
+                          ) : (
+                            '🔒 Oculto'
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Rotina de Combate & Reset */}
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-2xl bg-orange-950/20 border border-orange-700/60 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-orange-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                          <Activity className="w-3.5 h-3.5 text-orange-400" />
+                          Rotina de Combate (Turno do Perigo)
+                        </span>
+                        {renderEyeToggle('routine', 'Rotina')}
+                      </div>
+
+                      {isFieldVisible('routine') ? (
+                        <div className="space-y-2 text-xs">
+                          {peril?.routine && (
+                            <div className="p-3 rounded-xl bg-black/50 border border-orange-900/50 text-zinc-200 leading-relaxed font-sans">
+                              {peril.routine}
                             </div>
                           )}
-                          <p className="text-zinc-300">{act.effect}</p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-zinc-500 italic">
-                      🔒 Ações e rotina de combate ocultas pelo Mestre.
-                    </div>
-                  )}
-                </div>
 
-                {/* Reset / Desativação Permanente */}
-                {peril?.reset && (
-                  <div className="p-3.5 rounded-2xl bg-[#0f0b1a] border border-zinc-800/80 flex items-start gap-2.5 text-xs text-zinc-300">
-                    <RotateCcw className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="text-zinc-100 font-mono">Reset & Neutralização: </strong>
-                      <span>{peril.reset}</span>
+                          {peril?.attacks && peril.attacks.map((atk) => (
+                            <div key={atk.id} className="p-2.5 rounded-xl bg-black/40 border border-zinc-800 flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-zinc-100">[1 ação] {atk.name}</span>
+                              <span className="font-mono text-cyan-300 font-bold">+{atk.bonus}</span>
+                              <span className="text-rose-300 font-mono font-semibold">{atk.damage}</span>
+                              {atk.extraEffects && <span className="text-zinc-400">({atk.extraEffects})</span>}
+                            </div>
+                          ))}
+
+                          {peril?.actions && peril.actions.map((act) => (
+                            <div key={act.id} className="p-2.5 rounded-xl bg-black/40 border border-zinc-800 space-y-1">
+                              <div className="font-bold text-zinc-100 flex items-center gap-2">
+                                <span className="text-orange-400 font-mono">[{act.cost}]</span>
+                                <span>{act.name}</span>
+                              </div>
+                              {act.trigger && (
+                                <div className="text-amber-300/90 text-[11px]">
+                                  <strong>Gatilho:</strong> {act.trigger}
+                                </div>
+                              )}
+                              <p className="text-zinc-300">{act.effect}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-zinc-500 italic">
+                          🔒 Ações e rotina de combate ocultas pelo Mestre.
+                        </div>
+                      )}
                     </div>
+
+                    {/* Reset / Desativação Permanente */}
+                    {peril?.reset && (
+                      <div className="p-3.5 rounded-2xl bg-[#0f0b1a] border border-zinc-800/80 flex items-start gap-2.5 text-xs text-zinc-300">
+                        <RotateCcw className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="text-zinc-100 font-mono">Reset & Neutralização: </strong>
+                          <span>{peril.reset}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </>
+                </div>
+              </div>
             )}
 
             {/* ────────────────── 4. PERIGO AMBIENTAL (ENVIRONMENTAL) ────────────────── */}
             {isEnvironmental && (
-              <>
-                {/* Detecção & Observação do Bioma */}
-                <div className="p-4 rounded-2xl bg-[#120e20] border border-emerald-900/30 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                      <Eye className="w-3.5 h-3.5 text-emerald-400" />
-                      Detecção & Observação Ambiental
-                    </span>
-                    {renderEyeToggle('sensesAndPerception', 'Detecção')}
-                  </div>
-
-                  {isFieldVisible('sensesAndPerception') ? (
-                    <div className="text-xs text-zinc-300 space-y-1.5">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <strong className="text-zinc-100">Identificação / Detecção:</strong>
-                        <span className="px-2.5 py-0.5 rounded-lg bg-emerald-950/60 text-emerald-200 border border-emerald-800/50 font-mono font-bold">
-                          {peril?.stealthCheck || 'Sobrevivência ou Natureza para prever a anomalia'}
-                        </span>
-                      </div>
-                      {peril?.senses && (
-                        <div>
-                          <strong className="text-zinc-100">Área / Escopo:</strong>{' '}
-                          <span className="text-zinc-300">{peril.senses}</span>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-zinc-500 italic">
-                      🔒 Sinais climáticos e pistas ocultas (teste de Sobrevivência ou Natureza para prever).
-                    </div>
-                  )}
-                </div>
-
-                {/* Superação & Sobrevivência (Overcoming) */}
-                <div className="p-4 rounded-2xl bg-emerald-950/20 border border-emerald-700/60 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                      <Footprints className="w-3.5 h-3.5 text-emerald-400" />
-                      Superação & Sobrevivência (Overcoming)
-                    </span>
-                    {renderEyeToggle('disableAndReset', 'Superação')}
-                  </div>
-
-                  {isFieldVisible('disableAndReset') ? (
-                    <div className="p-3 rounded-xl bg-black/50 border border-emerald-800/50 text-xs text-emerald-100 leading-relaxed font-sans">
-                      {peril?.disable || 'Sobrevivência para encontrar abrigo, Atletismo para transpor ou testes de Fortitude.'}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-zinc-500 italic">
-                      🔒 Procedimentos de sobrevivência ocultos (teste de Sobrevivência para deduzir).
-                    </div>
-                  )}
-                </div>
-
-                {/* Efeito Climático & Dano Ambiental */}
-                {(peril?.routine || (peril?.actions && peril.actions.length > 0)) && (
-                  <div className="p-4 rounded-2xl bg-[#120e20] border border-zinc-800/80 space-y-3">
+              <div className="space-y-4">
+                {/* Linha 1: Detecção & Superação */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+                  {/* Detecção & Observação do Bioma */}
+                  <div className="p-4 rounded-2xl bg-[#120e20] border border-emerald-900/30 space-y-2 h-full">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                        <Flame className="w-3.5 h-3.5 text-emerald-400" />
-                        Efeito Climático & Dano Ambiental
+                        <Eye className="w-3.5 h-3.5 text-emerald-400" />
+                        Detecção & Observação Ambiental
                       </span>
-                      {renderEyeToggle('routine', 'Efeito')}
+                      {renderEyeToggle('sensesAndPerception', 'Detecção')}
                     </div>
 
-                    {isFieldVisible('routine') ? (
-                      <div className="space-y-2 text-xs">
-                        {peril?.routine && (
-                          <div className="p-3 rounded-xl bg-black/50 border border-zinc-800 text-zinc-200 leading-relaxed">
-                            {peril.routine}
+                    {isFieldVisible('sensesAndPerception') ? (
+                      <div className="text-xs text-zinc-300 space-y-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <strong className="text-zinc-100">Identificação / Detecção:</strong>
+                          <span className="px-2.5 py-0.5 rounded-lg bg-emerald-950/60 text-emerald-200 border border-emerald-800/50 font-mono font-bold">
+                            {peril?.stealthCheck || 'Sobrevivência ou Natureza para prever a anomalia'}
+                          </span>
+                        </div>
+                        {peril?.senses && (
+                          <div>
+                            <strong className="text-zinc-100">Área / Escopo:</strong>{' '}
+                            <span className="text-zinc-300">{peril.senses}</span>
                           </div>
                         )}
-
-                        {peril?.actions && peril.actions.map((act) => (
-                          <div key={act.id} className="p-2.5 rounded-xl bg-black/40 border border-zinc-800 space-y-1">
-                            <div className="font-bold text-zinc-100 flex items-center gap-2">
-                              <span className="text-emerald-400 font-mono">[{act.cost}]</span>
-                              <span>{act.name}</span>
-                            </div>
-                            <p className="text-zinc-300">{act.effect}</p>
-                          </div>
-                        ))}
                       </div>
                     ) : (
                       <div className="text-xs text-zinc-500 italic">
-                        🔒 Dados de exposição e severidade climática ocultos.
+                        🔒 Sinais climáticos e pistas ocultas (teste de Sobrevivência ou Natureza para prever).
                       </div>
                     )}
                   </div>
-                )}
 
-                {/* Resiliência & Imunidades do Bioma */}
-                <div className="p-4 rounded-2xl bg-[#120e20] border border-zinc-800/80 space-y-2 text-xs text-zinc-300">
-                  <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                    <Shield className="w-3.5 h-3.5 text-rose-400" />
-                    Resiliência & Imunidades do Ambiente
-                  </span>
-
-                  <div className="pt-2 space-y-1">
-                    <div>
-                      <strong className="text-zinc-100">Imunidades do Ambiente:</strong>{' '}
-                      {isFieldVisible('immunities')
-                        ? peril?.immunities && peril.immunities.length > 0
-                          ? peril.immunities.join(', ')
-                          : 'Imune a ataques físicos convencionais, dano de precisão e efeitos mentais'
-                        : '🔒 Oculto'}
+                  {/* Superação & Sobrevivência (Overcoming) */}
+                  <div className="p-4 rounded-2xl bg-emerald-950/20 border border-emerald-700/60 space-y-2 h-full">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                        <Footprints className="w-3.5 h-3.5 text-emerald-400" />
+                        Superação & Sobrevivência (Overcoming)
+                      </span>
+                      {renderEyeToggle('disableAndReset', 'Superação')}
                     </div>
 
-                    {peril?.weaknesses && peril.weaknesses.length > 0 && (
-                      <div>
-                        <strong className="text-rose-400">Fraquezas Ambientais:</strong>{' '}
-                        {isFieldVisible('weaknessesAndResistances') ? (
-                          <span className="text-rose-300 font-semibold">{peril.weaknesses.join(', ')}</span>
-                        ) : (
-                          '🔒 Oculto'
-                        )}
+                    {isFieldVisible('disableAndReset') ? (
+                      <div className="p-3 rounded-xl bg-black/50 border border-emerald-800/50 text-xs text-emerald-100 leading-relaxed font-sans">
+                        {peril?.disable || 'Sobrevivência para encontrar abrigo, Atletismo para transpor ou testes de Fortitude.'}
                       </div>
-                    )}
-
-                    {peril?.resistances && peril.resistances.length > 0 && (
-                      <div>
-                        <strong className="text-cyan-400">Resistências:</strong>{' '}
-                        {isFieldVisible('weaknessesAndResistances') ? (
-                          <span className="text-cyan-300 font-semibold">{peril.resistances.join(', ')}</span>
-                        ) : (
-                          '🔒 Oculto'
-                        )}
-                      </div>
-                    )}
-
-                    {/* Dureza ou PV de barreiras físicas (ex: desabamento de pedras, geleira) */}
-                    {(peril?.hardness !== undefined || peril?.hp !== undefined) && (
-                      <div className="pt-1 flex items-center gap-3 text-zinc-300 font-mono">
-                        {peril.hardness !== undefined && <span>Dureza da Barreira: <strong>{peril.hardness}</strong></span>}
-                        {peril.hp !== undefined && <span>PV para Escavar/Quebrar: <strong>{peril.hp} PV</strong></span>}
+                    ) : (
+                      <div className="text-xs text-zinc-500 italic">
+                        🔒 Procedimentos de sobrevivência ocultos (teste de Sobrevivência para deduzir).
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Duração & Ciclo Climático */}
-                {peril?.reset && (
-                  <div className="p-3.5 rounded-2xl bg-[#0f0b1a] border border-zinc-800/80 flex items-start gap-2.5 text-xs text-zinc-300">
-                    <Clock className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="text-zinc-100 font-mono">Duração & Ciclo: </strong>
-                      <span>{peril.reset}</span>
+                {/* Linha 2: Efeito Climático & Resiliência */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+                  {/* Efeito Climático & Dano Ambiental */}
+                  {(peril?.routine || (peril?.actions && peril.actions.length > 0)) && (
+                    <div className="p-4 rounded-2xl bg-[#120e20] border border-zinc-800/80 space-y-3 h-full">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                          <Flame className="w-3.5 h-3.5 text-emerald-400" />
+                          Efeito Climático & Dano Ambiental
+                        </span>
+                        {renderEyeToggle('routine', 'Efeito')}
+                      </div>
+
+                      {isFieldVisible('routine') ? (
+                        <div className="space-y-2 text-xs">
+                          {peril?.routine && (
+                            <div className="p-3 rounded-xl bg-black/50 border border-zinc-800 text-zinc-200 leading-relaxed">
+                              {peril.routine}
+                            </div>
+                          )}
+
+                          {peril?.actions && peril.actions.map((act) => (
+                            <div key={act.id} className="p-2.5 rounded-xl bg-black/40 border border-zinc-800 space-y-1">
+                              <div className="font-bold text-zinc-100 flex items-center gap-2">
+                                <span className="text-emerald-400 font-mono">[{act.cost}]</span>
+                                <span>{act.name}</span>
+                              </div>
+                              <p className="text-zinc-300">{act.effect}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-zinc-500 italic">
+                          🔒 Dados de exposição e severidade climática ocultos.
+                        </div>
+                      )}
                     </div>
+                  )}
+
+                  {/* Resiliência & Imunidades do Bioma */}
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-2xl bg-[#120e20] border border-zinc-800/80 space-y-2 text-xs text-zinc-300">
+                      <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                        <Shield className="w-3.5 h-3.5 text-rose-400" />
+                        Resiliência & Imunidades do Ambiente
+                      </span>
+
+                      <div className="pt-2 space-y-1">
+                        <div>
+                          <strong className="text-zinc-100">Imunidades do Ambiente:</strong>{' '}
+                          {isFieldVisible('immunities')
+                            ? peril?.immunities && peril.immunities.length > 0
+                              ? peril.immunities.join(', ')
+                              : 'Imune a ataques físicos convencionais, dano de precisão e efeitos mentais'
+                            : '🔒 Oculto'}
+                        </div>
+
+                        {peril?.weaknesses && peril.weaknesses.length > 0 && (
+                          <div>
+                            <strong className="text-rose-400">Fraquezas Ambientais:</strong>{' '}
+                            {isFieldVisible('weaknessesAndResistances') ? (
+                              <span className="text-rose-300 font-semibold">{peril.weaknesses.join(', ')}</span>
+                            ) : (
+                              '🔒 Oculto'
+                            )}
+                          </div>
+                        )}
+
+                        {peril?.resistances && peril.resistances.length > 0 && (
+                          <div>
+                            <strong className="text-cyan-400">Resistências:</strong>{' '}
+                            {isFieldVisible('weaknessesAndResistances') ? (
+                              <span className="text-cyan-300 font-semibold">{peril.resistances.join(', ')}</span>
+                            ) : (
+                              '🔒 Oculto'
+                            )}
+                          </div>
+                        )}
+
+                        {/* Dureza ou PV de barreiras físicas */}
+                        {(peril?.hardness !== undefined || peril?.hp !== undefined) && (
+                          <div className="pt-1 flex items-center gap-3 text-zinc-300 font-mono">
+                            {peril.hardness !== undefined && <span>Dureza da Barreira: <strong>{peril.hardness}</strong></span>}
+                            {peril.hp !== undefined && <span>PV para Escavar/Quebrar: <strong>{peril.hp} PV</strong></span>}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Duração & Ciclo Climático */}
+                    {peril?.reset && (
+                      <div className="p-3.5 rounded-2xl bg-[#0f0b1a] border border-zinc-800/80 flex items-start gap-2.5 text-xs text-zinc-300">
+                        <Clock className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="text-zinc-100 font-mono">Duração & Ciclo: </strong>
+                          <span>{peril.reset}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </>
+                </div>
+              </div>
             )}
 
             {/* ────────────────── 5. ASSOMBRAÇÃO (HAUNT) ────────────────── */}
             {isHaunt && (
-              <>
-                {/* Sensibilidade & Furtividade Espiritual */}
-                <div className="p-4 rounded-2xl bg-[#120e20] border border-purple-900/40 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                      <Ghost className="w-3.5 h-3.5 text-purple-400" />
-                      Sensibilidade & Furtividade Espiritual
-                    </span>
-                    {renderEyeToggle('sensesAndPerception', 'Sensibilidade')}
-                  </div>
-
-                  {isFieldVisible('sensesAndPerception') ? (
-                    <div className="text-xs text-zinc-300 space-y-1.5">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <strong className="text-zinc-100">Detecção Sobrenatural:</strong>
-                        <span className="px-2.5 py-0.5 rounded-lg bg-purple-950/60 text-purple-200 border border-purple-800/50 font-mono font-bold">
-                          {peril?.stealthCheck || 'Ocultismo ou Religião CD 20 para sentir o calafrio espectral'}
-                        </span>
-                      </div>
-                      {peril?.senses && (
-                        <div>
-                          <strong className="text-zinc-100">Assinatura Espectral:</strong>{' '}
-                          <span className="text-zinc-300">{peril.senses}</span>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-zinc-500 italic">
-                      🔒 Presença espiritual imperceptível (teste de Ocultismo ou Religião para pressentir).
-                    </div>
-                  )}
-                </div>
-
-                {/* Exorcismo & Apaziguamento (Disable) */}
-                <div className="p-4 rounded-2xl bg-purple-950/20 border border-purple-700/60 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                      <Sparkle className="w-3.5 h-3.5 text-purple-400" />
-                      Exorcismo & Apaziguamento (Disable)
-                    </span>
-                    {renderEyeToggle('disableAndReset', 'Exorcismo')}
-                  </div>
-
-                  {isFieldVisible('disableAndReset') ? (
-                    <div className="p-3 rounded-xl bg-black/50 border border-purple-800/50 text-xs text-purple-100 leading-relaxed font-sans">
-                      {peril?.disable || 'Religião para consagrar o local, Ocultismo para banir ou Diplomacia para apaziguar o espírito.'}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-zinc-500 italic">
-                      🔒 Métodos de exorcismo ocultos (teste de Religião ou Ocultismo para descobrir como apaziguar).
-                    </div>
-                  )}
-                </div>
-
-                {/* Defesas Espirituais & Fraquezas Sagradas */}
-                <div className="p-4 rounded-2xl bg-[#120e20] border border-zinc-800/80 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                      <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
-                      Defesas Espirituais & Fraquezas Sagradas
-                    </span>
-                    <div className="flex items-center gap-2">
-                      {renderEyeToggle('weaknessesAndResistances', 'Fraquezas')}
-                      {renderEyeToggle('hpAndHealth', 'PV Espiritual')}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-                    <div className="bg-purple-950/30 p-2.5 rounded-xl border border-purple-800/50 text-center">
-                      <div className="text-[10px] uppercase font-mono text-purple-400">PV Espiritual</div>
-                      <div className="text-base font-black text-purple-200 mt-0.5 font-mono">
-                        {isFieldVisible('hpAndHealth') ? (peril?.hp ? `${peril.hp} PV` : 'Incorpóreo') : '???'}
-                      </div>
-                    </div>
-
-                    <div className="bg-black/50 p-2.5 rounded-xl border border-zinc-800 text-center">
-                      <div className="text-[10px] uppercase font-mono text-zinc-500">CA da Manifestação</div>
-                      <div className="text-base font-bold text-zinc-100 mt-0.5 font-mono">
-                        {isFieldVisible('acAndDefenses') ? peril?.ac ?? '—' : '???'}
-                      </div>
-                    </div>
-
-                    <div className="bg-black/50 p-2.5 rounded-xl border border-zinc-800 text-center">
-                      <div className="text-[10px] uppercase font-mono text-zinc-500">Dureza Espectral</div>
-                      <div className="text-base font-bold text-zinc-300 mt-0.5 font-mono">
-                        {isFieldVisible('hardnessAndBT') ? peril?.hardness ?? '—' : '???'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Fraquezas Sagradas & Imunidades */}
-                  <div className="pt-2 border-t border-zinc-800/60 space-y-1.5 text-xs text-zinc-300">
-                    <div>
-                      <strong className="text-rose-400 font-bold">Fraquezas Sagradas:</strong>{' '}
-                      {isFieldVisible('weaknessesAndResistances')
-                        ? peril?.weaknesses && peril.weaknesses.length > 0
-                          ? <span className="text-rose-300 font-semibold">{peril.weaknesses.join(', ')}</span>
-                          : 'Dano positivo, feitiços de luz divina, água benta'
-                        : '🔒 Oculto'}
-                    </div>
-
-                    <div>
-                      <strong className="text-zinc-100">Imunidades Espectrais:</strong>{' '}
-                      {isFieldVisible('immunities')
-                        ? peril?.immunities && peril.immunities.length > 0
-                          ? peril.immunities.join(', ')
-                          : 'Imune a ataques físicos mundanos, precisão, veneno, paralisia, atordoamento'
-                        : '🔒 Oculto'}
-                    </div>
-
-                    {peril?.resistances && peril.resistances.length > 0 && (
-                      <div>
-                        <strong className="text-cyan-400">Resistências:</strong>{' '}
-                        {isFieldVisible('weaknessesAndResistances') ? (
-                          <span className="text-cyan-300 font-semibold">{peril.resistances.join(', ')}</span>
-                        ) : (
-                          '🔒 Oculto'
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Gatilho & Manifestação Sobrenatural */}
-                {(peril?.routine || (peril?.actions && peril.actions.length > 0) || (peril?.attacks && peril.attacks.length > 0)) && (
-                  <div className="p-4 rounded-2xl bg-[#120e20] border border-purple-900/40 space-y-3">
+              <div className="space-y-4">
+                {/* Linha 1: Sensibilidade & Exorcismo */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+                  {/* Sensibilidade & Furtividade Espiritual */}
+                  <div className="p-4 rounded-2xl bg-[#120e20] border border-purple-900/40 space-y-2 h-full">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                        <Flame className="w-3.5 h-3.5 text-purple-400" />
-                        Gatilho & Manifestação Sobrenatural
+                        <Ghost className="w-3.5 h-3.5 text-purple-400" />
+                        Sensibilidade & Furtividade Espiritual
                       </span>
-                      {renderEyeToggle('actionsAndAbilities', 'Manifestação')}
+                      {renderEyeToggle('sensesAndPerception', 'Sensibilidade')}
                     </div>
 
-                    {isFieldVisible('actionsAndAbilities') ? (
-                      <div className="space-y-2 text-xs">
-                        {peril?.routine && (
-                          <div className="p-3 rounded-xl bg-black/50 border border-purple-900/50 text-zinc-200 leading-relaxed font-sans">
-                            <strong className="text-purple-300 font-mono">Manifestação: </strong>
-                            {peril.routine}
+                    {isFieldVisible('sensesAndPerception') ? (
+                      <div className="text-xs text-zinc-300 space-y-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <strong className="text-zinc-100">Detecção Sobrenatural:</strong>
+                          <span className="px-2.5 py-0.5 rounded-lg bg-purple-950/60 text-purple-200 border border-purple-800/50 font-mono font-bold">
+                            {peril?.stealthCheck || 'Ocultismo ou Religião CD 20 para sentir o calafrio espectral'}
+                          </span>
+                        </div>
+                        {peril?.senses && (
+                          <div>
+                            <strong className="text-zinc-100">Assinatura Espectral:</strong>{' '}
+                            <span className="text-zinc-300">{peril.senses}</span>
                           </div>
                         )}
-
-                        {peril?.attacks && peril.attacks.map((atk) => (
-                          <div key={atk.id} className="p-2.5 rounded-xl bg-black/40 border border-zinc-800 flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-purple-200">[Espiritual] {atk.name}</span>
-                            <span className="font-mono text-cyan-300 font-bold">+{atk.bonus}</span>
-                            <span className="text-rose-300 font-mono font-semibold">{atk.damage}</span>
-                            {atk.extraEffects && <span className="text-zinc-400">({atk.extraEffects})</span>}
-                          </div>
-                        ))}
-
-                        {peril?.actions && peril.actions.map((act) => (
-                          <div key={act.id} className="p-2.5 rounded-xl bg-black/40 border border-zinc-800 space-y-1">
-                            <div className="font-bold text-zinc-100 flex items-center gap-2">
-                              <span className="text-purple-400 font-mono">[{act.cost}]</span>
-                              <span>{act.name}</span>
-                            </div>
-                            {act.trigger && (
-                              <div className="text-amber-300/90 text-[11px]">
-                                <strong>Perturbação / Gatilho:</strong> {act.trigger}
-                              </div>
-                            )}
-                            <p className="text-zinc-300">{act.effect}</p>
-                          </div>
-                        ))}
                       </div>
                     ) : (
                       <div className="text-xs text-zinc-500 italic">
-                        🔒 Efeitos de pavor e perturbação sobrenatural ocultos.
+                        🔒 Presença espiritual imperceptível (teste de Ocultismo ou Religião para pressentir).
                       </div>
                     )}
                   </div>
-                )}
 
-                {/* Descanso Eterno & Retorno (Reset) */}
-                {peril?.reset && (
-                  <div className="p-3.5 rounded-2xl bg-[#0f0b1a] border border-purple-900/40 flex items-start gap-2.5 text-xs text-zinc-300">
-                    <RotateCcw className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="text-purple-300 font-mono">Descanso Eterno & Retorno: </strong>
-                      <span>{peril.reset}</span>
+                  {/* Exorcismo & Apaziguamento (Disable) */}
+                  <div className="p-4 rounded-2xl bg-purple-950/20 border border-purple-700/60 space-y-2 h-full">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                        <Sparkle className="w-3.5 h-3.5 text-purple-400" />
+                        Exorcismo & Apaziguamento (Disable)
+                      </span>
+                      {renderEyeToggle('disableAndReset', 'Exorcismo')}
+                    </div>
+
+                    {isFieldVisible('disableAndReset') ? (
+                      <div className="p-3 rounded-xl bg-black/50 border border-purple-800/50 text-xs text-purple-100 leading-relaxed font-sans">
+                        {peril?.disable || 'Religião para consagrar o local, Ocultismo para banir ou Diplomacia para apaziguar o espírito.'}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-zinc-500 italic">
+                        🔒 Métodos de exorcismo ocultos (teste de Religião ou Ocultismo para descobrir como apaziguar).
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Linha 2: Defesas Espirituais & Manifestação */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+                  {/* Defesas Espirituais & Fraquezas Sagradas */}
+                  <div className="p-4 rounded-2xl bg-[#120e20] border border-zinc-800/80 space-y-3 h-full">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                        <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+                        Defesas Espirituais & Fraquezas Sagradas
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {renderEyeToggle('weaknessesAndResistances', 'Fraquezas')}
+                        {renderEyeToggle('hpAndHealth', 'PV Espiritual')}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                      <div className="bg-purple-950/30 p-2.5 rounded-xl border border-purple-800/50 text-center">
+                        <div className="text-[10px] uppercase font-mono text-purple-400">PV Espiritual</div>
+                        <div className="text-base font-black text-purple-200 mt-0.5 font-mono">
+                          {isFieldVisible('hpAndHealth') ? (peril?.hp ? `${peril.hp} PV` : 'Incorpóreo') : '???'}
+                        </div>
+                      </div>
+
+                      <div className="bg-black/50 p-2.5 rounded-xl border border-zinc-800 text-center">
+                        <div className="text-[10px] uppercase font-mono text-zinc-500">CA da Manifestação</div>
+                        <div className="text-base font-bold text-zinc-100 mt-0.5 font-mono">
+                          {isFieldVisible('acAndDefenses') ? peril?.ac ?? '—' : '???'}
+                        </div>
+                      </div>
+
+                      <div className="bg-black/50 p-2.5 rounded-xl border border-zinc-800 text-center">
+                        <div className="text-[10px] uppercase font-mono text-zinc-500">Dureza Espectral</div>
+                        <div className="text-base font-bold text-zinc-300 mt-0.5 font-mono">
+                          {isFieldVisible('hardnessAndBT') ? peril?.hardness ?? '—' : '???'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Fraquezas Sagradas & Imunidades */}
+                    <div className="pt-2 border-t border-zinc-800/60 space-y-1.5 text-xs text-zinc-300">
+                      <div>
+                        <strong className="text-rose-400 font-bold">Fraquezas Sagradas:</strong>{' '}
+                        {isFieldVisible('weaknessesAndResistances')
+                          ? peril?.weaknesses && peril.weaknesses.length > 0
+                            ? <span className="text-rose-300 font-semibold">{peril.weaknesses.join(', ')}</span>
+                            : 'Dano positivo, feitiços de luz divina, água benta'
+                          : '🔒 Oculto'}
+                      </div>
+
+                      <div>
+                        <strong className="text-zinc-100">Imunidades Espectrais:</strong>{' '}
+                        {isFieldVisible('immunities')
+                          ? peril?.immunities && peril.immunities.length > 0
+                            ? peril.immunities.join(', ')
+                            : 'Imune a ataques físicos mundanos, precisão, veneno, paralisia, atordoamento'
+                          : '🔒 Oculto'}
+                      </div>
+
+                      {peril?.resistances && peril.resistances.length > 0 && (
+                        <div>
+                          <strong className="text-cyan-400">Resistências:</strong>{' '}
+                          {isFieldVisible('weaknessesAndResistances') ? (
+                            <span className="text-cyan-300 font-semibold">{peril.resistances.join(', ')}</span>
+                          ) : (
+                            '🔒 Oculto'
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
-              </>
+
+                  {/* Gatilho & Manifestação Sobrenatural */}
+                  <div className="space-y-4">
+                    {(peril?.routine || (peril?.actions && peril.actions.length > 0) || (peril?.attacks && peril.attacks.length > 0)) && (
+                      <div className="p-4 rounded-2xl bg-[#120e20] border border-purple-900/40 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                            <Flame className="w-3.5 h-3.5 text-purple-400" />
+                            Gatilho & Manifestação Sobrenatural
+                          </span>
+                          {renderEyeToggle('actionsAndAbilities', 'Manifestação')}
+                        </div>
+
+                        {isFieldVisible('actionsAndAbilities') ? (
+                          <div className="space-y-2 text-xs">
+                            {peril?.routine && (
+                              <div className="p-3 rounded-xl bg-black/50 border border-purple-900/50 text-zinc-200 leading-relaxed font-sans">
+                                <strong className="text-purple-300 font-mono">Manifestação: </strong>
+                                {peril.routine}
+                              </div>
+                            )}
+
+                            {peril?.attacks && peril.attacks.map((atk) => (
+                              <div key={atk.id} className="p-2.5 rounded-xl bg-black/40 border border-zinc-800 flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-purple-200">[Espiritual] {atk.name}</span>
+                                <span className="font-mono text-cyan-300 font-bold">+{atk.bonus}</span>
+                                <span className="text-rose-300 font-mono font-semibold">{atk.damage}</span>
+                                {atk.extraEffects && <span className="text-zinc-400">({atk.extraEffects})</span>}
+                              </div>
+                            ))}
+
+                            {peril?.actions && peril.actions.map((act) => (
+                              <div key={act.id} className="p-2.5 rounded-xl bg-black/40 border border-zinc-800 space-y-1">
+                                <div className="font-bold text-zinc-100 flex items-center gap-2">
+                                  <span className="text-purple-400 font-mono">[{act.cost}]</span>
+                                  <span>{act.name}</span>
+                                </div>
+                                {act.trigger && (
+                                  <div className="text-amber-300/90 text-[11px]">
+                                    <strong>Perturbação / Gatilho:</strong> {act.trigger}
+                                  </div>
+                                )}
+                                <p className="text-zinc-300">{act.effect}</p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-zinc-500 italic">
+                            🔒 Efeitos de pavor e perturbação sobrenatural ocultos.
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Descanso Eterno & Retorno (Reset) */}
+                    {peril?.reset && (
+                      <div className="p-3.5 rounded-2xl bg-[#0f0b1a] border border-purple-900/40 flex items-start gap-2.5 text-xs text-zinc-300">
+                        <RotateCcw className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="text-purple-300 font-mono">Descanso Eterno & Retorno: </strong>
+                          <span>{peril.reset}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* SEÇÃO COMPLEMENTAR SE HOUVER DADOS HÍBRIDOS NÃO APRESENTADOS */}
@@ -1445,8 +1569,206 @@ export const PerilView: React.FC<PerilViewProps> = ({
               </div>
             )}
 
+            {/* SEÇÃO DE TESOURO & LOOT */}
+            {peril?.loot && (
+              Boolean(
+                (peril.loot.items && peril.loot.items.length > 0) ||
+                (peril.loot.currency && (
+                  peril.loot.currency.cp !== undefined ||
+                  peril.loot.currency.sp !== undefined ||
+                  peril.loot.currency.gp !== undefined ||
+                  peril.loot.currency.pp !== undefined ||
+                  peril.loot.currency.custom
+                )) ||
+                (peril.loot.notes && peril.loot.notes.trim())
+              )
+            ) && (
+              <div className="p-4 sm:p-5 rounded-2xl bg-[#120e20] border border-amber-900/40 space-y-4 shadow-lg shadow-black/40">
+                <div className="flex items-center justify-between border-b border-amber-950/60 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                      <Coins className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-xs font-bold text-amber-300 uppercase tracking-wider font-mono">
+                      Tesouro & Recompensas de Loot
+                    </h3>
+                  </div>
+                  {renderEyeToggle('loot', 'Tesouro & Loot')}
+                </div>
+
+                {isFieldVisible('loot') ? (
+                  <div className="space-y-4">
+                    {/* Currency Display */}
+                    {peril.loot.currency && (
+                      Boolean(
+                        peril.loot.currency.cp !== undefined ||
+                        peril.loot.currency.sp !== undefined ||
+                        peril.loot.currency.gp !== undefined ||
+                        peril.loot.currency.pp !== undefined ||
+                        peril.loot.currency.custom
+                      )
+                    ) && (
+                      <div className="space-y-2">
+                        <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider font-mono block">
+                          Riquezas Monetárias
+                        </span>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                          {/* Cobre */}
+                          {peril.loot.currency.cp !== undefined && peril.loot.currency.cp !== '' && (
+                            <div className="p-2.5 rounded-xl bg-black/50 border border-amber-900/50 flex items-center justify-between">
+                              <span className="text-xs font-medium text-amber-600">Cobre (pc)</span>
+                              <span className="text-xs font-bold font-mono text-amber-300 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/40">
+                                {peril.loot.currency.cp} cp
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Prata */}
+                          {peril.loot.currency.sp !== undefined && peril.loot.currency.sp !== '' && (
+                            <div className="p-2.5 rounded-xl bg-black/50 border border-slate-700/50 flex items-center justify-between">
+                              <span className="text-xs font-medium text-slate-300">Prata (pp)</span>
+                              <span className="text-xs font-bold font-mono text-slate-200 bg-slate-900 px-2 py-0.5 rounded border border-slate-700">
+                                {peril.loot.currency.sp} sp
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Ouro */}
+                          {peril.loot.currency.gp !== undefined && peril.loot.currency.gp !== '' && (
+                            <div className="p-2.5 rounded-xl bg-black/50 border border-amber-500/40 flex items-center justify-between shadow-sm shadow-amber-950/30">
+                              <span className="text-xs font-medium text-amber-400">Ouro (po)</span>
+                              <span className="text-xs font-bold font-mono text-amber-300 bg-amber-900/60 px-2 py-0.5 rounded border border-amber-600/50">
+                                {peril.loot.currency.gp} gp
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Platina */}
+                          {peril.loot.currency.pp !== undefined && peril.loot.currency.pp !== '' && (
+                            <div className="p-2.5 rounded-xl bg-black/50 border border-cyan-500/40 flex items-center justify-between">
+                              <span className="text-xs font-medium text-cyan-300">Platina (pl)</span>
+                              <span className="text-xs font-bold font-mono text-cyan-200 bg-cyan-950/70 px-2 py-0.5 rounded border border-cyan-700/60">
+                                {peril.loot.currency.pp} pp
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Joias / Bens valiosos customizados */}
+                        {peril.loot.currency.custom && (
+                          <div className="p-2.5 rounded-xl bg-black/40 border border-zinc-800/80 flex items-start gap-2 text-xs">
+                            <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                            <div>
+                              <strong className="text-amber-300">Gemas & Relíquias: </strong>
+                              <span className="text-zinc-200">{peril.loot.currency.custom}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Items List */}
+                    {peril.loot.items && peril.loot.items.length > 0 && (
+                      <div className="space-y-2">
+                        <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider font-mono block">
+                          Itens & Equipamentos ({peril.loot.items.length})
+                        </span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                          {peril.loot.items.map((item, iIdx) => (
+                            <div
+                              key={item.id || iIdx}
+                              className="p-3 rounded-xl bg-black/50 border border-zinc-800 hover:border-amber-700/50 transition-colors flex flex-col justify-between space-y-2"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <Package className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                    {item.itemId ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => onNavigate(item.itemId!)}
+                                        className="font-bold text-xs text-amber-300 hover:text-amber-200 hover:underline flex items-center gap-1 text-left cursor-pointer"
+                                        title="Ver artigo completo deste item"
+                                      >
+                                        <span>{item.name}</span>
+                                        <ExternalLink className="w-3 h-3 text-amber-400/70" />
+                                      </button>
+                                    ) : (
+                                      <span className="font-bold text-xs text-zinc-100">{item.name}</span>
+                                    )}
+
+                                    {item.level !== undefined && (
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-zinc-800 text-zinc-300 border border-zinc-700">
+                                        Nvl {item.level}
+                                      </span>
+                                    )}
+
+                                    {item.rarity && item.rarity !== 'Comum' && (
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-950/40 text-amber-400 border border-amber-800/40">
+                                        {item.rarity}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-2 text-[10px] text-zinc-400 font-mono">
+                                    {item.price && <span className="text-amber-300 font-semibold">{item.price}</span>}
+                                    {item.bulk && <span>Vol: {item.bulk}</span>}
+                                  </div>
+
+                                  {item.traits && item.traits.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 pt-0.5">
+                                      {item.traits.map((trait, tIdx) => (
+                                        <span
+                                          key={tIdx}
+                                          className="px-1 py-0.5 rounded text-[9px] bg-zinc-900 text-zinc-400 border border-zinc-800"
+                                        >
+                                          {trait}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="shrink-0 text-right">
+                                  <span className="px-2 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20 text-xs font-bold font-mono">
+                                    x{item.quantity ?? 1}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {item.notes && (
+                                <div className="pt-1 border-t border-zinc-800/60 text-[11px] text-zinc-400 italic">
+                                  {item.notes}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Harvest / Loot Rules Notes */}
+                    {peril.loot.notes && (
+                      <div className="p-3 rounded-xl bg-black/40 border border-zinc-800/80 space-y-1 text-xs">
+                        <div className="flex items-center gap-1.5 text-amber-300 font-bold uppercase tracking-wider text-[10px] font-mono">
+                          <FileText className="w-3.5 h-3.5" />
+                          Regras de Extração & Pilhagem
+                        </div>
+                        <p className="text-zinc-300 leading-relaxed">{peril.loot.notes}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-xs text-zinc-500 italic p-2 rounded-xl bg-black/30 border border-zinc-800/60 flex items-center gap-2">
+                    <Lock className="w-3.5 h-3.5 text-zinc-600" />
+                    <span>Tesouro e recompensas de loot ocultos pelo Mestre.</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Descrição e Conteúdo Formatado */}
-            {currentEntity.content && (
+            {cleanContentForBottom && (
               <div className="pt-4 border-t border-zinc-800">
                 <div className="flex items-center gap-2 mb-3">
                   <FileText className="w-4 h-4 text-rose-400" />
@@ -1455,7 +1777,7 @@ export const PerilView: React.FC<PerilViewProps> = ({
                   </h3>
                 </div>
                 <RichContentRenderer
-                  content={currentEntity.content}
+                  content={cleanContentForBottom}
                   onNavigate={onNavigate}
                   onTagClick={onTagClick}
                 />

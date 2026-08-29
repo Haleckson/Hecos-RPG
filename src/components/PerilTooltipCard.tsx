@@ -74,12 +74,12 @@ export const PerilTooltipCard: React.FC<PerilTooltipCardProps> = ({
   const canViewMechanics = isFieldVisible('disableAndReset') || isFieldVisible('routine');
 
   const kind: PerilKind = perilData.perilKind || (peril.category === 'creature' ? 'monster' : 'hazard_simple');
+  const isMonster = kind === 'monster';
   const level = perilData.level ?? peril.statblock?.level ?? 1;
   const rarity = perilData.rarity || peril.statblock?.rarity || 'Comum';
-  const size = perilData.size || peril.statblock?.size;
+  const size = isMonster ? (perilData.size || peril.statblock?.size || 'Médio') : (perilData.size || undefined);
 
   const isHazard = kind === 'hazard_simple' || kind === 'hazard_complex';
-  const isMonster = kind === 'monster';
 
   // Stats
   const hp = perilData.hp ?? peril.statblock?.hp;
@@ -96,8 +96,12 @@ export const PerilTooltipCard: React.FC<PerilTooltipCardProps> = ({
   const coverImage = (canViewDescription || effectiveIsGm) ? (peril.coverImage || perilData.portraitImage) : undefined;
   const tokenImage = peril.icon || perilData.tokenImage;
 
-  // Traits
-  const rawTraits = perilData.traits || peril.statblock?.traits || peril.tags || [];
+  // Traits - strictly show Rarity, Size (when monster/specified), and chosen custom traits
+  const rawTraits = (perilData.traits && perilData.traits.length > 0)
+    ? perilData.traits
+    : (peril.statblock?.traits && peril.statblock.traits.length > 0)
+    ? peril.statblock.traits
+    : [];
   const orderedTraits = sortTraitsHierarchically(rawTraits, { rarity, size });
 
   // Kind helper
@@ -125,7 +129,7 @@ export const PerilTooltipCard: React.FC<PerilTooltipCardProps> = ({
   );
 
   return (
-    <div className="p-3.5 space-y-2.5 w-[330px] sm:w-[390px] md:w-[420px] max-w-[calc(100vw-28px)] text-left bg-[#0e0a17] border border-rose-500/40 rounded-2xl shadow-2xl select-none">
+    <div className="p-3.5 space-y-2.5 w-[330px] sm:w-[380px] max-w-full text-left bg-[#0e0a17] border border-rose-500/40 rounded-2xl shadow-2xl select-none">
       {/* Top Header */}
       <div className="border-b border-zinc-800/90 pb-2.5 flex items-start gap-2.5">
         {/* Token/Portrait Thumbnail */}

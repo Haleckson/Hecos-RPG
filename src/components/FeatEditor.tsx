@@ -94,7 +94,7 @@ export const FeatEditor: React.FC<FeatEditorProps> = ({
     (entity.tags || []).length > 0 ? (entity.tags || []).join(', ') : 'talento'
   );
   const [isSecret, setIsSecret] = useState(entity.isSecret || false);
-  const [visibility, setVisibility] = useState<ItemVisibility>(entity.visibility || (entity.isSecret ? 'gm' : 'public'));
+  const [visibility, setVisibility] = useState<ItemVisibility>(entity.visibility || (entity.isSecret ? 'gm' : 'all'));
   const [allowedUserIds, setAllowedUserIds] = useState<string[]>(entity.allowedUserIds || []);
 
   // Parse or initialize blank structured Feat Attributes
@@ -355,6 +355,9 @@ export const FeatEditor: React.FC<FeatEditorProps> = ({
             onChange={setCoverImage}
             placeholder="URL ou Upload ImgBB..."
             showPreview={false}
+            category="talento"
+            entityName={title || 'talento'}
+            role="capa"
           />
         </div>
 

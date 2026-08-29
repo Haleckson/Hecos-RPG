@@ -524,84 +524,90 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
       </div>
 
       <div className="p-4 sm:p-6 md:p-8 space-y-6">
-        {/* Basic Article Meta Details (Title, Subtitle, Cover Image, Tags, Icon) */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 bg-[#13111b] p-5 rounded-2xl border border-zinc-800/80 items-start">
-          <div className="md:col-span-1 flex flex-col items-center justify-center pt-1">
-            <label className="text-[10px] font-bold text-[#74b6c2] mb-1.5">Ícone</label>
-            <IconPicker
-              value={icon}
-              onChange={setIcon}
-              category="ancestry"
-            />
-          </div>
+        {/* Basic Article Meta Details (Icon, Title, Subtitle, Cover Image, Tags, Visibility) */}
+        <div className="bg-[#13111b] p-5 sm:p-6 rounded-2xl border border-zinc-800/80 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+            {/* Ícone da Ancestralidade */}
+            <div className="md:col-span-3 lg:col-span-3 space-y-1.5">
+              <label className="text-xs font-bold text-[#74b6c2] flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-[#74b6c2]" />
+                <span>Ícone da Ancestralidade</span>
+              </label>
+              <div className="w-full">
+                <IconPicker
+                  value={icon}
+                  onChange={setIcon}
+                  category="ancestralidade"
+                  entityName={title || 'ancestralidade'}
+                  label="Ícone da Ancestralidade"
+                />
+              </div>
+            </div>
 
-          <div className="md:col-span-5 space-y-1.5">
-            <label htmlFor="ancestry-title-input" className="text-xs font-bold text-[#74b6c2] flex items-center gap-1.5">
-              <span>Nome da Ancestralidade *</span>
-            </label>
-            <input
-              id="ancestry-title-input"
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ex: Sylphari, Vane, Qalashin, Humani..."
-              className="w-full px-3.5 py-2.5 rounded-xl bg-[#0e0d14] border border-[#2e4f5a] focus:border-[#74b6c2] focus:ring-1 focus:ring-[#74b6c2]/40 text-base font-bold text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
-            />
-          </div>
-
-          <div className="md:col-span-6 space-y-1.5">
-            <label htmlFor="ancestry-subtitle-input" className="text-xs font-bold text-zinc-300">
-              Subtítulo / Epíteto Cultural
-            </label>
-            <input
-              id="ancestry-subtitle-input"
-              type="text"
-              value={subtitle}
-              onChange={(e) => setSubtitle(e.target.value)}
-              placeholder="Ex: Os Nômades do Eclipse, Filhos da Raiz..."
-              className="w-full px-3.5 py-2.5 rounded-xl bg-[#0e0d14] border border-zinc-800 focus:border-[#74b6c2] text-sm text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
-            />
-          </div>
-
-          <div className="md:col-span-6">
-            <ImageUploadInput
-              id="ancestry-cover-input"
-              value={coverImage}
-              onChange={setCoverImage}
-              label="URL da Imagem de Capa (opcional)"
-              placeholder="https://... ou faça upload direto da arte"
-              helpText="Arraste uma imagem ou clique em 'Upload ImgBB' para enviar do computador."
-            />
-          </div>
-
-          <div className="md:col-span-4 space-y-1.5">
-            <label htmlFor="ancestry-tags-input" className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
-              <TagIcon className="w-3.5 h-3.5 text-zinc-400" />
-              <span>Tags (separadas por vírgula)</span>
-            </label>
-            <input
-              id="ancestry-tags-input"
-              type="text"
-              value={tagsString}
-              onChange={(e) => setTagsString(e.target.value)}
-              placeholder="ancestry, pf2e, humanoide, magia"
-              className="w-full px-3.5 py-2 rounded-xl bg-[#0e0d14] border border-zinc-800 focus:border-[#74b6c2] text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
-            />
-          </div>
-
-          <div className="md:col-span-2 flex items-center pt-5">
-            <label className="flex items-center gap-2 cursor-pointer select-none">
+            {/* Nome da Ancestralidade */}
+            <div className="md:col-span-4 lg:col-span-4 space-y-1.5">
+              <label htmlFor="ancestry-title-input" className="text-xs font-bold text-[#74b6c2] flex items-center gap-1.5">
+                <Dna className="w-3.5 h-3.5 text-[#74b6c2]" />
+                <span>Nome da Ancestralidade *</span>
+              </label>
               <input
-                type="checkbox"
-                checked={isSecret}
-                onChange={(e) => setIsSecret(e.target.checked)}
-                className="w-4 h-4 rounded bg-[#0e0d14] border-zinc-700 text-[#cb8394] focus:ring-[#cb8394]"
+                id="ancestry-title-input"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Ex: Sylphari, Vane, Qalashin, Humani..."
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#0e0d14] border border-[#2e4f5a] focus:border-[#74b6c2] focus:ring-1 focus:ring-[#74b6c2]/40 text-sm sm:text-base font-bold text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
               />
-              <span className="text-xs font-bold text-[#cb8394] flex items-center gap-1">
-                <Lock className="w-3.5 h-3.5" />
-                <span>GM Only</span>
-              </span>
-            </label>
+            </div>
+
+            {/* Subtítulo / Epíteto Cultural */}
+            <div className="md:col-span-5 lg:col-span-5 space-y-1.5">
+              <label htmlFor="ancestry-subtitle-input" className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+                <BookOpen className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Subtítulo / Epíteto Cultural</span>
+              </label>
+              <input
+                id="ancestry-subtitle-input"
+                type="text"
+                value={subtitle}
+                onChange={(e) => setSubtitle(e.target.value)}
+                placeholder="Ex: Os Nômades do Eclipse, Filhos da Raiz..."
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#0e0d14] border border-zinc-800 focus:border-[#74b6c2] text-xs sm:text-sm text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start pt-3 border-t border-zinc-800/60">
+            {/* Imagem de Capa */}
+            <div className="md:col-span-7 space-y-1.5">
+              <ImageUploadInput
+                id="ancestry-cover-input"
+                value={coverImage}
+                onChange={setCoverImage}
+                label="URL da Imagem de Capa (opcional)"
+                placeholder="https://... ou faça upload direto da arte"
+                helpText="Conversão automática em WebP 100% e renomeação padronizada."
+                category="ancestralidade"
+                entityName={title || 'ancestralidade'}
+                role="capa"
+              />
+            </div>
+
+            {/* Tags */}
+            <div className="md:col-span-5 space-y-1.5">
+              <label htmlFor="ancestry-tags-input" className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+                <TagIcon className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Tags (separadas por vírgula)</span>
+              </label>
+              <input
+                id="ancestry-tags-input"
+                type="text"
+                value={tagsString}
+                onChange={(e) => setTagsString(e.target.value)}
+                placeholder="ancestry, pf2e, humanoide, magia"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#0e0d14] border border-zinc-800 focus:border-[#74b6c2] text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+              />
+            </div>
           </div>
         </div>
 
@@ -692,40 +698,44 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
               <ReferenceField
                 id="ancestry-traits"
                 label="🏷️ TRAÇOS DA ESPÉCIE"
-                value={data.traits}
+                value={Array.isArray(data.traits) ? data.traits.join(', ') : typeof data.traits === 'string' ? data.traits : ''}
                 onChange={(val) => updateHeader('traits', val)}
                 placeholder="Ex: Humanoide, Elf, Planar"
                 multiline={false}
                 onNavigate={onNavigate}
               />
-              {data.traits && data.traits.trim() && (
-                <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                  {data.traits.split(',').map((t, idx) => {
-                    const clean = t.trim();
-                    if (!clean) return null;
-                    return (
-                      <span
-                        key={`ancestry-trait-chip-${clean}-${idx}`}
-                        className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-md text-[11px] font-mono font-bold tracking-wide uppercase bg-amber-950/80 border border-amber-800 text-amber-200 shadow-sm"
-                      >
-                        <span>{clean}</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const list = data.traits.split(',').map((s) => s.trim()).filter(Boolean);
-                            list.splice(idx, 1);
-                            updateHeader('traits', list.join(', '));
-                          }}
-                          className="p-0.5 rounded hover:bg-amber-900/80 text-amber-400 hover:text-rose-300 transition-colors cursor-pointer"
-                          title={`Remover traço "${clean}"`}
+              {(() => {
+                const traitsStr = Array.isArray(data.traits) ? data.traits.join(', ') : typeof data.traits === 'string' ? data.traits : '';
+                if (!traitsStr.trim()) return null;
+                return (
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    {traitsStr.split(',').map((t, idx) => {
+                      const clean = t.trim();
+                      if (!clean) return null;
+                      return (
+                        <span
+                          key={`ancestry-trait-chip-${clean}-${idx}`}
+                          className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-md text-[11px] font-mono font-bold tracking-wide uppercase bg-amber-950/80 border border-amber-800 text-amber-200 shadow-sm"
                         >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
+                          <span>{clean}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const list = traitsStr.split(',').map((s) => s.trim()).filter(Boolean);
+                              list.splice(idx, 1);
+                              updateHeader('traits', list.join(', '));
+                            }}
+                            className="p-0.5 rounded hover:bg-amber-900/80 text-amber-400 hover:text-rose-300 transition-colors cursor-pointer"
+                            title={`Remover traço "${clean}"`}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -1275,6 +1285,10 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
                         onImagesUploaded={addMultipleAlbumImages}
                         onCancel={() => setIsBulkUploadOpen(false)}
                         themeColor="purple"
+                        category="ancestralidade"
+                        entityName={name || 'ancestralidade'}
+                        role="album"
+                        startIndex={(data.album || []).length + 1}
                       />
                     </div>
                   )}
@@ -1310,6 +1324,10 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
                               onChange={(url) => updateAlbumImage(idx, 'url', url)}
                               label={`Imagem #${idx + 1} (URL ou Upload)`}
                               placeholder="https://... ou faça upload"
+                              category="ancestralidade"
+                              entityName={name || 'ancestralidade'}
+                              role="album"
+                              index={idx + 1}
                             />
                             <div>
                               <label className="text-[11px] font-bold text-zinc-400 block mb-1">

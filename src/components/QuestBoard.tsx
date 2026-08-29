@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { TraitBadge } from './TraitBadge';
+import { sortTraitsHierarchically } from '../utils/traitUtils';
 
 interface QuestBoardProps {
   onNavigateEntity: (id: string) => void;
@@ -298,7 +299,7 @@ export const QuestBoard: React.FC<QuestBoardProps> = ({
                         {((quest.traits && quest.traits.length > 0) ||
                           (quest.tags && quest.tags.length > 0)) && (
                           <div className="flex flex-wrap gap-1 pt-1">
-                            {(quest.traits || []).map((tr) => (
+                            {sortTraitsHierarchically(quest.traits || []).map((tr) => (
                               <TraitBadge key={tr} trait={tr} className="text-[9px] py-0 px-1.5" />
                             ))}
                             {(quest.tags || []).map((tg) => (

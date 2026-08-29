@@ -335,7 +335,9 @@ export const ItemView: React.FC<ItemViewProps> = ({
                                   <Folder className={`w-3.5 h-3.5 ${isAssigned ? 'text-amber-400' : 'text-zinc-500'}`} />
                                   <span className="truncate">{folderName}</span>
                                   {isSecret && (
-                                    <EyeOff className="w-3 h-3 text-purple-400 shrink-0" title="Pasta Secreta" />
+                                    <span title="Pasta Secreta">
+                                      <EyeOff className="w-3 h-3 text-purple-400 shrink-0" />
+                                    </span>
                                   )}
                                 </div>
                                 <div className="shrink-0">

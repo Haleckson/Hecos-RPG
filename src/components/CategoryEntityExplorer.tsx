@@ -40,7 +40,14 @@ import {
   ChevronRight,
   Eye,
   Trash2,
-  Edit2
+  Edit2,
+  ArrowUpDown,
+  ArrowDownAZ,
+  ArrowUpAZ,
+  Clock,
+  History,
+  Check,
+  Zap
 } from 'lucide-react';
 
 interface CategoryEntityExplorerProps {
@@ -54,6 +61,16 @@ interface CategoryEntityExplorerProps {
   selectedTagFilter?: string | null;
   onClearTagFilter?: () => void;
 }
+
+export type SortOption =
+  | 'alpha_asc'
+  | 'alpha_desc'
+  | 'level_asc'
+  | 'level_desc'
+  | 'type'
+  | 'rarity'
+  | 'newest'
+  | 'oldest';
 
 export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
   categoryKey,
@@ -93,9 +110,28 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
   const meta = getCategoryMeta(categoryKey);
 
   // Filter & Search states
+  const storageSortKey = `hecos_sort_${categoryKey}`;
   const [searchQuery, setSearchQuery] = useState('');
-  type SortOption = 'alpha_asc' | 'alpha_desc' | 'type' | 'newest' | 'oldest';
-  const [sortBy, setSortBy] = useState<SortOption>('alpha_asc');
+  const [sortBy, setSortBy] = useState<SortOption>(() => {
+    try {
+      const saved = localStorage.getItem(storageSortKey);
+      if (saved) return saved as SortOption;
+    } catch {
+      // fallback
+    }
+    return categoryKey === 'peril' ? 'level_asc' : 'alpha_asc';
+  });
+
+  const handleSetSortBy = (newSort: SortOption) => {
+    setSortBy(newSort);
+    try {
+      localStorage.setItem(storageSortKey, newSort);
+    } catch {
+      // ignore
+    }
+  };
+
+  const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(() => {
     if (initialSubcategory && initialSubcategory.toLowerCase() !== meta.name.toLowerCase() && initialSubcategory.toLowerCase() !== categoryKey.toLowerCase()) {
       return initialSubcategory;
@@ -369,21 +405,71 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
     categoryKey,
   ]);
 
-  // Sorted entities according to selected sort order
-  const sortedEntities = useMemo(() => {
-    const list = [...filteredEntities];
-    return list.sort((a, b) => {
-      switch (sortBy) {
+  // Sort options configurations
+  const sortOptionsConfig = useMemo(() => [
+    { id: 'alpha_asc' as SortOption, label: 'Alfabética (A → Z)', shortLabel: 'A → Z', icon: ArrowDownAZ },
+    { id: 'alpha_desc' as SortOption, label: 'Alfabética (Z → A)', shortLabel: 'Z → A', icon: ArrowUpAZ },
+    { id: 'level_asc' as SortOption, label: 'Nível (Menor → Maior)', shortLabel: 'Nível ⬆', icon: Shield },
+    { id: 'level_desc' as SortOption, label: 'Nível (Maior → Menor)', shortLabel: 'Nível ⬇', icon: Zap },
+    { id: 'type' as SortOption, label: categoryKey === 'peril' ? 'Tipo de Perigo' : (categoryKey === 'ancestry' ? 'Tipo (Ancestralidade / Herança)' : 'Tipo / Categoria'), shortLabel: 'Por Tipo', icon: Layers },
+    { id: 'rarity' as SortOption, label: 'Raridade (Comum → Único)', shortLabel: 'Raridade', icon: Sparkles },
+    { id: 'newest' as SortOption, label: 'Mais Recentes', shortLabel: 'Mais Recentes', icon: Clock },
+    { id: 'oldest' as SortOption, label: 'Mais Antigos', shortLabel: 'Mais Antigos', icon: History },
+  ], [categoryKey]);
+
+  const activeSortOption = useMemo(() => {
+    return sortOptionsConfig.find((o) => o.id === sortBy) || sortOptionsConfig[0];
+  }, [sortOptionsConfig, sortBy]);
+
+  // Helper comparator for sorting entities
+  const sortEntityList = (list: HecosEntity[], sortOption: SortOption): HecosEntity[] => {
+    return [...list].sort((a, b) => {
+      switch (sortOption) {
         case 'alpha_asc':
           return (a.title || '').localeCompare(b.title || '', 'pt-BR');
         case 'alpha_desc':
           return (b.title || '').localeCompare(a.title || '', 'pt-BR');
+        case 'level_asc': {
+          const lvlA = a.perilData?.level ?? a.classData?.level ?? a.statblock?.level ?? 0;
+          const lvlB = b.perilData?.level ?? b.classData?.level ?? b.statblock?.level ?? 0;
+          if (lvlA !== lvlB) return lvlA - lvlB;
+          return (a.title || '').localeCompare(b.title || '', 'pt-BR');
+        }
+        case 'level_desc': {
+          const lvlA = a.perilData?.level ?? a.classData?.level ?? a.statblock?.level ?? 0;
+          const lvlB = b.perilData?.level ?? b.classData?.level ?? b.statblock?.level ?? 0;
+          if (lvlA !== lvlB) return lvlB - lvlA;
+          return (a.title || '').localeCompare(b.title || '', 'pt-BR');
+        }
         case 'type': {
-          const isHeritageA = Boolean(a.ancestryData?.isVersatileHeritage);
-          const isHeritageB = Boolean(b.ancestryData?.isVersatileHeritage);
-          if (isHeritageA !== isHeritageB) {
-            return isHeritageA ? 1 : -1;
-          }
+          const getPerilTypeRank = (ent: HecosEntity): number => {
+            const kind = ent.perilData?.perilKind || ent.perilData?.perilType || (ent.category === 'creature' ? 'monster' : ent.category);
+            if (kind === 'monster' || kind === 'creature') return 1;
+            if (kind === 'hazard_simple') return 2;
+            if (kind === 'hazard_complex') return 3;
+            if (kind === 'haunt') return 4;
+            if (kind === 'environmental') return 5;
+            if (ent.ancestryData?.isVersatileHeritage) return 2;
+            if (ent.category === 'ancestry') return 1;
+            return 99;
+          };
+          const rankA = getPerilTypeRank(a);
+          const rankB = getPerilTypeRank(b);
+          if (rankA !== rankB) return rankA - rankB;
+          return (a.title || '').localeCompare(b.title || '', 'pt-BR');
+        }
+        case 'rarity': {
+          const getRarityRank = (ent: HecosEntity): number => {
+            const r = (ent.perilData?.rarity || ent.classData?.rarity || ent.ancestryData?.rarity || 'Comum').toLowerCase();
+            if (r.includes('comum') || r.includes('common')) return 1;
+            if (r.includes('incomum') || r.includes('uncommon')) return 2;
+            if (r.includes('raro') || r.includes('rare')) return 3;
+            if (r.includes('único') || r.includes('unico') || r.includes('unique')) return 4;
+            return 5;
+          };
+          const rankA = getRarityRank(a);
+          const rankB = getRarityRank(b);
+          if (rankA !== rankB) return rankA - rankB;
           return (a.title || '').localeCompare(b.title || '', 'pt-BR');
         }
         case 'newest': {
@@ -400,6 +486,11 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
           return 0;
       }
     });
+  };
+
+  // Sorted entities according to selected sort order
+  const sortedEntities = useMemo(() => {
+    return sortEntityList(filteredEntities, sortBy);
   }, [filteredEntities, sortBy]);
 
   // Color & Theme setup
@@ -474,8 +565,12 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
       }
     });
 
-    return { map, noFolderList };
-  }, [allFolderNames, filteredEntities]);
+    Object.keys(map).forEach((k) => {
+      map[k] = sortEntityList(map[k], sortBy);
+    });
+
+    return { map, noFolderList: sortEntityList(noFolderList, sortBy) };
+  }, [allFolderNames, filteredEntities, sortBy]);
 
   const toggleFolderExpand = (folderName: string) => {
     setExpandedFolders((prev) => ({
@@ -621,8 +716,66 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
       {/* 3. STANDARDIZED FILTER & VIEW TOOLBAR */}
       <div className="bg-[#090710] p-4 rounded-2xl border border-zinc-800/80 shadow-md space-y-3">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-          {/* Left Side: Search & Folder Dropdown */}
+          {/* Left Side: Sorting Button, Search & Folder Dropdown */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1">
+            {/* Sorting Button / Dropdown (Icon-Only, Leftmost) */}
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
+                className={`p-2.5 rounded-xl border transition-all cursor-pointer shadow-sm flex items-center justify-center ${
+                  sortBy !== 'alpha_asc'
+                    ? (categoryKey === 'peril' ? 'bg-rose-950/90 border-rose-500/80 text-rose-300 hover:bg-rose-900/90' : 'bg-cyan-950/90 border-cyan-500/80 text-cyan-300 hover:bg-cyan-900/90')
+                    : 'bg-zinc-900/90 border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100'
+                }`}
+                title={`Ordenar: ${activeSortOption?.label || 'Alfabética'}`}
+                aria-label="Ordenar registros"
+              >
+                <ArrowUpDown className={`w-4 h-4 ${categoryKey === 'peril' ? (sortBy !== 'alpha_asc' ? 'text-rose-300' : 'text-rose-400') : (sortBy !== 'alpha_asc' ? 'text-cyan-300' : 'text-cyan-400')}`} />
+              </button>
+
+              {/* Sort Dropdown Menu */}
+              {isSortDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-30"
+                    onClick={() => setIsSortDropdownOpen(false)}
+                  />
+                  <div className="absolute left-0 mt-1.5 w-64 z-40 bg-[#0d0a17] border border-zinc-700/80 rounded-2xl shadow-2xl overflow-hidden animate-fade-in p-1.5 space-y-0.5">
+                    <div className="px-2.5 py-1.5 text-[10px] font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-800/80 mb-1 flex items-center justify-between">
+                      <span>Opções de Ordenação</span>
+                      <ArrowUpDown className="w-3 h-3 text-zinc-500" />
+                    </div>
+                    {sortOptionsConfig.map((opt) => {
+                      const isSelected = sortBy === opt.id;
+                      const IconComponent = opt.icon;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => {
+                            handleSetSortBy(opt.id);
+                            setIsSortDropdownOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                            isSelected
+                              ? (categoryKey === 'peril' ? 'bg-rose-900/60 text-rose-200 border border-rose-700/60 font-bold' : 'bg-cyan-950/90 text-cyan-200 border border-cyan-700/60 font-bold')
+                              : 'text-zinc-300 hover:bg-zinc-800/80 hover:text-zinc-100'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <IconComponent className={`w-3.5 h-3.5 ${isSelected ? (categoryKey === 'peril' ? 'text-rose-400' : 'text-cyan-400') : 'text-zinc-400'}`} />
+                            <span>{opt.label}</span>
+                          </div>
+                          {isSelected && <Check className={`w-3.5 h-3.5 ${categoryKey === 'peril' ? 'text-rose-400' : 'text-cyan-400'}`} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+
             {/* Search Input */}
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -644,179 +797,165 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
               )}
             </div>
 
-            {/* Folder Dropdown Selector OR Sort Selector for Ancestry */}
-            {categoryKey === 'ancestry' ? (
-              <div className="relative min-w-[200px] sm:w-64">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="w-full bg-zinc-900/90 border border-zinc-800 focus:border-cyan-500 rounded-xl px-3 py-2 text-xs text-zinc-200 font-semibold outline-none transition-all cursor-pointer"
+            {/* Folder Dropdown Selector (for categories supporting folders) */}
+            {categoryKey !== 'ancestry' && (
+              <div className="relative min-w-[200px] sm:w-60">
+                <button
+                  type="button"
+                  onClick={() => setIsFolderDropdownOpen(!isFolderDropdownOpen)}
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                    selectedFolder !== null
+                      ? 'bg-purple-950/70 border-purple-500/80 text-purple-200 shadow-sm'
+                      : 'bg-zinc-900/90 border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100'
+                  }`}
                 >
-                  <option value="alpha_asc">Alfabética (A-Z)</option>
-                  <option value="alpha_desc">Alfabética (Z-A)</option>
-                  <option value="type">Por Tipo (Ancestralidade / Herança)</option>
-                  <option value="newest">Mais Recente para Mais Antigo</option>
-                  <option value="oldest">Mais Antigo para Mais Recente</option>
-                </select>
-              </div>
-            ) : (
-            <div className="relative min-w-[200px] sm:w-60">
-              <button
-                type="button"
-                onClick={() => setIsFolderDropdownOpen(!isFolderDropdownOpen)}
-                className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                  selectedFolder !== null
-                    ? 'bg-purple-950/70 border-purple-500/80 text-purple-200 shadow-sm'
-                    : 'bg-zinc-900/90 border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100'
-                }`}
-              >
-                <div className="flex items-center gap-2 truncate">
-                  <Folder className={`w-3.5 h-3.5 shrink-0 ${selectedFolder ? 'text-purple-400' : 'text-zinc-400'}`} />
-                  <span className="truncate">
-                    {selectedFolder === null
-                      ? 'Todas as Pastas'
-                      : selectedFolder === '__none__'
-                      ? 'Sem Pasta (Raiz)'
-                      : selectedFolder}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-zinc-400 border border-zinc-800">
-                    {selectedFolder === null
-                      ? filteredEntities.length
-                      : selectedFolder === '__none__'
-                      ? folderCounts.__none__ || 0
-                      : folderCounts[selectedFolder] || 0}
-                  </span>
-                  <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${isFolderDropdownOpen ? 'rotate-180' : ''}`} />
-                </div>
-              </button>
+                  <div className="flex items-center gap-2 truncate">
+                    <Folder className={`w-3.5 h-3.5 shrink-0 ${selectedFolder ? 'text-purple-400' : 'text-zinc-400'}`} />
+                    <span className="truncate">
+                      {selectedFolder === null
+                        ? 'Todas as Pastas'
+                        : selectedFolder === '__none__'
+                        ? 'Sem Pasta (Raiz)'
+                        : selectedFolder}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-zinc-400 border border-zinc-800">
+                      {selectedFolder === null
+                        ? filteredEntities.length
+                        : selectedFolder === '__none__'
+                        ? folderCounts.__none__ || 0
+                        : folderCounts[selectedFolder] || 0}
+                    </span>
+                    <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${isFolderDropdownOpen ? 'rotate-180' : ''}`} />
+                  </div>
+                </button>
 
-              {/* Folder Selector Dropdown Menu */}
-              {isFolderDropdownOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-30"
-                    onClick={() => setIsFolderDropdownOpen(false)}
-                  />
-                  <div className="absolute left-0 right-0 sm:right-auto sm:w-72 mt-1.5 z-40 bg-[#0d0a17] border border-zinc-700/80 rounded-2xl shadow-2xl overflow-hidden animate-fade-in flex flex-col max-h-80">
-                    {/* Internal search in folder selector */}
-                    <div className="p-2 border-b border-zinc-800 bg-black/40">
-                      <div className="relative">
-                        <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                        <input
-                          type="text"
-                          value={folderSearchFilter}
-                          onChange={(e) => setFolderSearchFilter(e.target.value)}
-                          placeholder="Filtrar pastas..."
-                          className="w-full bg-zinc-900 border border-zinc-700/60 rounded-lg pl-8 pr-2 py-1 text-[11px] text-zinc-200 placeholder-zinc-500 outline-none"
-                          autoFocus
-                        />
+                {/* Folder Selector Dropdown Menu */}
+                {isFolderDropdownOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-30"
+                      onClick={() => setIsFolderDropdownOpen(false)}
+                    />
+                    <div className="absolute left-0 right-0 sm:right-auto sm:w-72 mt-1.5 z-40 bg-[#0d0a17] border border-zinc-700/80 rounded-2xl shadow-2xl overflow-hidden animate-fade-in flex flex-col max-h-80">
+                      {/* Internal search in folder selector */}
+                      <div className="p-2 border-b border-zinc-800 bg-black/40">
+                        <div className="relative">
+                          <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            value={folderSearchFilter}
+                            onChange={(e) => setFolderSearchFilter(e.target.value)}
+                            placeholder="Filtrar pastas..."
+                            className="w-full bg-zinc-900 border border-zinc-700/60 rounded-lg pl-8 pr-2 py-1 text-[11px] text-zinc-200 placeholder-zinc-500 outline-none"
+                            autoFocus
+                          />
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="overflow-y-auto p-1.5 space-y-0.5 max-h-60 no-scrollbar">
-                      {/* Option: All folders */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedFolder(null);
-                          setIsFolderDropdownOpen(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
-                          selectedFolder === null
-                            ? 'bg-cyan-500 text-zinc-950 font-bold'
-                            : 'text-zinc-300 hover:bg-zinc-800/80'
-                        }`}
-                      >
-                        <span className="flex items-center gap-2">
-                          <Layers className="w-3.5 h-3.5" />
-                          <span>Todas as Pastas</span>
-                        </span>
-                        <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${selectedFolder === null ? 'bg-black/30 text-zinc-950' : 'bg-zinc-800 text-zinc-400'}`}>
-                          {categoryEntities.length}
-                        </span>
-                      </button>
-
-                      {/* Option: Uncategorized / Root */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedFolder('__none__');
-                          setIsFolderDropdownOpen(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
-                          selectedFolder === '__none__'
-                            ? 'bg-cyan-500 text-zinc-950 font-bold'
-                            : 'text-zinc-300 hover:bg-zinc-800/80'
-                        }`}
-                      >
-                        <span className="flex items-center gap-2">
-                          <Folder className="w-3.5 h-3.5 text-zinc-500" />
-                          <span>Sem Pasta (Raiz)</span>
-                        </span>
-                        <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${selectedFolder === '__none__' ? 'bg-black/30 text-zinc-950' : 'bg-zinc-800 text-zinc-400'}`}>
-                          {folderCounts.__none__ || 0}
-                        </span>
-                      </button>
-
-                      {allFolderNames
-                        .filter((f) => f.toLowerCase().includes(folderSearchFilter.toLowerCase()))
-                        .map((folderName) => {
-                          const isSelected = selectedFolder === folderName;
-                          const count = folderCounts[folderName] || 0;
-                          const isSecret = HecosStorage.isFolderSecret(folderName);
-
-                          return (
-                            <button
-                              key={folderName}
-                              type="button"
-                              onClick={() => {
-                                setSelectedFolder(folderName);
-                                setIsFolderDropdownOpen(false);
-                              }}
-                              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
-                                isSelected
-                                  ? 'bg-purple-600 text-white font-bold'
-                                  : 'text-zinc-300 hover:bg-zinc-800/80'
-                              }`}
-                            >
-                              <span className="flex items-center gap-2 truncate">
-                                <Folder className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-white' : 'text-purple-400'}`} />
-                                <span className="truncate">{folderName}</span>
-                                {isSecret && (
-                                  <span className="text-[9px] px-1 py-0.2 rounded bg-rose-950 text-rose-300 border border-rose-800 font-mono">
-                                    GM
-                                  </span>
-                                )}
-                              </span>
-                              <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded shrink-0 ${isSelected ? 'bg-black/30 text-white' : 'bg-zinc-800 text-zinc-400'}`}>
-                                {count}
-                              </span>
-                            </button>
-                          );
-                        })}
-                    </div>
-
-                    {isActualGm && (
-                      <div className="p-1.5 border-t border-zinc-800 bg-[#090710]">
+                      <div className="overflow-y-auto p-1.5 space-y-0.5 max-h-60 no-scrollbar">
+                        {/* Option: All folders */}
                         <button
                           type="button"
                           onClick={() => {
+                            setSelectedFolder(null);
                             setIsFolderDropdownOpen(false);
-                            setIsFolderManagerOpen(true);
                           }}
-                          className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-cyan-300 hover:text-cyan-200 bg-cyan-950/40 hover:bg-cyan-950/70 border border-cyan-800/50 rounded-lg transition-colors cursor-pointer font-semibold"
+                          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                            selectedFolder === null
+                              ? 'bg-cyan-500 text-zinc-950 font-bold'
+                              : 'text-zinc-300 hover:bg-zinc-800/80'
+                          }`}
                         >
-                          <Settings className="w-3.5 h-3.5" />
-                          <span>Gerenciar Pastas...</span>
+                          <span className="flex items-center gap-2">
+                            <Layers className="w-3.5 h-3.5" />
+                            <span>Todas as Pastas</span>
+                          </span>
+                          <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${selectedFolder === null ? 'bg-black/30 text-zinc-950' : 'bg-zinc-800 text-zinc-400'}`}>
+                            {categoryEntities.length}
+                          </span>
                         </button>
+
+                        {/* Option: Uncategorized / Root */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedFolder('__none__');
+                            setIsFolderDropdownOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                            selectedFolder === '__none__'
+                              ? 'bg-cyan-500 text-zinc-950 font-bold'
+                              : 'text-zinc-300 hover:bg-zinc-800/80'
+                          }`}
+                        >
+                          <span className="flex items-center gap-2">
+                            <Folder className="w-3.5 h-3.5 text-zinc-500" />
+                            <span>Sem Pasta (Raiz)</span>
+                          </span>
+                          <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${selectedFolder === '__none__' ? 'bg-black/30 text-zinc-950' : 'bg-zinc-800 text-zinc-400'}`}>
+                            {folderCounts.__none__ || 0}
+                          </span>
+                        </button>
+
+                        {allFolderNames
+                          .filter((f) => f.toLowerCase().includes(folderSearchFilter.toLowerCase()))
+                          .map((folderName) => {
+                            const isSelected = selectedFolder === folderName;
+                            const count = folderCounts[folderName] || 0;
+                            const isSecret = HecosStorage.isFolderSecret(folderName);
+
+                            return (
+                              <button
+                                key={folderName}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedFolder(folderName);
+                                  setIsFolderDropdownOpen(false);
+                                }}
+                                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-purple-600 text-white font-bold'
+                                    : 'text-zinc-300 hover:bg-zinc-800/80'
+                                }`}
+                              >
+                                <span className="flex items-center gap-2 truncate">
+                                  <Folder className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-white' : 'text-purple-400'}`} />
+                                  <span className="truncate">{folderName}</span>
+                                  {isSecret && (
+                                    <span className="text-[9px] px-1 py-0.2 rounded bg-rose-950 text-rose-300 border border-rose-800 font-mono">
+                                      GM
+                                    </span>
+                                  )}
+                                </span>
+                                <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded shrink-0 ${isSelected ? 'bg-black/30 text-white' : 'bg-zinc-800 text-zinc-400'}`}>
+                                  {count}
+                                </span>
+                              </button>
+                            );
+                          })}
                       </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
+
+                      {isActualGm && (
+                        <div className="p-1.5 border-t border-zinc-800 bg-[#090710]">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsFolderDropdownOpen(false);
+                              setIsFolderManagerOpen(true);
+                            }}
+                            className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-cyan-300 hover:text-cyan-200 bg-cyan-950/40 hover:bg-cyan-950/70 border border-cyan-800/50 rounded-lg transition-colors cursor-pointer font-semibold"
+                          >
+                            <Settings className="w-3.5 h-3.5" />
+                            <span>Gerenciar Pastas...</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
             )}
 
             {/* Tag Filter Badge (if selected) */}

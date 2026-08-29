@@ -32,6 +32,7 @@ import { EntityIcon } from './EntityIcon';
 import { getCategoryMeta } from '../utils/categories';
 import { RichContentRenderer } from './RichContentRenderer';
 import { TraitBadge } from './TraitBadge';
+import { extractEntityAllTraits } from '../utils/traitUtils';
 import { AdjustableImage } from './AdjustableImage';
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 
@@ -442,23 +443,27 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
                           </div>
 
                           {/* Traits & Tags Bar */}
-                          {((currentEntity.traits || []).length > 0 || (currentEntity.tags || []).length > 0) && (
-                            <div className="flex flex-wrap gap-1.5 mt-4 pt-3 border-t border-zinc-800/80">
-                              {(currentEntity.traits || []).map((t) => (
-                                <TraitBadge key={t} trait={t} size="sm" />
-                              ))}
-                              {(currentEntity.tags || []).map((t) => (
-                                <button
-                                  key={t}
-                                  type="button"
-                                  onClick={() => handleTagClick(t)}
-                                  className="px-2 py-0.5 rounded-md bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-cyan-300 transition-colors text-xs font-mono"
-                                >
-                                  #{t}
-                                </button>
-                              ))}
-                            </div>
-                          )}
+                          {(() => {
+                            const allTraits = currentEntity ? extractEntityAllTraits(currentEntity) : [];
+                            if (allTraits.length === 0 && (currentEntity.tags || []).length === 0) return null;
+                            return (
+                              <div className="flex flex-wrap gap-1.5 mt-4 pt-3 border-t border-zinc-800/80">
+                                {allTraits.map((t) => (
+                                  <TraitBadge key={t} trait={t} size="sm" />
+                                ))}
+                                {(currentEntity.tags || []).map((t) => (
+                                  <button
+                                    key={t}
+                                    type="button"
+                                    onClick={() => handleTagClick(t)}
+                                    className="px-2 py-0.5 rounded-md bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-cyan-300 transition-colors text-xs font-mono"
+                                  >
+                                    #{t}
+                                  </button>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
 

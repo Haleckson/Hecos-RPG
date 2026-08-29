@@ -41,8 +41,6 @@ export const ClassCreateModal: React.FC<ClassCreateModalProps> = ({
   onClose,
   onSave
 }) => {
-  if (!isOpen) return null;
-
   const [kind, setKind] = useState<'class' | 'archetype'>(initialKind);
   const [name, setName] = useState('');
   const [subtitle, setSubtitle] = useState('');
@@ -276,6 +274,8 @@ ${gmNotes.trim() ? `\n:::gm\n**Notas do Mestre:**\n${gmNotes.trim()}\n:::\n` : '
     onSave(newEntity);
     onClose();
   };
+
+  if (!isOpen) return null;
 
   return (
     <div
@@ -521,6 +521,9 @@ ${gmNotes.trim() ? `\n:::gm\n**Notas do Mestre:**\n${gmNotes.trim()}\n:::\n` : '
                   value={coverImage}
                   onChange={setCoverImage}
                   placeholder="URL da arte conceitual ou faça upload..."
+                  category="classe"
+                  entityName={name || 'classe'}
+                  role="capa"
                 />
               </div>
 

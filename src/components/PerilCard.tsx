@@ -612,9 +612,10 @@ export const PerilCard: React.FC<PerilCardProps> = ({
   const canViewActions = isFieldVisible('actionsAndAbilities');
 
   const kind = perilData.perilKind || (currentEntity.category === 'creature' ? 'monster' : 'hazard_simple');
+  const isMonster = kind === 'monster';
   const level = perilData.level ?? currentEntity.statblock?.level ?? 1;
   const rarity = perilData.rarity || currentEntity.statblock?.rarity || 'Comum';
-  const size = perilData.size || currentEntity.statblock?.size;
+  const size = isMonster ? (perilData.size || currentEntity.statblock?.size || 'Médio') : (perilData.size || undefined);
 
   // Portrait and Token Images (masked if description/visuals are private)
   const coverImage = (canViewDescription || effectiveIsGm) ? (currentEntity.coverImage || perilData.portraitImage) : undefined;
@@ -623,8 +624,12 @@ export const PerilCard: React.FC<PerilCardProps> = ({
   // Visibility classes
   const visStyle = getCardVisibilityClasses(currentEntity.visibility, currentEntity.isSecret);
 
-  // Traits
-  const rawTraits = perilData.traits || currentEntity.statblock?.traits || currentEntity.tags || [];
+  // Traits - strictly show Rarity, Size (when monster/specified), and genuine custom traits chosen
+  const rawTraits = (perilData.traits && perilData.traits.length > 0)
+    ? perilData.traits
+    : (currentEntity.statblock?.traits && currentEntity.statblock.traits.length > 0)
+    ? currentEntity.statblock.traits
+    : [];
   const orderedTraits = sortTraitsHierarchically(rawTraits, { rarity, size });
 
   // Folders
@@ -755,7 +760,7 @@ export const PerilCard: React.FC<PerilCardProps> = ({
           {/* TOKEN + NOME + SUBTÍTULO COM TOOLTIP FLUTUANTE ZERO SCROLL */}
           <div className="flex items-start gap-2.5">
             <Tooltip
-              content={<PerilTooltipCard peril={currentEntity} onSelectEntity={handleOpenInDrawer} />}
+              content={<PerilTooltipCard peril={currentEntity} onSelectEntity={() => handleOpenInDrawer()} />}
               delay={200}
               placement="right"
             >
@@ -783,9 +788,10 @@ export const PerilCard: React.FC<PerilCardProps> = ({
 
             <div className="min-w-0 flex-1">
               <Tooltip
-                content={<PerilTooltipCard peril={currentEntity} onSelectEntity={handleOpenInDrawer} />}
-                delay={250}
-                placement="top"
+                content={<PerilTooltipCard peril={currentEntity} onSelectEntity={() => handleOpenInDrawer()} />}
+                delay={200}
+                side="right"
+                className="w-full"
               >
                 <div className="text-left w-full group/title focus:outline-none cursor-pointer block transition-all">
                   <h3 className="text-base sm:text-lg font-black text-zinc-100 group-hover/title:text-rose-300 font-serif group-hover/title:drop-shadow-[0_0_15px_rgba(244,63,94,0.9)] flex items-center gap-1.5 leading-snug break-words transition-all">
