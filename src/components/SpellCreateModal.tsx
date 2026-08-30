@@ -492,7 +492,7 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
       updatedAt: new Date().toISOString(),
       isSecret: visibility === 'gm',
       visibility,
-      allowedUserIds: visibility === 'specific' ? allowedUserIds : [],
+      allowedUserIds: visibility === 'custom' ? allowedUserIds : [],
     };
 
     HecosStorage.saveEntity(savedEntity);

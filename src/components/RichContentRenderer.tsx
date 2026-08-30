@@ -23,6 +23,7 @@ import {
 interface RichContentRendererProps {
   content: string;
   onNavigate?: (entityId: string) => void;
+  onTagClick?: (tag: string) => void;
   className?: string;
   isGmMode?: boolean;
   inline?: boolean;

@@ -23,7 +23,9 @@ interface EntityCardProps {
   onSelect: (id: string) => void;
   onTagClick?: (tag: string) => void;
   onDelete?: (id: string) => void;
+  onEdit?: (id: string) => void;
   isGm?: boolean;
+  isGmMode?: boolean;
 }
 
 export const EntityCard: React.FC<EntityCardProps> = ({
@@ -31,11 +33,13 @@ export const EntityCard: React.FC<EntityCardProps> = ({
   onSelect,
   onTagClick,
   onDelete,
-  isGm = false
+  onEdit,
+  isGm = false,
+  isGmMode = false
 }) => {
   const meta = getCategoryMeta(entity.category);
   const currentUser = HecosStorage.getCurrentUser();
-  const effectiveIsGm = isGm || currentUser?.role === 'gm';
+  const effectiveIsGm = isGm || isGmMode || currentUser?.role === 'gm';
 
   const isCiano = meta.accentColor === 'ciano';
   const isMalva = meta.accentColor === 'malva';

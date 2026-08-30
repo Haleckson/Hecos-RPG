@@ -95,7 +95,7 @@ export function App() {
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [selectedCategoryKey, setSelectedCategoryKey] = useState<string>('codex');
   const [activeSubcategory, setActiveSubcategory] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<'entities' | 'view' | 'edit' | 'map' | 'timeline' | 'tags'>('entities');
+  const [activeView, setActiveView] = useState<'entities' | 'view' | 'edit' | 'map' | 'timeline' | 'tags' | 'quests'>('entities');
   
   const [editingEntity, setEditingEntity] = useState<HecosEntity | null>(null);
   const [isGmMode, setIsGmMode] = useState<boolean>(true);
@@ -1935,9 +1935,9 @@ export function App() {
       <TrashBinModal
         isOpen={isTrashOpen}
         onClose={() => setIsTrashOpen(false)}
-        onRestoreEntity={(id) => {
+        onRestoreEntity={(restored) => {
           refreshEntities();
-          handleNavigateEntity(id);
+          handleNavigateEntity(restored.id);
         }}
       />
 

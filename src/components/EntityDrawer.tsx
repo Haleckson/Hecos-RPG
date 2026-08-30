@@ -506,16 +506,16 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
                           </div>
 
                           {/* Saves */}
-                          {currentEntity.statblock.saves && (
+                          {(currentEntity.statblock.saves || currentEntity.statblock.fort !== undefined || currentEntity.statblock.will !== undefined) && (
                             <div className="flex items-center justify-around gap-2 pt-2 border-t border-zinc-800/80 text-xs font-mono">
                               <span className="text-zinc-400">
-                                Fort: <strong className="text-zinc-200">+{currentEntity.statblock.saves.fortitude || 0}</strong>
+                                Fort: <strong className="text-zinc-200">+{currentEntity.statblock.saves?.fortitude ?? currentEntity.statblock.saves?.fort ?? currentEntity.statblock.fort ?? 0}</strong>
                               </span>
                               <span className="text-zinc-400">
-                                Ref: <strong className="text-zinc-200">+{currentEntity.statblock.saves.reflex || 0}</strong>
+                                Ref: <strong className="text-zinc-200">+{currentEntity.statblock.saves?.reflex ?? currentEntity.statblock.saves?.ref ?? currentEntity.statblock.ref ?? 0}</strong>
                               </span>
                               <span className="text-zinc-400">
-                                Vont: <strong className="text-zinc-200">+{currentEntity.statblock.saves.will || 0}</strong>
+                                Vont: <strong className="text-zinc-200">+{currentEntity.statblock.saves?.will ?? currentEntity.statblock.will ?? 0}</strong>
                               </span>
                             </div>
                           )}

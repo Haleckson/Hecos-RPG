@@ -30,6 +30,7 @@ import {
 interface ItemPickerModalProps {
   isOpen: boolean;
   onClose: () => void;
+  title?: string;
   onSelectItems: (
     selected: {
       entity: HecosEntity;

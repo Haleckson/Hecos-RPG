@@ -71,7 +71,7 @@ export type SpellCategoryType =
 export interface PF2eSpellAttributes {
   rank: number; // 0 = Truque / Cantrip, 1-10
   traditions: string[];
-  spellType?: 'spell' | 'focus' | 'ritual' | 'other' | 'cantrip';
+  spellType?: 'spell' | 'focus' | 'ritual' | 'other' | 'cantrip' | 'extras';
   subcategories?: string[];
   tags?: string[];
   castTime: string;
@@ -150,6 +150,7 @@ export interface PF2eStatblock {
   perception?: number;
   senses?: string;
   languages?: string[];
+  innate?: string;
   skills?: Record<string, number>;
   abilities?: {
     str: number;
@@ -163,6 +164,13 @@ export interface PF2eStatblock {
   fort?: number;
   ref?: number;
   will?: number;
+  saves?: {
+    fort?: number;
+    ref?: number;
+    will?: number;
+    fortitude?: number;
+    reflex?: number;
+  } | Record<string, number>;
   hp?: number;
   immunities?: string[];
   resistances?: string[];
@@ -495,8 +503,8 @@ export interface PerilAttributes {
   portraitImage?: string;
   tokenImage?: string;
   level: number;
-  rarity: 'Comum' | 'Incomum' | 'Raro' | 'Único';
-  size?: 'Tiny' | 'Small' | 'Medium' | 'Large' | 'Huge' | 'Gargantuan';
+  rarity: 'Comum' | 'Incomum' | 'Raro' | 'Único' | string;
+  size?: 'Tiny' | 'Small' | 'Medium' | 'Large' | 'Huge' | 'Gargantuan' | 'Minúsculo' | 'Pequeno' | 'Médio' | 'Grande' | 'Enorme' | 'Gigantesco' | string;
   traits: string[];
   stealthCheck?: string; // e.g. "Furtividade +15 ou Percepção CD 25 para notar"
   
@@ -666,6 +674,7 @@ export interface HecosEntity {
   isSecret?: boolean;
   visibility?: ItemVisibility;
   allowedUserIds?: string[];
+  gmNotes?: string;
   createdAt: string;
   updatedAt: string;
 

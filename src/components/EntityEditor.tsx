@@ -81,7 +81,7 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
   const [tagsString, setTagsString] = useState((entity.tags || []).join(', '));
   const [traitsString, setTraitsString] = useState((entity.traits || []).join(', '));
   const [isSecret, setIsSecret] = useState(entity.isSecret !== undefined ? entity.isSecret : true);
-  const [visibility, setVisibility] = useState<ItemVisibility>(entity.visibility || (entity.isSecret ? 'gm' : 'public'));
+  const [visibility, setVisibility] = useState<ItemVisibility>(entity.visibility || (entity.isSecret ? 'gm' : 'all'));
   const [allowedUserIds, setAllowedUserIds] = useState<string[]>(entity.allowedUserIds || []);
   const [useStructuredAncestry, setUseStructuredAncestry] = useState(true);
   const [useStructuredFeat, setUseStructuredFeat] = useState(true);

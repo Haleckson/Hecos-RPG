@@ -194,11 +194,11 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
     initPeril?.perilKind || (targetEntity?.category === 'creature' ? 'monster' : 'monster')
   );
   const [level, setLevel] = useState<number>(initPeril?.level ?? targetEntity?.statblock?.level ?? 1);
-  const [rarity, setRarity] = useState<'Comum' | 'Incomum' | 'Raro' | 'Único'>(
-    (initPeril?.rarity || targetEntity?.statblock?.rarity || 'Comum') as 'Comum' | 'Incomum' | 'Raro' | 'Único'
+  const [rarity, setRarity] = useState<string>(
+    canonicalizeRarityName(initPeril?.rarity || targetEntity?.statblock?.rarity || 'Comum')
   );
-  const [size, setSize] = useState<'Tiny' | 'Small' | 'Medium' | 'Large' | 'Huge' | 'Gargantuan'>(
-    (initPeril?.size || targetEntity?.statblock?.size || 'Medium') as 'Tiny' | 'Small' | 'Medium' | 'Large' | 'Huge' | 'Gargantuan'
+  const [size, setSize] = useState<string>(
+    canonicalizeSizeName(initPeril?.size || targetEntity?.statblock?.size || 'Médio')
   );
   const [traits, setTraits] = useState<string[]>(() =>
     normalizeStringArray(initPeril?.traits || targetEntity?.statblock?.traits || targetEntity?.traits)

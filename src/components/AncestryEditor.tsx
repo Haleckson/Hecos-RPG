@@ -65,7 +65,7 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
   const [icon, setIcon] = useState(entity.icon || '');
   const [tagsString, setTagsString] = useState((entity.tags || []).join(', '));
   const [isSecret, setIsSecret] = useState(entity.isSecret || false);
-  const [visibility, setVisibility] = useState<ItemVisibility>(entity.visibility || (entity.isSecret ? 'gm' : 'public'));
+  const [visibility, setVisibility] = useState<ItemVisibility>(entity.visibility || (entity.isSecret ? 'gm' : 'all'));
   const [allowedUserIds, setAllowedUserIds] = useState<string[]>(entity.allowedUserIds || []);
 
   // Parse or initialize blank structured Ancestry Attributes
@@ -1286,7 +1286,7 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
                         onCancel={() => setIsBulkUploadOpen(false)}
                         themeColor="purple"
                         category="ancestralidade"
-                        entityName={name || 'ancestralidade'}
+                        entityName={title || 'ancestralidade'}
                         role="album"
                         startIndex={(data.album || []).length + 1}
                       />
@@ -1325,7 +1325,7 @@ export const AncestryEditor: React.FC<AncestryEditorProps> = ({
                               label={`Imagem #${idx + 1} (URL ou Upload)`}
                               placeholder="https://... ou faça upload"
                               category="ancestralidade"
-                              entityName={name || 'ancestralidade'}
+                              entityName={title || 'ancestralidade'}
                               role="album"
                               index={idx + 1}
                             />

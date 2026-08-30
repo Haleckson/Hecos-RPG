@@ -139,10 +139,10 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
 
   // Filtering & Sorting State with persistence
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<'count-desc' | 'count-asc' | 'alpha-asc' | 'alpha-desc'>(() => {
+  const [sortBy, setSortBy] = useState<'hierarchy' | 'count-desc' | 'count-asc' | 'alpha-asc' | 'alpha-desc'>(() => {
     try {
       const saved = localStorage.getItem('hecos_tag_explorer_sort_by');
-      if (saved === 'count-desc' || saved === 'count-asc' || saved === 'alpha-asc' || saved === 'alpha-desc') {
+      if (saved === 'hierarchy' || saved === 'count-desc' || saved === 'count-asc' || saved === 'alpha-asc' || saved === 'alpha-desc') {
         return saved;
       }
     } catch {}
@@ -158,7 +158,7 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
   });
 
   // Persist sorting and view mode changes
-  const handleSortChange = (newSort: 'count-desc' | 'count-asc' | 'alpha-asc' | 'alpha-desc') => {
+  const handleSortChange = (newSort: 'hierarchy' | 'count-desc' | 'count-asc' | 'alpha-asc' | 'alpha-desc') => {
     setSortBy(newSort);
     try {
       localStorage.setItem('hecos_tag_explorer_sort_by', newSort);

@@ -4,6 +4,7 @@ import { LucideIcon } from 'lucide-react';
 
 interface EntityIconProps {
   icon?: string;
+  iconName?: string;
   category?: string;
   className?: string;
   imageClassName?: string;
@@ -39,17 +40,19 @@ const CATEGORY_DEFAULT_ICONS: Record<string, string> = {
 
 export const EntityIcon: React.FC<EntityIconProps> = ({
   icon,
+  iconName: propIconName,
   category,
   className = 'w-5 h-5',
   imageClassName,
   fallbackIcon: Fallback,
   size,
 }) => {
+  const effectiveIcon = icon || propIconName;
   // If icon is a web URL or data URL (image avatar/token)
-  if (icon && (icon.startsWith('http://') || icon.startsWith('https://') || icon.startsWith('data:'))) {
+  if (effectiveIcon && (effectiveIcon.startsWith('http://') || effectiveIcon.startsWith('https://') || effectiveIcon.startsWith('data:'))) {
     return (
       <img
-        src={icon}
+        src={effectiveIcon}
         alt="Ícone"
         referrerPolicy="no-referrer"
         className={`object-cover ${imageClassName || className}`}
@@ -59,10 +62,10 @@ export const EntityIcon: React.FC<EntityIconProps> = ({
   }
 
   // Determine Lucide Icon Name
-  const iconName = icon || (category ? CATEGORY_DEFAULT_ICONS[category] : 'BookOpen') || 'BookOpen';
+  const finalIconName = effectiveIcon || (category ? CATEGORY_DEFAULT_ICONS[category] : 'BookOpen') || 'BookOpen';
 
   // Find icon in Lucide collection
-  const IconComponent = (LucideIcons as unknown as Record<string, LucideIcon>)[iconName] || Fallback || LucideIcons.BookOpen;
+  const IconComponent = (LucideIcons as unknown as Record<string, LucideIcon>)[finalIconName] || Fallback || LucideIcons.BookOpen;
 
   return (
     <IconComponent
