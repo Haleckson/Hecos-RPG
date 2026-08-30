@@ -332,8 +332,8 @@ export const FeatView: React.FC<FeatViewProps> = ({
       {/* SEÇÃO DE LORE & CONTEXTO EM HECOS */}
       {(featData.hecosLore || featData.roleplayTips || featData.gmNotes) && (
         <div className="p-6 rounded-2xl bg-[#0b0914] border border-zinc-800 space-y-4">
-          <h3 className="text-base font-bold text-[#74b6c2] flex items-center gap-2.5 font-serif border-b border-zinc-800 pb-2">
-            <Scroll className="w-4 h-4 text-cyan-400" />
+          <h3 className="text-base font-bold text-amber-300 flex items-center gap-2.5 font-serif border-b border-zinc-800 pb-2">
+            <Scroll className="w-4 h-4 text-amber-400" />
             <span>Contexto & Tradição no Mundo de Hecos</span>
           </h3>
 
@@ -349,7 +349,7 @@ export const FeatView: React.FC<FeatViewProps> = ({
 
             {featData.roleplayTips && (
               <div className="p-4 rounded-xl bg-black/40 border border-zinc-800 space-y-1">
-                <h4 className="text-[11px] font-bold text-purple-300 uppercase font-mono mb-1">
+                <h4 className="text-[11px] font-bold text-amber-200 uppercase font-mono mb-1">
                   Dicas de Interpretação e Visual
                 </h4>
                 <RichContentRenderer content={featData.roleplayTips} onNavigate={onNavigate} />

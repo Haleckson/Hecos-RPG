@@ -98,6 +98,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       case 'session': return <BookOpen className="w-4 h-4 text-cyan-400" />;
       case 'rule': return <Scroll className="w-4 h-4 text-purple-400" />;
       case 'timeline': return <History className="w-4 h-4 text-rose-400" />;
+      case 'quest': return <BookOpen className="w-4 h-4 text-amber-400" />;
       default: return <BookOpen className="w-4 h-4 text-zinc-400" />;
     }
   };

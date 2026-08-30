@@ -422,8 +422,8 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md overflow-hidden animate-fade-in">
-      <div className="bg-[#0b0816] border border-zinc-700/80 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-1 sm:p-2 md:p-3 bg-black/90 backdrop-blur-md overflow-hidden animate-fade-in">
+      <div className="w-[95vw] h-[95vh] max-w-[98vw] max-h-[98vh] bg-[#0b0816] border border-amber-900/60 rounded-2xl shadow-[0_0_60px_rgba(245,158,11,0.2)] flex flex-col overflow-hidden text-zinc-100">
         {/* Modal Header */}
         <div className="p-4 sm:p-5 bg-[#0e0a1b] border-b border-zinc-800/80 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">

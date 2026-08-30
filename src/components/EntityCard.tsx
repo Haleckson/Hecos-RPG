@@ -1,10 +1,11 @@
 import React from 'react';
 import { HecosEntity } from '../types';
-import { getCategoryMeta } from '../utils/categories';
+import { getCategoryMeta, getCategoryTheme } from '../utils/categories';
 import { EntityIcon } from './EntityIcon';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { AdjustableImage } from './AdjustableImage';
 import { TraitBadge } from './TraitBadge';
+import { Tooltip } from './Tooltip';
 import { renderContentWithMentions } from './MentionBadge';
 import { HecosStorage } from '../services/storage';
 import { getCardVisibilityClasses } from '../utils/cardVisibility';
@@ -38,17 +39,9 @@ export const EntityCard: React.FC<EntityCardProps> = ({
   isGmMode = false
 }) => {
   const meta = getCategoryMeta(entity.category);
+  const theme = getCategoryTheme(entity.category);
   const currentUser = HecosStorage.getCurrentUser();
   const effectiveIsGm = isGm || isGmMode || currentUser?.role === 'gm';
-
-  const isCiano = meta.accentColor === 'ciano';
-  const isMalva = meta.accentColor === 'malva';
-
-  const accentColorClass = isCiano
-    ? 'text-cyan-300 border-cyan-800 bg-cyan-950/80 shadow-[0_0_15px_rgba(6,182,212,0.2)]'
-    : isMalva
-    ? 'text-purple-300 border-purple-800 bg-purple-950/80 shadow-[0_0_15px_rgba(168,85,247,0.2)]'
-    : 'text-rose-300 border-rose-800 bg-rose-950/80 shadow-[0_0_15px_rgba(244,63,94,0.2)]';
 
   const visStyle = getCardVisibilityClasses(entity.visibility, entity.isSecret);
   const coverImage = entity.coverImage;
@@ -70,7 +63,7 @@ export const EntityCard: React.FC<EntityCardProps> = ({
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-[#1b1236] via-[#100b21] to-[#0a0714] flex items-center justify-center p-4">
-            <div className="w-14 h-14 rounded-2xl bg-black/40 border border-zinc-800/80 flex items-center justify-center text-zinc-500 group-hover:text-cyan-300 group-hover:scale-110 transition-all">
+            <div className={`w-14 h-14 rounded-2xl bg-black/40 border border-zinc-800/80 flex items-center justify-center text-zinc-500 group-hover:${theme.textAccent} group-hover:scale-110 transition-all`}>
               <EntityIcon
                 icon={entity.icon}
                 category={entity.category}
@@ -85,13 +78,15 @@ export const EntityCard: React.FC<EntityCardProps> = ({
 
         {/* Floating Category Pill & Actions */}
         <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-auto">
-          <span
-            className={`text-[10px] uppercase font-bold px-2.5 py-1 rounded-md border backdrop-blur-md flex items-center gap-1.5 ${accentColorClass}`}
-          >
-            <EntityIcon icon={entity.icon} category={entity.category} className="w-3 h-3" />
-            <span>{meta.name}</span>
-            {entity.statblock && <span>• Nv {entity.statblock.level}</span>}
-          </span>
+          <Tooltip content={`${meta.name}${entity.statblock ? ` • Nível ${entity.statblock.level}` : ''}`}>
+            <span
+              className={`text-[10px] uppercase font-bold px-2.5 py-1 rounded-md border backdrop-blur-md flex items-center gap-1.5 cursor-help ${theme.badgeBg} ${theme.badgeText} ${theme.badgeBorder}`}
+            >
+              <EntityIcon icon={entity.icon} category={entity.category} className="w-3 h-3" />
+              <span>{meta.name}</span>
+              {entity.statblock && <span>• Nv {entity.statblock.level}</span>}
+            </span>
+          </Tooltip>
 
           {effectiveIsGm && (
             <div
@@ -107,14 +102,15 @@ export const EntityCard: React.FC<EntityCardProps> = ({
                 }}
               />
               {onDelete && (
-                <button
-                  type="button"
-                  onClick={() => onDelete(entity.id)}
-                  className="p-1 rounded hover:bg-rose-950 text-zinc-400 hover:text-rose-300 transition-colors cursor-pointer"
-                  title="Excluir Artigo"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
+                <Tooltip content="Excluir Artigo">
+                  <button
+                    type="button"
+                    onClick={() => onDelete(entity.id)}
+                    className="p-1 rounded hover:bg-rose-950 text-zinc-400 hover:text-rose-300 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </Tooltip>
               )}
             </div>
           )}
@@ -132,7 +128,7 @@ export const EntityCard: React.FC<EntityCardProps> = ({
               className="text-left w-full group/title flex items-start gap-2.5 cursor-pointer focus:outline-none transition-all"
               title={`Abrir artigo ${entity.title}`}
             >
-              <div className="w-7 h-7 rounded-lg bg-[#18112b] border border-zinc-700/80 group-hover/title:border-cyan-400 flex items-center justify-center text-cyan-300 shrink-0 mt-0.5 shadow-sm transition-all group-hover/title:scale-105">
+              <div className={`w-7 h-7 rounded-lg bg-[#18112b] border border-zinc-700/80 group-hover/title:${theme.borderAccent} flex items-center justify-center ${theme.textAccent} shrink-0 mt-0.5 shadow-sm transition-all group-hover/title:scale-105`}>
                 <EntityIcon
                   icon={entity.icon}
                   category={entity.category}
@@ -140,11 +136,11 @@ export const EntityCard: React.FC<EntityCardProps> = ({
                 />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-base font-bold text-zinc-100 group-hover/title:text-cyan-300 transition-all font-serif group-hover/title:drop-shadow-[0_0_12px_rgba(6,182,212,0.85)] flex items-center gap-1.5 break-words">
-                  <span className="group-hover/title:underline decoration-cyan-400/80 decoration-2 underline-offset-2">
+                <h3 className={`text-base font-bold text-zinc-100 group-hover/title:${theme.textAccent} transition-all font-serif flex items-center gap-1.5 break-words`}>
+                  <span className="group-hover/title:underline decoration-2 underline-offset-2">
                     {entity.title}
                   </span>
-                  <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover/title:opacity-100 text-cyan-400 group-hover/title:translate-x-0.5 transition-all shrink-0" />
+                  <ArrowRight className={`w-3.5 h-3.5 opacity-0 group-hover/title:opacity-100 ${theme.textAccent} group-hover/title:translate-x-0.5 transition-all shrink-0`} />
                 </h3>
                 {entity.subtitle && (
                   <p className="text-xs text-zinc-400 font-medium mt-0.5 break-words">
@@ -178,31 +174,34 @@ export const EntityCard: React.FC<EntityCardProps> = ({
           <div className="flex flex-wrap gap-1 items-center">
             {entity.tags && entity.tags.length > 0 ? (
               entity.tags.map((t, tIdx) => (
-                <button
-                  key={`${entity.id}-crdtag-${t}-${tIdx}`}
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (onTagClick) onTagClick(t);
-                  }}
-                  className="text-[10px] px-1.5 py-0.5 rounded bg-black/60 hover:bg-zinc-800 text-zinc-400 hover:text-cyan-300 border border-zinc-800 transition-colors cursor-pointer"
-                >
-                  #{t}
-                </button>
+                <Tooltip key={`${entity.id}-crdtag-${t}-${tIdx}`} content={`Filtrar por tag #${t}`}>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onTagClick) onTagClick(t);
+                    }}
+                    className={`text-[10px] px-1.5 py-0.5 rounded bg-black/60 hover:bg-zinc-800 text-zinc-400 hover:${theme.textAccent} border border-zinc-800 transition-colors cursor-pointer`}
+                  >
+                    #{t}
+                  </button>
+                </Tooltip>
               ))
             ) : (
               <span className="text-[10px] text-zinc-600 font-mono">Sem tags</span>
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={() => onSelect(entity.id)}
-            className="text-[11px] font-semibold text-zinc-400 hover:text-cyan-300 flex items-center gap-1 transition-colors cursor-pointer"
-          >
-            <span>Ver Artigo</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          <Tooltip content={`Abrir artigo completo de ${entity.title}`}>
+            <button
+              type="button"
+              onClick={() => onSelect(entity.id)}
+              className={`text-[11px] font-semibold text-zinc-400 hover:${theme.textAccent} flex items-center gap-1 transition-colors cursor-pointer`}
+            >
+              <span>Ver Artigo</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </Tooltip>
         </div>
       </div>
     </div>

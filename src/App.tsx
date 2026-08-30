@@ -33,6 +33,13 @@ import { EntityCard } from './components/EntityCard';
 import { QuestBoard } from './components/QuestBoard';
 import { PerilCreateModal } from './components/PerilCreateModal';
 import { ClassCreateModal } from './components/ClassCreateModal';
+import { NPCCreateModal } from './components/NPCCreateModal';
+import { LocationCreateModal } from './components/LocationCreateModal';
+import { QuestCreateModal } from './components/QuestCreateModal';
+import { OrganizationCreateModal } from './components/OrganizationCreateModal';
+import { FaunaCreateModal } from './components/FaunaCreateModal';
+import { FloraCreateModal } from './components/FloraCreateModal';
+import { PCCreateModal } from './components/PCCreateModal';
 import { TraitDrawer } from './components/TraitDrawer';
 import { TagDrawer } from './components/TagDrawer';
 import { EntityDrawer } from './components/EntityDrawer';
@@ -199,6 +206,27 @@ export function App() {
   const [editingPerilEntity, setEditingPerilEntity] = useState<HecosEntity | null>(null);
   const [isClassCreateModalOpen, setIsClassCreateModalOpen] = useState(false);
   const [classModalPresetKind, setClassModalPresetKind] = useState<'class' | 'archetype'>('class');
+
+  const [isNpcCreateModalOpen, setIsNpcCreateModalOpen] = useState(false);
+  const [editingNpcEntity, setEditingNpcEntity] = useState<HecosEntity | null>(null);
+
+  const [isLocationCreateModalOpen, setIsLocationCreateModalOpen] = useState(false);
+  const [editingLocationEntity, setEditingLocationEntity] = useState<HecosEntity | null>(null);
+
+  const [isQuestCreateModalOpen, setIsQuestCreateModalOpen] = useState(false);
+  const [editingQuestEntity, setEditingQuestEntity] = useState<HecosEntity | null>(null);
+
+  const [isOrganizationCreateModalOpen, setIsOrganizationCreateModalOpen] = useState(false);
+  const [editingOrganizationEntity, setEditingOrganizationEntity] = useState<HecosEntity | null>(null);
+
+  const [isFaunaCreateModalOpen, setIsFaunaCreateModalOpen] = useState(false);
+  const [editingFaunaEntity, setEditingFaunaEntity] = useState<HecosEntity | null>(null);
+
+  const [isFloraCreateModalOpen, setIsFloraCreateModalOpen] = useState(false);
+  const [editingFloraEntity, setEditingFloraEntity] = useState<HecosEntity | null>(null);
+
+  const [isPcCreateModalOpen, setIsPcCreateModalOpen] = useState(false);
+  const [editingPcEntity, setEditingPcEntity] = useState<HecosEntity | null>(null);
 
   // Trait Drawer state
   const [selectedDrawerTrait, setSelectedDrawerTrait] = useState<string | null>(null);
@@ -423,6 +451,48 @@ export function App() {
       return;
     }
 
+    if (category === 'npc') {
+      setEditingNpcEntity(null);
+      setIsNpcCreateModalOpen(true);
+      return;
+    }
+
+    if (category === 'location') {
+      setEditingLocationEntity(null);
+      setIsLocationCreateModalOpen(true);
+      return;
+    }
+
+    if (category === 'quest') {
+      setEditingQuestEntity(null);
+      setIsQuestCreateModalOpen(true);
+      return;
+    }
+
+    if (category === 'organization') {
+      setEditingOrganizationEntity(null);
+      setIsOrganizationCreateModalOpen(true);
+      return;
+    }
+
+    if (category === 'fauna') {
+      setEditingFaunaEntity(null);
+      setIsFaunaCreateModalOpen(true);
+      return;
+    }
+
+    if (category === 'flora') {
+      setEditingFloraEntity(null);
+      setIsFloraCreateModalOpen(true);
+      return;
+    }
+
+    if (category === 'pc') {
+      setEditingPcEntity(null);
+      setIsPcCreateModalOpen(true);
+      return;
+    }
+
     if (category === 'class' || category === 'archetype') {
       setClassModalPresetKind(category === 'archetype' ? 'archetype' : 'class');
       setIsClassCreateModalOpen(true);
@@ -560,6 +630,41 @@ export function App() {
       handleCreateEntityOfCategory('ancestry');
       return;
     }
+    if (presetCategoryOrSub === 'npc') {
+      setEditingNpcEntity(null);
+      setIsNpcCreateModalOpen(true);
+      return;
+    }
+    if (presetCategoryOrSub === 'location' || presetCategoryOrSub === 'locais') {
+      setEditingLocationEntity(null);
+      setIsLocationCreateModalOpen(true);
+      return;
+    }
+    if (presetCategoryOrSub === 'quest' || presetCategoryOrSub === 'missoes' || presetCategoryOrSub === 'quests') {
+      setEditingQuestEntity(null);
+      setIsQuestCreateModalOpen(true);
+      return;
+    }
+    if (presetCategoryOrSub === 'organization' || presetCategoryOrSub === 'organizacoes') {
+      setEditingOrganizationEntity(null);
+      setIsOrganizationCreateModalOpen(true);
+      return;
+    }
+    if (presetCategoryOrSub === 'fauna') {
+      setEditingFaunaEntity(null);
+      setIsFaunaCreateModalOpen(true);
+      return;
+    }
+    if (presetCategoryOrSub === 'flora') {
+      setEditingFloraEntity(null);
+      setIsFloraCreateModalOpen(true);
+      return;
+    }
+    if (presetCategoryOrSub === 'pc') {
+      setEditingPcEntity(null);
+      setIsPcCreateModalOpen(true);
+      return;
+    }
     // Open Category selector modal so user can choose ANY category from anywhere
     setIsNewArticleModalOpen(true);
   };
@@ -586,6 +691,27 @@ export function App() {
     } else if (ent.category === 'peril' || ent.category === 'creature' || ent.perilData) {
       setEditingPerilEntity(ent);
       setIsPerilCreateModalOpen(true);
+    } else if (ent.category === 'npc' || ent.npcData) {
+      setEditingNpcEntity(ent);
+      setIsNpcCreateModalOpen(true);
+    } else if (ent.category === 'location' || ent.locationData) {
+      setEditingLocationEntity(ent);
+      setIsLocationCreateModalOpen(true);
+    } else if (ent.category === 'quest' || ent.questData) {
+      setEditingQuestEntity(ent);
+      setIsQuestCreateModalOpen(true);
+    } else if (ent.category === 'organization' || ent.organizationData) {
+      setEditingOrganizationEntity(ent);
+      setIsOrganizationCreateModalOpen(true);
+    } else if (ent.category === 'fauna' || ent.faunaData) {
+      setEditingFaunaEntity(ent);
+      setIsFaunaCreateModalOpen(true);
+    } else if (ent.category === 'flora' || ent.floraData) {
+      setEditingFloraEntity(ent);
+      setIsFloraCreateModalOpen(true);
+    } else if (ent.category === 'pc' || ent.pcData) {
+      setEditingPcEntity(ent);
+      setIsPcCreateModalOpen(true);
     } else {
       setSelectedEntityId(ent.id);
       setEditingEntity(ent);
@@ -836,11 +962,17 @@ export function App() {
                     }
                     setIsSidebarOpen(false);
                   }}
-                  className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all ${
+                  className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all border ${
                     isSelected
-                      ? 'bg-gradient-to-r from-purple-950/60 to-cyan-950/40 border border-cyan-500/40 text-cyan-200 shadow-md'
-                      : 'hover:bg-zinc-900/60 text-zinc-300 border border-transparent'
+                      ? 'shadow-md font-bold'
+                      : 'hover:bg-zinc-900/60 text-zinc-300 border-transparent'
                   }`}
+                  style={isSelected ? {
+                    backgroundColor: `${category.color}15`,
+                    borderColor: `${category.color}60`,
+                    color: category.color,
+                    boxShadow: `0 0 16px ${category.color}20`
+                  } : undefined}
                 >
                   <div className="flex items-center gap-2.5">
                     <span style={{ color: category.color }}>
@@ -940,11 +1072,17 @@ export function App() {
                                           }
                                           setIsSidebarOpen(false);
                                         }}
-                                        className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer transition-colors ${
+                                        className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer transition-colors border ${
                                           isChildSelected
-                                            ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-700/60 font-semibold'
-                                            : 'text-zinc-400 hover:text-zinc-200'
+                                            ? 'font-semibold'
+                                            : 'text-zinc-400 hover:text-zinc-200 border-transparent'
                                         }`}
+                                        style={isChildSelected ? {
+                                          backgroundColor: `${child.color}20`,
+                                          borderColor: `${child.color}70`,
+                                          color: child.color,
+                                          boxShadow: `0 0 12px ${child.color}20`
+                                        } : undefined}
                                       >
                                         <span style={{ color: child.color }}>
                                           <ChildIcon className="w-3.5 h-3.5" />
@@ -1002,11 +1140,17 @@ export function App() {
                                 }
                                 setIsSidebarOpen(false);
                               }}
-                              className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer transition-colors ${
+                              className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer transition-colors border ${
                                 isChildSelected
-                                  ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-700/60 font-semibold'
-                                  : 'text-zinc-400 hover:text-zinc-200'
+                                  ? 'font-semibold'
+                                  : 'text-zinc-400 hover:text-zinc-200 border-transparent'
                               }`}
+                              style={isChildSelected ? {
+                                backgroundColor: `${child.color}20`,
+                                borderColor: `${child.color}70`,
+                                color: child.color,
+                                boxShadow: `0 0 12px ${child.color}20`
+                              } : undefined}
                             >
                               <span style={{ color: child.color }}>
                                 <ChildIcon className="w-3.5 h-3.5" />
@@ -1385,19 +1529,22 @@ export function App() {
             />
           )}
 
+          {/* VIEW: Quest Kanban Board */}
+          {activeView === 'quests' && (
+            <QuestBoard
+              onNavigateEntity={handleNavigateEntity}
+              onEditEntity={(ent) => handleEditEntity(ent.id)}
+              onCreateQuest={() => handleCreateNewEntity('quest')}
+              onDeleteEntity={handleDeleteEntity}
+              isGmMode={isGmMode}
+            />
+          )}
+
           {/* VIEW: Single Entity Detailed View */}
           {activeView === 'view' && currentEntity && (
             <EntityView
               entity={currentEntity}
-              onEdit={() => {
-                if (currentEntity.category === 'spell' || currentEntity.spellData) {
-                  setEditingSpellEntity(currentEntity);
-                  setIsSpellCreateModalOpen(true);
-                } else {
-                  setEditingEntity(currentEntity);
-                  setActiveView('edit');
-                }
-              }}
+              onEdit={() => handleEditEntity(currentEntity.id)}
               onDelete={() => handleDeleteEntity(currentEntity.id)}
               onNavigate={handleNavigateEntity}
               onTagClick={(tag) => {
@@ -1427,13 +1574,7 @@ export function App() {
               <FeatExplorer
                 entities={entities}
                 onSelectEntity={handleNavigateEntity}
-                onEditEntity={(id) => {
-                  const ent = entities.find((e) => e.id === id || e.slug === id);
-                  if (ent) {
-                    setEditingEntity(ent);
-                    setActiveView('edit');
-                  }
-                }}
+                onEditEntity={(id) => handleEditEntity(id)}
                 onCreateFeat={handleCreateFeatDirectly}
                 onDeleteEntity={handleDeleteEntity}
                 onTagClick={(tag) => {
@@ -1446,13 +1587,7 @@ export function App() {
               <SpellExplorer
                 entities={entities}
                 onSelectEntity={handleNavigateEntity}
-                onEditEntity={(id) => {
-                  const ent = entities.find((e) => e.id === id || e.slug === id);
-                  if (ent) {
-                    setEditingSpellEntity(ent);
-                    setIsSpellCreateModalOpen(true);
-                  }
-                }}
+                onEditEntity={(id) => handleEditEntity(id)}
                 onCreateSpell={handleCreateSpellDirectly}
                 onDeleteEntity={handleDeleteEntity}
                 onTagClick={(tag) => {
@@ -1465,13 +1600,7 @@ export function App() {
               <ItemExplorer
                 entities={entities}
                 onSelectEntity={handleNavigateEntity}
-                onEditEntity={(id) => {
-                  const ent = entities.find((e) => e.id === id || e.slug === id);
-                  if (ent) {
-                    setEditingEntity(ent);
-                    setActiveView('edit');
-                  }
-                }}
+                onEditEntity={(id) => handleEditEntity(id)}
                 onCreateItem={handleCreateItemDirectly}
                 onDeleteEntity={handleDeleteEntity}
                 onTagClick={(tag) => {
@@ -1483,11 +1612,9 @@ export function App() {
             ) : effectiveCategoryKey === 'quest' ? (
               <QuestBoard
                 onNavigateEntity={handleNavigateEntity}
-                onEditEntity={(ent) => {
-                  setEditingEntity(ent);
-                  setActiveView('edit');
-                }}
+                onEditEntity={(ent) => handleEditEntity(ent.id)}
                 onCreateQuest={() => handleCreateNewEntity('quest')}
+                onDeleteEntity={handleDeleteEntity}
                 isGmMode={isGmMode}
               />
             ) : effectiveCategoryKey === 'codex' && !activeSubcategory && !searchFilter.trim() && !selectedTagFilter ? (
@@ -1499,7 +1626,15 @@ export function App() {
                   setActiveSubcategory(null);
                   setSelectedEntityId(null);
                   setEditingEntity(null);
-                  setActiveView('entities');
+                  if (catKey === 'quest' || catKey === 'quests') {
+                    setActiveView('quests');
+                  } else if (catKey === 'timeline') {
+                    setActiveView('timeline');
+                  } else if (catKey === 'map') {
+                    setActiveView('map');
+                  } else {
+                    setActiveView('entities');
+                  }
                 }}
                 onCreateArticle={() => setIsNewArticleModalOpen(true)}
                 isGm={isActualGm}
@@ -1510,28 +1645,14 @@ export function App() {
                 activeSubcategory={activeSubcategory}
                 onSelectEntity={(id) => {
                   const ent = entities.find((e) => e.id === id || e.slug === id);
-                  if (ent && (ent.category === 'peril' || ent.category === 'creature' || ent.perilData)) {
+                  if (ent && (ent.category === 'peril' || ent.category === 'creature' || ent.perilData || ent.category === 'npc' || ent.npcData)) {
                     setSelectedDrawerEntityId(ent.id);
                     setIsEntityDrawerOpen(true);
                   } else {
                     handleNavigateEntity(id);
                   }
                 }}
-                onEditEntity={(id) => {
-                  const ent = entities.find((e) => e.id === id || e.slug === id);
-                  if (ent) {
-                    if (ent.category === 'spell') {
-                      setEditingSpellEntity(ent);
-                      setIsSpellCreateModalOpen(true);
-                    } else if (ent.category === 'peril' || ent.category === 'creature' || ent.perilData) {
-                      setEditingPerilEntity(ent);
-                      setIsPerilCreateModalOpen(true);
-                    } else {
-                      setEditingEntity(ent);
-                      setActiveView('edit');
-                    }
-                  }
-                }}
+                onEditEntity={(id) => handleEditEntity(id)}
                 onDeleteEntity={handleDeleteEntity}
                 onCreateNewEntity={(cat) => handleCreateNewEntity(cat)}
                 isActualGm={isActualGm}
@@ -1732,7 +1853,13 @@ export function App() {
                           <AncestryCard
                             key={item.id}
                             entity={item}
-                            onSelect={handleNavigateEntity}
+                            onSelect={(id) => {
+                              window.dispatchEvent(
+                                new CustomEvent('hecos:open-entity-drawer', {
+                                  detail: { entityId: id, slug: item.slug }
+                                })
+                              );
+                            }}
                             onEdit={(id) => {
                               const ent = entities.find((e) => e.id === id);
                               if (ent) {
@@ -1913,6 +2040,118 @@ export function App() {
           refreshEntities();
           handleNavigateEntity(newClassEntity.id);
           setIsClassCreateModalOpen(false);
+        }}
+      />
+
+      {/* Hecos NPC Creation & Edition Modal */}
+      <NPCCreateModal
+        isOpen={isNpcCreateModalOpen}
+        initEntity={editingNpcEntity}
+        onClose={() => {
+          setIsNpcCreateModalOpen(false);
+          setEditingNpcEntity(null);
+        }}
+        onSave={(newNpcEntity) => {
+          refreshEntities();
+          handleNavigateEntity(newNpcEntity.id);
+          setIsNpcCreateModalOpen(false);
+          setEditingNpcEntity(null);
+        }}
+      />
+
+      {/* Hecos Location Creation & Edition Modal */}
+      <LocationCreateModal
+        isOpen={isLocationCreateModalOpen}
+        initEntity={editingLocationEntity}
+        onClose={() => {
+          setIsLocationCreateModalOpen(false);
+          setEditingLocationEntity(null);
+        }}
+        onSave={(newEntity) => {
+          refreshEntities();
+          handleNavigateEntity(newEntity.id);
+          setIsLocationCreateModalOpen(false);
+          setEditingLocationEntity(null);
+        }}
+      />
+
+      {/* Hecos Quest Creation & Edition Modal */}
+      <QuestCreateModal
+        isOpen={isQuestCreateModalOpen}
+        initEntity={editingQuestEntity}
+        onClose={() => {
+          setIsQuestCreateModalOpen(false);
+          setEditingQuestEntity(null);
+        }}
+        onSave={(newEntity) => {
+          refreshEntities();
+          handleNavigateEntity(newEntity.id);
+          setIsQuestCreateModalOpen(false);
+          setEditingQuestEntity(null);
+        }}
+      />
+
+      {/* Hecos Organization Creation & Edition Modal */}
+      <OrganizationCreateModal
+        isOpen={isOrganizationCreateModalOpen}
+        initEntity={editingOrganizationEntity}
+        onClose={() => {
+          setIsOrganizationCreateModalOpen(false);
+          setEditingOrganizationEntity(null);
+        }}
+        onSave={(newEntity) => {
+          refreshEntities();
+          handleNavigateEntity(newEntity.id);
+          setIsOrganizationCreateModalOpen(false);
+          setEditingOrganizationEntity(null);
+        }}
+      />
+
+      {/* Hecos Fauna Creation & Edition Modal */}
+      <FaunaCreateModal
+        isOpen={isFaunaCreateModalOpen}
+        initEntity={editingFaunaEntity}
+        onClose={() => {
+          setIsFaunaCreateModalOpen(false);
+          setEditingFaunaEntity(null);
+        }}
+        onSave={(newEntity) => {
+          refreshEntities();
+          handleNavigateEntity(newEntity.id);
+          setIsFaunaCreateModalOpen(false);
+          setEditingFaunaEntity(null);
+        }}
+      />
+
+      {/* Hecos Flora Creation & Edition Modal */}
+      <FloraCreateModal
+        isOpen={isFloraCreateModalOpen}
+        initEntity={editingFloraEntity}
+        onClose={() => {
+          setIsFloraCreateModalOpen(false);
+          setEditingFloraEntity(null);
+        }}
+        onSave={(newEntity) => {
+          refreshEntities();
+          handleNavigateEntity(newEntity.id);
+          setIsFloraCreateModalOpen(false);
+          setEditingFloraEntity(null);
+        }}
+      />
+
+      {/* Hecos PC Creation & Edition Modal */}
+      <PCCreateModal
+        isOpen={isPcCreateModalOpen}
+        initEntity={editingPcEntity}
+        onClose={() => {
+          setIsPcCreateModalOpen(false);
+          setEditingPcEntity(null);
+        }}
+        onSave={(newEntity) => {
+          refreshEntities();
+          handleNavigateEntity(newEntity.id);
+          setIsPcCreateModalOpen(false);
+          setEditingPcEntity(null);
         }}
       />
 

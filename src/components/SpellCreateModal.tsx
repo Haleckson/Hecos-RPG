@@ -616,8 +616,8 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[99980] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in">
-      <div className="bg-[#0c0915] border border-cyan-900/40 rounded-2xl w-full max-w-4xl shadow-[0_0_60px_rgba(6,182,212,0.15)] overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-[99980] flex items-center justify-center p-1 sm:p-2 md:p-3 bg-black/90 backdrop-blur-md overflow-hidden animate-fade-in">
+      <div className="w-[95vw] h-[95vh] max-w-[98vw] max-h-[98vh] bg-[#0c0915] border border-cyan-900/60 rounded-2xl shadow-[0_0_60px_rgba(6,182,212,0.25)] flex flex-col overflow-hidden text-zinc-100 animate-in zoom-in-95 duration-150">
         {/* Modal Header */}
         <div className="p-4 sm:p-5 bg-gradient-to-r from-cyan-950/70 via-[#130e22] to-[#0c0915] border-b border-zinc-800/80 flex items-center justify-between">
           <div className="flex items-center gap-3">

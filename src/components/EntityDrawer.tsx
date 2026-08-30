@@ -29,7 +29,7 @@ import {
 import { HecosEntity } from '../types';
 import { HecosStorage } from '../services/storage';
 import { EntityIcon } from './EntityIcon';
-import { getCategoryMeta } from '../utils/categories';
+import { getCategoryMeta, getCategoryTheme } from '../utils/categories';
 import { RichContentRenderer } from './RichContentRenderer';
 import { TraitBadge } from './TraitBadge';
 import { extractEntityAllTraits } from '../utils/traitUtils';
@@ -43,6 +43,8 @@ import { PerilView } from './PerilView';
 import { ClassView } from './ClassView';
 import { SpellView } from './SpellView';
 import { ItemView } from './ItemView';
+import { NPCView } from './NPCView';
+import { PCView } from './PCView';
 
 interface EntityDrawerProps {
   entityId: string | null;
@@ -161,10 +163,8 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
   if (!isOpen) return null;
 
   const isActualGm = isGmMode || HecosStorage.isUserGm();
-
-  const isCiano = currentEntity ? ['pc', 'spell', 'ancestry', 'rule'].includes(currentEntity.category) : false;
-  const isMalva = currentEntity ? ['npc', 'item', 'flora', 'class', 'feat', 'timeline'].includes(currentEntity.category) : false;
-  const isBordo = currentEntity ? ['creature', 'fauna', 'organization', 'gm_note', 'archetype', 'session'].includes(currentEntity.category) : false;
+  const currentMeta = getCategoryMeta(currentEntity?.category);
+  const currentTheme = getCategoryTheme(currentEntity?.category);
 
   // Backlinks for current entity
   const backlinks = currentEntity
@@ -192,18 +192,14 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
           className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
         />
 
-        {/* Slide-over Right Drawer Container */}
-        <div className="fixed inset-y-0 right-0 max-w-full flex pl-4 sm:pl-10">
+        {/* Slide-over Right Drawer Container - 95% Width Available as Requested */}
+        <div className="fixed inset-y-0 right-0 max-w-full flex pl-2 sm:pl-6">
           <motion.div
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-            className={`w-screen ${
-              currentEntity?.category === 'peril' || currentEntity?.category === 'creature' || currentEntity?.perilData
-                ? 'max-w-[90vw] md:max-w-[90vw] lg:max-w-[90vw]'
-                : 'max-w-2xl lg:max-w-3xl xl:max-w-4xl'
-            } bg-[#09080e] border-l border-zinc-800 shadow-2xl flex flex-col h-full overflow-hidden text-zinc-100 relative`}
+            className="w-screen max-w-[95vw] bg-[#09080e] border-l border-zinc-800 shadow-2xl flex flex-col h-full overflow-hidden text-zinc-100 relative"
           >
             {/* 1. Header Toolbar */}
             <div className="px-5 py-3.5 bg-[#100d1b] border-b border-zinc-800/90 flex items-center justify-between gap-3 shrink-0 z-30 shadow-md">
@@ -224,16 +220,10 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
                 {currentEntity && (
                   <div className="flex items-center gap-2 min-w-0">
                     <span
-                      className={`px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded border shrink-0 flex items-center gap-1 ${
-                        isCiano
-                          ? 'bg-cyan-950/80 text-cyan-300 border-cyan-700/60'
-                          : isMalva
-                          ? 'bg-purple-950/80 text-purple-300 border-purple-700/60'
-                          : 'bg-rose-950/80 text-rose-300 border-rose-700/60'
-                      }`}
+                      className={`px-2.5 py-1 text-[11px] font-mono font-bold uppercase tracking-wider rounded-lg border shrink-0 flex items-center gap-1.5 shadow-sm ${currentTheme.badgeBg} ${currentTheme.badgeBorder} ${currentTheme.badgeText}`}
                     >
-                      <EntityIcon icon={currentEntity.icon} category={currentEntity.category} className="w-3 h-3" />
-                      <span>{getCategoryMeta(currentEntity.category).name}</span>
+                      <EntityIcon icon={currentEntity.icon} category={currentEntity.category} className="w-3.5 h-3.5" />
+                      <span>{currentMeta.name}</span>
                     </span>
 
                     {/* CLICKABLE TITLE ON TOP OF DRAWER: Primary request of user! */}
@@ -243,10 +233,10 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
                       className="group/title flex items-center gap-1.5 min-w-0 text-left cursor-pointer transition-all truncate hover:opacity-90"
                       title="Clique no título para abrir a página completa deste artigo no Codex de Hecos"
                     >
-                      <h3 className="text-sm sm:text-base font-serif font-bold text-zinc-100 group-hover/title:text-cyan-300 group-hover/title:underline underline-offset-4 decoration-cyan-400 transition-colors truncate">
+                      <h3 className={`text-sm sm:text-base font-serif font-bold text-zinc-100 ${currentTheme.textHover} group-hover/title:underline underline-offset-4 transition-colors truncate`}>
                         {currentEntity.title}
                       </h3>
-                      <ExternalLink className="w-3.5 h-3.5 text-cyan-400 opacity-60 group-hover/title:opacity-100 group-hover/title:scale-110 transition-all shrink-0 ml-0.5" />
+                      <ExternalLink className={`w-3.5 h-3.5 ${currentTheme.textAccent} opacity-60 group-hover/title:opacity-100 group-hover/title:scale-110 transition-all shrink-0 ml-0.5`} />
                     </button>
                   </div>
                 )}
@@ -259,7 +249,7 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
                   <button
                     type="button"
                     onClick={handleOpenFullPage}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-950/70 hover:bg-cyan-900 border border-cyan-500/50 text-cyan-200 text-xs font-bold transition-all shadow-sm cursor-pointer hover:shadow-[0_0_12px_rgba(6,182,212,0.3)]"
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-sm cursor-pointer hover:brightness-125 ${currentTheme.badgeBg} ${currentTheme.badgeBorder} ${currentTheme.badgeText} ${currentTheme.hoverGlow}`}
                     title="Abrir página completa no Codex de Hecos"
                   >
                     <span>Ir para Artigo</span>
@@ -275,7 +265,7 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
                       onClose();
                       onEditEntity(currentEntity.id);
                     }}
-                    className="p-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-cyan-300 transition-colors cursor-pointer"
+                    className="p-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-white transition-colors cursor-pointer"
                     title="Editar este artigo"
                   >
                     <Edit3 className="w-4 h-4" />
@@ -363,6 +353,26 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
                         onTagClick={handleTagClick}
                       />
                     </div>
+                  ) : currentEntity.category === 'npc' || currentEntity.npcData ? (
+                    <div className="rounded-2xl overflow-hidden bg-[#0c0a14] border border-zinc-800/90 shadow-xl">
+                      <NPCView
+                        entity={currentEntity}
+                        onEdit={() => onEditEntity?.(currentEntity.id)}
+                        onDelete={() => {}}
+                        onNavigate={handleInternalNavigate}
+                        onTagClick={handleTagClick}
+                      />
+                    </div>
+                  ) : currentEntity.category === 'pc' || currentEntity.pcData ? (
+                    <div className="rounded-2xl overflow-hidden bg-[#080d16] border border-zinc-800/90 shadow-xl">
+                      <PCView
+                        entity={currentEntity}
+                        onEdit={() => onEditEntity?.(currentEntity.id)}
+                        onDelete={() => {}}
+                        onNavigate={handleInternalNavigate}
+                        onTagClick={handleTagClick}
+                      />
+                    </div>
                   ) : (
                     /* Robust General Entity View Layout for all other categories (Lore, Item, NPC, PC, Fauna, Flora, Location, Faction, Rule, Session, etc.) */
                     <div className="space-y-6">
@@ -387,21 +397,15 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
 
                         <div className="p-5 relative z-10 -mt-10 sm:-mt-12">
                           <div className="flex items-start gap-3.5">
-                            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#171126] border-2 border-zinc-700/80 flex items-center justify-center shadow-xl shrink-0">
-                              <EntityIcon icon={currentEntity.icon} category={currentEntity.category} className="w-6 h-6 text-cyan-300" />
+                            <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#171126] border-2 ${currentTheme.borderAccent} flex items-center justify-center shadow-xl shrink-0 ${currentTheme.textAccent}`}>
+                              <EntityIcon icon={currentEntity.icon} category={currentEntity.category} className="w-6 h-6" />
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap mb-1">
                                 <span
-                                  className={`px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded border ${
-                                    isCiano
-                                      ? 'bg-cyan-950 text-cyan-300 border-cyan-800'
-                                      : isMalva
-                                      ? 'bg-purple-950 text-purple-300 border-purple-800'
-                                      : 'bg-rose-950 text-rose-300 border-rose-800'
-                                  }`}
+                                  className={`px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded border ${currentTheme.badgeBg} ${currentTheme.badgeBorder} ${currentTheme.badgeText}`}
                                 >
-                                  {currentEntity.category.toUpperCase()}
+                                  {currentMeta.name}
                                 </span>
 
                                 {currentEntity.statblock && (
@@ -428,9 +432,9 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
                                 className="group/main-title text-left block w-full cursor-pointer"
                                 title="Clique para abrir a página completa deste artigo"
                               >
-                                <h2 className="text-xl sm:text-2xl font-bold font-serif text-white group-hover/main-title:text-cyan-300 transition-colors flex items-center gap-2">
+                                <h2 className={`text-xl sm:text-2xl font-bold font-serif text-white ${currentTheme.textHover} transition-colors flex items-center gap-2`}>
                                   <span>{currentEntity.title}</span>
-                                  <ExternalLink className="w-4 h-4 text-cyan-400 opacity-60 group-hover/main-title:opacity-100 transition-opacity shrink-0" />
+                                  <ExternalLink className={`w-4 h-4 ${currentTheme.textAccent} opacity-60 group-hover/main-title:opacity-100 transition-opacity shrink-0`} />
                                 </h2>
                               </button>
 
@@ -456,7 +460,7 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
                                     key={t}
                                     type="button"
                                     onClick={() => handleTagClick(t)}
-                                    className="px-2 py-0.5 rounded-md bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-cyan-300 transition-colors text-xs font-mono"
+                                    className={`px-2 py-0.5 rounded-md bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 ${currentTheme.textHover} transition-colors text-xs font-mono`}
                                   >
                                     #{t}
                                   </button>
@@ -588,7 +592,7 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
                     <button
                       type="button"
                       onClick={handleOpenFullPage}
-                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-900 to-purple-900 hover:from-cyan-800 hover:to-purple-800 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer hover:shadow-cyan-500/20"
+                      className={`px-4 py-2 rounded-xl ${currentTheme.btnBg} text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer ${currentTheme.glow}`}
                     >
                       <span>Abrir Página Completa</span>
                       <ExternalLink className="w-3.5 h-3.5" />

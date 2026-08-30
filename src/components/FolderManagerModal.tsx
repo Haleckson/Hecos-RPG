@@ -45,6 +45,7 @@ export type FolderScope =
   | 'pc'
   | 'npc'
   | 'organization'
+  | 'quest'
   | 'map'
   | 'tag'
   | 'general';

@@ -188,14 +188,34 @@ export interface PF2eStatblock {
 
 export interface ItemAttributes extends PF2eItemAttributes {}
 
+export interface LocationPointOfInterest {
+  id: string;
+  name: string;
+  type?: string;
+  description?: string;
+  linkedEntityId?: string;
+  isSecret?: boolean;
+}
+
 export interface LocationAttributes {
   settlementType?: string;
   ruler?: string;
+  rulerEntityId?: string;
   population?: string;
-  dangerLevel?: string;
+  dangerLevel?: 'Seguro' | 'Baixo' | 'Moderado' | 'Perigoso' | 'Extremo' | 'Mortal' | string;
   planeOrRegion?: string;
+  climate?: string;
+  government?: string;
+  factionsPresent?: string[];
+  factionEntityIds?: string[];
+  inhabitantNpcIds?: string[]; // IDs de NPCs residentes / figuras notáveis vinculadas
+  questIds?: string[]; // IDs de Quests vinculadas a este local
+  pointsOfInterest?: LocationPointOfInterest[];
   districts?: string[];
   coordinates?: { x: number; y: number };
+  mapImage?: string;
+  subcategories?: string[];
+  gmSecrets?: string;
 }
 
 export interface SessionAttributes {
@@ -218,6 +238,8 @@ export interface TimelineEventAttributes {
 
 export type QuestStatus = 'not_started' | 'in_progress' | 'completed' | 'failed' | 'abandoned';
 export type QuestDifficulty = 'Trivial' | 'Baixa' | 'Moderada' | 'Severa' | 'Extrema' | 'Lendária';
+export type QuestType = 'Principal' | 'Secundária' | 'Contrato de Caça' | 'Pessoal' | 'Rumor' | 'Facção';
+export type QuestPriority = 'Baixa' | 'Normal' | 'Alta' | 'Urgente';
 
 export interface QuestObjective {
   id: string;
@@ -230,21 +252,388 @@ export interface QuestAttributes {
   status: QuestStatus;
   difficulty?: QuestDifficulty;
   recommendedLevel?: number;
+  questType?: QuestType;
+  priority?: QuestPriority;
+  deadline?: string;
   questGiver?: string; // Entity ID or name
+  questGiverEntityId?: string;
+  involvedNpcIds?: string[]; // NPCs envolvidos (alvos, aliados, testemunhas)
   location?: string; // Entity ID or location name
+  locationEntityId?: string;
+  involvedLocationIds?: string[]; // Locais adicionais envolvidos
+  relatedLocationIds?: string[]; // Alias para involvedLocationIds
+  organization?: string; // Nome da Organização patrocinadora/vinculada
+  organizationEntityId?: string;
+  involvedOrgIds?: string[]; // Organizações envolvidas
+  faction?: string; // Alias para organization
+  factionEntityId?: string; // Alias para organizationEntityId
   objectives: QuestObjective[];
   rewards?: {
     xp?: number;
     gold?: string;
     items?: string[]; // Entity IDs or descriptions
+    reputation?: string;
   };
   actOrChapter?: string;
+  subcategories?: string[];
+  gmNotes?: string;
+}
+
+export type OrganizationType =
+  | 'Guilda'
+  | 'Ordem de Cavalaria'
+  | 'Culto Religioso'
+  | 'Império / Reino'
+  | 'Sindicato do Crime'
+  | 'Círculo Arcano'
+  | 'Companhia Mercenária'
+  | 'Academia / Eruditos'
+  | 'Facção Política'
+  | 'Outro';
+
+export type OrganizationScope = 'Local' | 'Regional' | 'Nacional' | 'Continental' | 'Planar';
+
+export interface OrganizationRank {
+  id: string;
+  rankName: string;
+  description?: string;
+  requirements?: string;
+}
+
+export interface OrganizationAttributes {
+  type?: OrganizationType | string;
+  leader?: string;
+  leaderEntityId?: string;
+  headquarters?: string;
+  headquartersLocationId?: string;
+  memberNpcIds?: string[]; // IDs de NPCs membros/líderes vinculados
+  affiliatedLocationIds?: string[]; // IDs de Locais onde a organização atua
+  questIds?: string[]; // IDs de Quests vinculadas à organização
+  alignment?: string;
+  scope?: OrganizationScope | string;
+  motto?: string;
+  resources?: string;
+  influence?: 'Baixa' | 'Média' | 'Alta' | 'Dominante' | string;
+  allies?: string[];
+  alliedOrgIds?: string[];
+  allyEntityIds?: string[]; // Alias para alliedOrgIds
+  rivals?: string[];
+  rivalOrgIds?: string[];
+  rivalEntityIds?: string[]; // Alias para rivalOrgIds
+  ranks?: OrganizationRank[];
+  symbolImage?: string;
+  traits?: string[];
+  subcategories?: string[];
+  gmSecrets?: string;
+}
+
+export interface FaunaHarvestPart {
+  id: string;
+  name: string;
+  utility?: string;
+  dcOrDifficulty?: string;
+  value?: string;
+}
+
+export interface FaunaAttributes {
+  habitat?: string;
+  diet?: 'Carnívoro' | 'Herbívoro' | 'Onívoro' | 'Mágico / Cristalino' | 'Necrófago' | string;
+  temperament?: 'Dócil' | 'Arisco' | 'Territorial' | 'Predador Agressivo' | 'Treinável' | string;
+  dangerLevel?: 'Inofensivo' | 'Baixo' | 'Médio' | 'Perigoso' | 'Mortal' | string;
+  rarity?: 'Comum' | 'Incomum' | 'Raro' | 'Único' | string;
+  size?: 'Miúdo' | 'Pequeno' | 'Médio' | 'Grande' | 'Enorme' | 'Imenso' | string;
+  behavior?: string;
+  domestication?: string;
+  harvestableParts?: FaunaHarvestPart[];
+  tokenImage?: string;
+  portraitImage?: string;
+  traits?: string[];
+  subcategories?: string[];
+  gmNotes?: string;
+}
+
+export interface FloraAttributes {
+  habitat?: string;
+  properties?: ('Medicinal' | 'Venenosa' | 'Reagente Alquímico' | 'Alucinógena' | 'Nutritiva' | 'Mágica' | string)[];
+  rarity?: 'Comum' | 'Incomum' | 'Raro' | 'Único' | string;
+  harvestSeason?: string;
+  preparationAndEffects?: string;
+  dangerOrToxicity?: string;
+  preservationTime?: string;
+  tokenImage?: string;
+  portraitImage?: string;
+  traits?: string[];
+  subcategories?: string[];
+  gmNotes?: string;
+}
+
+export interface PCAttributes {
+  playerName?: string;
+  characterClass?: string;
+  class?: string; // alias
+  subclass?: string;
+  level?: number;
+  ancestry?: string;
+  heritage?: string;
+  background?: string;
+  deity?: string;
+  alignment?: string;
+  size?: string;
+  portraitImage?: string;
+  tokenImage?: string;
+  ac?: number;
+  hp?: number;
+  maxHp?: number;
+  perception?: number;
+  speed?: string;
+  heroPoints?: number;
+  str?: number;
+  dex?: number;
+  con?: number;
+  int?: number;
+  wis?: number;
+  cha?: number;
+  fort?: number;
+  ref?: number;
+  will?: number;
+  attributes?: {
+    str?: number;
+    dex?: number;
+    con?: number;
+    int?: number;
+    wis?: number;
+    cha?: number;
+  };
+  attacks?: any[];
+  backstory?: string;
+  concept?: string;
+  notes?: string;
+  gmNotes?: string;
+  subcategories?: string[];
+  traits?: string[];
 }
 
 export interface GMNoteAttributes {
   category: 'plot' | 'secret_lore' | 'encounter_plan' | 'scratchpad';
   isRevealedToPlayers: boolean;
   linkedQuests?: string[];
+}
+
+export type NPCDisposition = 'helpful' | 'friendly' | 'indifferent' | 'unfriendly' | 'hostile' | 'unknown';
+export type NPCRarity = 'Comum' | 'Incomum' | 'Raro' | 'Único';
+export type NPCSize = 'Miúdo' | 'Pequeno' | 'Médio' | 'Grande' | 'Enorme' | 'Imenso';
+
+export interface NPCRumor {
+  id: string;
+  text: string;
+  isTrue?: boolean;
+  source?: string;
+}
+
+export interface NPCQuestLink {
+  id: string;
+  questEntityId?: string;
+  title: string;
+  roleInQuest?: string; // ex: "Doador da Missão", "Alvo / Procurado", "Aliado", "Recompensador", "Obstáculo"
+  description?: string;
+  isSecret?: boolean;
+}
+
+export interface NPCLootItem {
+  id: string;
+  name: string;
+  quantity?: number | string;
+  itemEntityId?: string;
+  itemId?: string;
+  slug?: string;
+  category?: string;
+  priceOrValue?: string;
+  description?: string;
+  isEquipped?: boolean;
+  isSecret?: boolean; // Item oculto / Drop secreto do GM
+}
+
+export interface NPCRelationship {
+  id: string;
+  targetEntityId?: string; // ID da entidade relacionada (NPC, PC ou outra)
+  targetName: string;
+  targetSlug?: string;
+  targetCategory?: string; // 'npc' | 'pc' | 'entity'
+  targetAvatar?: string;
+  relationshipType: string; // ex: "Irmão mais velho", "Rival de guilda", "Devedor", "Mentor arcano", "Amante"
+  attitude?: NPCDisposition;
+  notes?: string;
+  isSecret?: boolean; // GM-only
+}
+
+export interface NPCSessionMemory {
+  id: string;
+  sessionTitleOrNumber: string;
+  date?: string;
+  note: string;
+}
+
+export interface NPCAttributes {
+  // Identidade Básica
+  level?: number;
+  rarity?: NPCRarity;
+  size?: NPCSize;
+  traits?: string[];
+  subcategories?: string[];
+
+  // Imagens Especializadas
+  portraitImage?: string; // Retrato vertical
+  tokenImage?: string;    // Token circular de mesa/VTT
+
+  // Perfil & Origem
+  ancestry?: string;      // ex: Humano, Elfo de Vidro, Autômato
+  ancestryEntityId?: string; // ID da entidade da Ancestralidade vinculada
+  heritage?: string;      // ex: Herança do Crepúsculo
+  occupation?: string;    // Profissão / Cargo / Título
+  role?: string;          // Alias for occupation / role
+  organization?: string;  // Facção / Afiliação / Guilda
+  organizationEntityId?: string; // ID da entidade de organização vinculada
+  linkedOrganizationIds?: string[]; // IDs de organizações vinculadas
+  organizationIds?: string[]; // Alias para linkedOrganizationIds
+  faction?: string;       // Alias for organization
+  factionEntityId?: string; // Alias for organizationEntityId
+  wealth?: string;        // Nível de riqueza
+  location?: string;      // Onde reside / Local atual
+  locationEntityId?: string; // ID da entidade de local vinculada
+  linkedLocationIds?: string[]; // IDs de locais vinculados
+  questIds?: string[];    // IDs de quests vinculadas
+  pronouns?: string;      // ex: Ele/Dele, Ela/Dela, Neutro
+  age?: string;           // Idade aparente ou real
+  gender?: string;
+  alignment?: string;
+  disposition?: NPCDisposition;
+
+  // Guia de Interpretação / Roleplay
+  concept?: string;        // Essência / Conceito em 1 frase
+  voiceAndSpeech?: string; // Tom de voz, sotaque, velocidade, gírias
+  voice?: string;          // Alias for voiceAndSpeech
+  mannerisms?: string;     // Gestos, tiques, hábitos, postura
+  personality?: string;    // Personalidade
+  appearance?: string;     // Aparência física
+  firstImpression?: string;// Primeira impressão dos jogadores
+
+  // Narrativa & Dinâmica Social
+  motivations?: string;    // O que deseja / Objetivos
+  motivation?: string;     // Alias
+  triggers?: string;       // O que o irrita / Gatilhos emocionais
+  canOffer?: string;       // Favores, serviços, itens ou informações
+  secrets?: string;        // Segredos conhecidos por poucos
+
+  // Relacionamentos & Vínculos Sociais
+  relationships?: NPCRelationship[];
+
+  // Rumores & Missões (Quests)
+  rumors?: NPCRumor[];     // Rumores ouvidos nas tavernas
+  quests?: NPCQuestLink[]; // Missões vinculadas ou ganchos ativos
+
+  // Loot & Inventário / Posses
+  loot?: NPCLootItem[];
+  inventory?: any[];       // Alias for loot/items
+  currency?: {
+    po?: number | string; // Peças de Ouro
+    pp?: number | string; // Peças de Prata
+    pc?: number | string; // Peças de Cobre
+    custom?: string;      // ex: "3 Gemas de Obsidiana Lapidadas"
+  };
+
+  // Confidencial do Mestre (GM-Only)
+  gmSecret?: string;       // Segredo oculto da campanha / reviravolta
+  gmPlotHook?: string;     // Gancho de enredo
+  gmNotes?: string;        // GM notes
+
+  // Estatísticas Mecânicas / Combate (Opcional)
+  hasCombatStats?: boolean;
+  ac?: number;
+  hp?: number;
+  perception?: number;
+  speed?: string;
+  saves?: {
+    fortitude?: number;
+    reflex?: number;
+    will?: number;
+  };
+  keySkills?: string;       // ex: "Enganação +16, Diplomacia +14, Sociedade +12"
+  specialAbilities?: string;// ex: "Aura de Blefe, Esquiva Sobrenatural"
+
+  // Memória & Histórico de Sessões
+  sessionLog?: NPCSessionMemory[];
+
+  // Visibilidade de campos específicos (Suporte a visibilidade granular por campo, bloco, tag ou pasta)
+  fieldVisibility?: NPCFieldVisibility;
+}
+
+export interface NPCFieldVisibility {
+  // Imagens & Mídia
+  portraitImage?: ItemVisibility | boolean;
+  tokenImage?: ItemVisibility | boolean;
+
+  // Identidade & Cabeçalho
+  level?: ItemVisibility | boolean;
+  disposition?: ItemVisibility | boolean;
+  role?: ItemVisibility | boolean;
+  traits?: ItemVisibility | boolean;
+  subcategories?: ItemVisibility | boolean;
+  locationFactionCard?: ItemVisibility | boolean;
+
+  // Perfil & Identidade Social
+  identityBlock?: ItemVisibility | boolean;
+  occupation?: ItemVisibility | boolean;
+  location?: ItemVisibility | boolean;
+  ancestry?: ItemVisibility | boolean;
+  faction?: ItemVisibility | boolean;
+  wealth?: ItemVisibility | boolean;
+  alignment?: ItemVisibility | boolean;
+  ageAndPronouns?: ItemVisibility | boolean;
+
+  // Psicologia & Interpretação
+  psychologyBlock?: ItemVisibility | boolean;
+  voiceAndSpeech?: ItemVisibility | boolean;
+  personality?: ItemVisibility | boolean;
+  motivations?: ItemVisibility | boolean;
+  appearance?: ItemVisibility | boolean;
+  canOffer?: ItemVisibility | boolean;
+  triggers?: ItemVisibility | boolean;
+  secrets?: ItemVisibility | boolean;
+
+  // Histórico & Lore Markdown
+  narrativeLore?: ItemVisibility | boolean;
+
+  // Mecânicas & Combate
+  combatStats?: ItemVisibility | boolean;
+  acAndDefenses?: ItemVisibility | boolean;
+  hpAndHealth?: ItemVisibility | boolean;
+  perceptionAndSenses?: ItemVisibility | boolean;
+  speed?: ItemVisibility | boolean;
+  keySkills?: ItemVisibility | boolean;
+  specialAbilities?: ItemVisibility | boolean;
+
+  // Relações & Missões
+  relationships?: ItemVisibility | boolean;
+  questsAndRumors?: ItemVisibility | boolean;
+  quests?: ItemVisibility | boolean;
+  rumors?: ItemVisibility | boolean;
+
+  // Inventário & Bens
+  inventory?: ItemVisibility | boolean;
+  currency?: ItemVisibility | boolean;
+  loot?: ItemVisibility | boolean;
+
+  // Conexões Cruzadas
+  backlinks?: ItemVisibility | boolean;
+
+  // Memória & Histórico
+  sessionLog?: ItemVisibility | boolean;
+
+  // Usuários com permissão personalizada
+  allowedUsers?: Record<string, string[]>;
+
+  // Chaves dinâmicas para tags (tag_Nome), pastas (folder_Nome), relacionamentos (rel_ID), etc.
+  [key: string]: any;
 }
 
 export interface AncestryHeritage {
@@ -691,6 +1080,11 @@ export interface HecosEntity {
   gmNoteData?: GMNoteAttributes;
   spellData?: PF2eSpellAttributes;
   questData?: QuestAttributes;
+  npcData?: NPCAttributes;
+  organizationData?: OrganizationAttributes;
+  faunaData?: FaunaAttributes;
+  floraData?: FloraAttributes;
+  pcData?: PCAttributes;
 }
 
 export interface MapPin {

@@ -1,10 +1,17 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { HecosEntity, ItemVisibility } from '../types';
 import { HecosStorage } from '../services/storage';
-import { getCategoryMeta } from '../utils/categories';
+import { getCategoryMeta, getCategoryTheme } from '../utils/categories';
 import { EntityCard } from './EntityCard';
 import { AncestryCard } from './AncestryCard';
 import { PerilCard } from './PerilCard';
+import { NPCCard } from './NPCCard';
+import { LocationCard } from './LocationCard';
+import { QuestCard } from './QuestCard';
+import { OrganizationCard } from './OrganizationCard';
+import { FaunaCard } from './FaunaCard';
+import { FloraCard } from './FloraCard';
+import { PCCard } from './PCCard';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { Tooltip } from './Tooltip';
 import { PerilTooltipCard } from './PerilTooltipCard';
@@ -203,6 +210,14 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
         { id: 'heritages', name: 'Heranças Versáteis', description: 'Linhagens adaptáveis' },
       ];
     }
+    if (categoryKey === 'npc') {
+      return [
+        { id: 'all', name: 'Todos os NPCs', description: 'Visão geral de todos os personagens e contatos' },
+        { id: 'allies', name: 'Aliados & Companheiros', description: 'Amigos, aliados de campanha e guias' },
+        { id: 'contacts', name: 'Contatos & Mercadores', description: 'Informantes, artesãos e comerciantes' },
+        { id: 'villains', name: 'Vilões & Antagonistas', description: 'Nêmesis, rivais e ameaças' },
+      ];
+    }
     return [
       { id: 'all', name: 'Tudo', description: `Todos os registros de ${meta.name}` }
     ];
@@ -234,6 +249,9 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
       if (categoryKey === 'ancestry') {
         return ent.category === 'ancestry' || Boolean(ent.ancestryData);
       }
+      if (categoryKey === 'npc') {
+        return ent.category === 'npc' || Boolean(ent.npcData);
+      }
       return ent.category === categoryKey;
     });
   }, [entities, categoryKey, currentUser]);
@@ -243,6 +261,7 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
     if (ent.perilData?.subcategories) return ent.perilData.subcategories;
     if (ent.classData?.subcategories) return ent.classData.subcategories;
     if (ent.ancestryData?.subcategories) return ent.ancestryData.subcategories;
+    if (ent.npcData?.subcategories && ent.npcData.subcategories.length > 0) return ent.npcData.subcategories;
     return ent.subcategories || (ent.subcategory ? [ent.subcategory] : []);
   };
 
@@ -320,6 +339,20 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
           if (tab.id === 'ancestries') return ent.category === 'ancestry' && !ent.ancestryData?.isVersatileHeritage;
           if (tab.id === 'heritages') return Boolean(ent.ancestryData?.isVersatileHeritage);
         }
+        if (categoryKey === 'npc') {
+          const disp = ent.npcData?.disposition;
+          const subcats = (ent.npcData?.subcategories || ent.subcategories || (ent.subcategory ? [ent.subcategory] : [])).map((s) => s.toLowerCase());
+          const tags = (ent.tags || []).map((t) => t.toLowerCase());
+          if (tab.id === 'allies') {
+            return disp === 'helpful' || disp === 'friendly' || subcats.some((s) => s.includes('aliad') || s.includes('companh') || s.includes('amig')) || tags.some((t) => t.includes('aliad') || t.includes('companh'));
+          }
+          if (tab.id === 'contacts') {
+            return disp === 'indifferent' || disp === 'unknown' || subcats.some((s) => s.includes('merc') || s.includes('art') || s.includes('contat') || s.includes('inform') || s.includes('loj') || s.includes('tav')) || tags.some((t) => t.includes('mercador') || t.includes('artesao') || t.includes('informante'));
+          }
+          if (tab.id === 'villains') {
+            return disp === 'hostile' || disp === 'unfriendly' || subcats.some((s) => s.includes('vil') || s.includes('antag') || s.includes('nemesis') || s.includes('inimig')) || tags.some((t) => t.includes('vilao') || t.includes('inimigo') || t.includes('antagonista'));
+          }
+        }
         return false;
       }).length;
     });
@@ -349,6 +382,22 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
         } else if (categoryKey === 'ancestry') {
           if (selectedTab === 'ancestries' && ent.ancestryData?.isVersatileHeritage) return false;
           if (selectedTab === 'heritages' && !ent.ancestryData?.isVersatileHeritage) return false;
+        } else if (categoryKey === 'npc') {
+          const disp = ent.npcData?.disposition;
+          const subcats = (ent.npcData?.subcategories || ent.subcategories || (ent.subcategory ? [ent.subcategory] : [])).map((s) => s.toLowerCase());
+          const tags = (ent.tags || []).map((t) => t.toLowerCase());
+          if (selectedTab === 'allies') {
+            const isAlly = disp === 'helpful' || disp === 'friendly' || subcats.some((s) => s.includes('aliad') || s.includes('companh') || s.includes('amig')) || tags.some((t) => t.includes('aliad') || t.includes('companh'));
+            if (!isAlly) return false;
+          }
+          if (selectedTab === 'contacts') {
+            const isContact = disp === 'indifferent' || disp === 'unknown' || subcats.some((s) => s.includes('merc') || s.includes('art') || s.includes('contat') || s.includes('inform') || s.includes('loj') || s.includes('tav')) || tags.some((t) => t.includes('mercador') || t.includes('artesao') || t.includes('informante'));
+            if (!isContact) return false;
+          }
+          if (selectedTab === 'villains') {
+            const isVillain = disp === 'hostile' || disp === 'unfriendly' || subcats.some((s) => s.includes('vil') || s.includes('antag') || s.includes('nemesis') || s.includes('inimig')) || tags.some((t) => t.includes('vilao') || t.includes('inimigo') || t.includes('antagonista'));
+            if (!isVillain) return false;
+          }
         }
       }
 
@@ -493,56 +542,10 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
     return sortEntityList(filteredEntities, sortBy);
   }, [filteredEntities, sortBy]);
 
-  // Color & Theme setup
+  // Dynamic Category Theme setup according to single source of truth in utils/categories.ts
   const themeClasses = useMemo(() => {
-    if (scope === 'peril' || scope === 'organization') {
-      return {
-        accent: 'rose',
-        textAccent: 'text-rose-400',
-        bgAccent: 'bg-rose-500',
-        badgeBg: 'bg-rose-950/80 text-rose-300 border-rose-800',
-        btnBg: 'bg-gradient-to-r from-rose-500 to-amber-600 hover:from-rose-400 hover:to-amber-500 text-zinc-950',
-        borderAccent: 'border-rose-700/60',
-        glow: 'shadow-[0_0_20px_rgba(244,63,94,0.25)]',
-        activeTab: 'bg-rose-500 text-black font-bold shadow-md shadow-rose-500/20',
-      };
-    }
-    if (scope === 'class' || scope === 'npc') {
-      return {
-        accent: 'purple',
-        textAccent: 'text-purple-400',
-        bgAccent: 'bg-purple-500',
-        badgeBg: 'bg-purple-950/80 text-purple-300 border-purple-800',
-        btnBg: 'bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-400 hover:to-cyan-400 text-zinc-950',
-        borderAccent: 'border-purple-700/60',
-        glow: 'shadow-[0_0_20px_rgba(168,85,247,0.25)]',
-        activeTab: 'bg-purple-500 text-black font-bold shadow-md shadow-purple-500/20',
-      };
-    }
-    if (scope === 'fauna' || scope === 'flora') {
-      return {
-        accent: 'emerald',
-        textAccent: 'text-emerald-400',
-        bgAccent: 'bg-emerald-500',
-        badgeBg: 'bg-emerald-950/80 text-emerald-300 border-emerald-800',
-        btnBg: 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-zinc-950',
-        borderAccent: 'border-emerald-700/60',
-        glow: 'shadow-[0_0_20px_rgba(16,185,129,0.25)]',
-        activeTab: 'bg-emerald-500 text-black font-bold shadow-md shadow-emerald-500/20',
-      };
-    }
-    // Default cyan
-    return {
-      accent: 'cyan',
-      textAccent: 'text-cyan-400',
-      bgAccent: 'bg-cyan-500',
-      badgeBg: 'bg-cyan-950/80 text-cyan-300 border-cyan-800',
-      btnBg: 'bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-zinc-950',
-      borderAccent: 'border-cyan-700/60',
-      glow: 'shadow-[0_0_20px_rgba(6,182,212,0.25)]',
-      activeTab: 'bg-cyan-500 text-black font-bold shadow-md shadow-cyan-500/20',
-    };
-  }, [scope]);
+    return getCategoryTheme(categoryKey);
+  }, [categoryKey]);
 
   // Grouped by folders for folder/tree view
   const groupedByFolder = useMemo(() => {
@@ -580,32 +583,147 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
   };
 
   const getCategoryIcon = () => {
-    switch (categoryKey) {
-      case 'peril':
-        return <Skull className="w-5 h-5 text-rose-400" />;
-      case 'class':
-        return <Swords className="w-5 h-5 text-purple-400" />;
-      case 'archetype':
-      case 'arquetipos':
-      case 'vocacao':
-        return <Layers className="w-5 h-5 text-cyan-400" />;
-      case 'ancestry':
-        return <Users className="w-5 h-5 text-cyan-400" />;
-      case 'fauna':
-        return <TreePine className="w-5 h-5 text-emerald-400" />;
-      case 'flora':
-        return <Flower2 className="w-5 h-5 text-emerald-400" />;
-      case 'location':
-        return <Compass className="w-5 h-5 text-cyan-400" />;
-      case 'pc':
-        return <User className="w-5 h-5 text-cyan-400" />;
-      case 'npc':
-        return <Users className="w-5 h-5 text-purple-400" />;
-      case 'organization':
-        return <Crown className="w-5 h-5 text-rose-400" />;
-      default:
-        return <BookOpen className="w-5 h-5 text-cyan-400" />;
+    const IconComp = themeClasses.meta.icon || BookOpen;
+    return <IconComp className={`w-5 h-5 ${themeClasses.textAccent}`} />;
+  };
+
+  const renderItemCard = (item: HecosEntity) => {
+    if (item.category === 'ancestry') {
+      return (
+        <AncestryCard
+          key={item.id}
+          entity={item}
+          onSelect={(id) => {
+            window.dispatchEvent(
+              new CustomEvent('hecos:open-entity-drawer', {
+                detail: { entityId: id, slug: item.slug }
+              })
+            );
+          }}
+          onEdit={onEditEntity}
+          onDelete={onDeleteEntity}
+          isGmMode={isActualGm}
+        />
+      );
     }
+    if (item.category === 'peril' || item.category === 'creature' || item.perilData) {
+      return (
+        <PerilCard
+          key={item.id}
+          entity={item}
+          onSelect={onSelectEntity}
+          onEdit={onEditEntity}
+          onDelete={onDeleteEntity}
+          isGmMode={isActualGm}
+        />
+      );
+    }
+    if (item.category === 'npc' || item.npcData) {
+      return (
+        <NPCCard
+          key={item.id}
+          entity={item}
+          onSelect={onSelectEntity}
+          onEdit={onEditEntity}
+          onDelete={onDeleteEntity}
+          isGmMode={isActualGm}
+        />
+      );
+    }
+    if (item.category === 'location' || item.locationData) {
+      return (
+        <LocationCard
+          key={item.id}
+          entity={item}
+          onSelect={onSelectEntity}
+          onEdit={onEditEntity}
+          onDelete={onDeleteEntity}
+          isGm={isActualGm}
+        />
+      );
+    }
+    if (item.category === 'quest' || item.questData) {
+      return (
+        <QuestCard
+          key={item.id}
+          entity={item}
+          onSelect={onSelectEntity}
+          onEdit={onEditEntity}
+          onDelete={onDeleteEntity}
+          onStatusChange={(id, newStatus) => {
+            const ent = HecosStorage.getEntityById(id);
+            if (ent) {
+              const updated = {
+                ...ent,
+                questData: { ...(ent.questData || { status: newStatus, difficulty: 'Moderada', objectives: [] }), status: newStatus },
+                updatedAt: new Date().toISOString(),
+              };
+              HecosStorage.saveEntity(updated);
+              setEntities(HecosStorage.getEntities());
+            }
+          }}
+          isGm={isActualGm}
+        />
+      );
+    }
+    if (item.category === 'organization' || item.organizationData) {
+      return (
+        <OrganizationCard
+          key={item.id}
+          entity={item}
+          onSelect={onSelectEntity}
+          onEdit={onEditEntity}
+          onDelete={onDeleteEntity}
+          isGm={isActualGm}
+        />
+      );
+    }
+    if (item.category === 'fauna' || item.faunaData) {
+      return (
+        <FaunaCard
+          key={item.id}
+          entity={item}
+          onSelect={onSelectEntity}
+          onEdit={onEditEntity}
+          onDelete={onDeleteEntity}
+          isGm={isActualGm}
+        />
+      );
+    }
+    if (item.category === 'flora' || item.floraData) {
+      return (
+        <FloraCard
+          key={item.id}
+          entity={item}
+          onSelect={onSelectEntity}
+          onEdit={onEditEntity}
+          onDelete={onDeleteEntity}
+          isGm={isActualGm}
+        />
+      );
+    }
+    if (item.category === 'pc' || item.pcData) {
+      return (
+        <PCCard
+          key={item.id}
+          entity={item}
+          onSelect={onSelectEntity}
+          onEdit={onEditEntity}
+          onDelete={onDeleteEntity}
+          isGm={isActualGm}
+        />
+      );
+    }
+    return (
+      <EntityCard
+        key={item.id}
+        entity={item}
+        onSelect={onSelectEntity}
+        onEdit={onEditEntity}
+        onDelete={onDeleteEntity}
+        isGmMode={isActualGm}
+      />
+    );
   };
 
   return (
@@ -725,13 +843,13 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
                 onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
                 className={`p-2.5 rounded-xl border transition-all cursor-pointer shadow-sm flex items-center justify-center ${
                   sortBy !== 'alpha_asc'
-                    ? (categoryKey === 'peril' ? 'bg-rose-950/90 border-rose-500/80 text-rose-300 hover:bg-rose-900/90' : 'bg-cyan-950/90 border-cyan-500/80 text-cyan-300 hover:bg-cyan-900/90')
+                    ? `${themeClasses.badgeBg} ${themeClasses.borderAccent} ${themeClasses.textAccent} hover:brightness-110`
                     : 'bg-zinc-900/90 border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100'
                 }`}
                 title={`Ordenar: ${activeSortOption?.label || 'Alfabética'}`}
                 aria-label="Ordenar registros"
               >
-                <ArrowUpDown className={`w-4 h-4 ${categoryKey === 'peril' ? (sortBy !== 'alpha_asc' ? 'text-rose-300' : 'text-rose-400') : (sortBy !== 'alpha_asc' ? 'text-cyan-300' : 'text-cyan-400')}`} />
+                <ArrowUpDown className={`w-4 h-4 ${sortBy !== 'alpha_asc' ? themeClasses.textAccent : 'text-zinc-400'}`} />
               </button>
 
               {/* Sort Dropdown Menu */}
@@ -759,15 +877,15 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
                           }}
                           className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
                             isSelected
-                              ? (categoryKey === 'peril' ? 'bg-rose-900/60 text-rose-200 border border-rose-700/60 font-bold' : 'bg-cyan-950/90 text-cyan-200 border border-cyan-700/60 font-bold')
+                              ? `${themeClasses.badgeBg} ${themeClasses.textAccent} ${themeClasses.borderAccent} border font-bold`
                               : 'text-zinc-300 hover:bg-zinc-800/80 hover:text-zinc-100'
                           }`}
                         >
                           <div className="flex items-center gap-2.5">
-                            <IconComponent className={`w-3.5 h-3.5 ${isSelected ? (categoryKey === 'peril' ? 'text-rose-400' : 'text-cyan-400') : 'text-zinc-400'}`} />
+                            <IconComponent className={`w-3.5 h-3.5 ${isSelected ? themeClasses.textAccent : 'text-zinc-400'}`} />
                             <span>{opt.label}</span>
                           </div>
-                          {isSelected && <Check className={`w-3.5 h-3.5 ${categoryKey === 'peril' ? 'text-rose-400' : 'text-cyan-400'}`} />}
+                          {isSelected && <Check className={`w-3.5 h-3.5 ${themeClasses.textAccent}`} />}
                         </button>
                       );
                     })}
@@ -784,7 +902,7 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={`Buscar em ${meta.name} por nome, resumo, tags...`}
-                className="w-full bg-black/50 border border-zinc-800 focus:border-cyan-500 rounded-xl pl-10 pr-9 py-2 text-xs text-zinc-200 placeholder-zinc-500 outline-none transition-all"
+                className="w-full bg-black/50 border border-zinc-800 focus:border-zinc-500 rounded-xl pl-10 pr-9 py-2 text-xs text-zinc-200 placeholder-zinc-500 outline-none transition-all"
               />
               {searchQuery && (
                 <button
@@ -1073,12 +1191,14 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
                 {sortedEntities.map((item) => {
                   const itemFolders = getEntityFolders(item);
                   const isPerilItem = item.category === 'peril' || item.category === 'creature' || item.perilData;
+                  const isNpcItem = item.category === 'npc' || item.npcData;
+                  const isAncestryItem = item.category === 'ancestry' || item.ancestryData;
 
                   return (
                     <tr
                       key={item.id}
                       onClick={() => {
-                        if (isPerilItem) {
+                        if (isPerilItem || isNpcItem || isAncestryItem) {
                           window.dispatchEvent(
                             new CustomEvent('hecos:open-entity-drawer', {
                               detail: { entityId: item.id, slug: item.slug }
@@ -1237,30 +1357,7 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
                       <p className="text-xs text-zinc-500 italic py-2">Nenhum item nesta pasta.</p>
                     ) : (
                       <div className={categoryKey === 'peril' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 min-[1800px]:grid-cols-4 gap-3 sm:gap-4' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3'}>
-                        {list.map((item) => {
-                          if (item.category === 'peril' || item.category === 'creature' || item.perilData) {
-                            return (
-                              <PerilCard
-                                key={item.id}
-                                entity={item}
-                                onSelect={onSelectEntity}
-                                onEdit={onEditEntity}
-                                onDelete={onDeleteEntity}
-                                isGmMode={isActualGm}
-                              />
-                            );
-                          }
-                          return (
-                            <EntityCard
-                              key={item.id}
-                              entity={item}
-                              onSelect={onSelectEntity}
-                              onEdit={onEditEntity}
-                              onDelete={onDeleteEntity}
-                              isGmMode={isActualGm}
-                            />
-                          );
-                        })}
+                        {list.map(renderItemCard)}
                       </div>
                     )}
                   </div>
@@ -1289,30 +1386,7 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
               {expandedFolders.__none__ !== false && (
                 <div className="p-4">
                   <div className={categoryKey === 'peril' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 min-[1800px]:grid-cols-4 gap-3 sm:gap-4' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3'}>
-                    {groupedByFolder.noFolderList.map((item) => {
-                      if (item.category === 'peril' || item.category === 'creature' || item.perilData) {
-                        return (
-                          <PerilCard
-                            key={item.id}
-                            entity={item}
-                            onSelect={onSelectEntity}
-                            onEdit={onEditEntity}
-                            onDelete={onDeleteEntity}
-                            isGmMode={isActualGm}
-                          />
-                        );
-                      }
-                      return (
-                        <EntityCard
-                          key={item.id}
-                          entity={item}
-                          onSelect={onSelectEntity}
-                          onEdit={onEditEntity}
-                          onDelete={onDeleteEntity}
-                          isGmMode={isActualGm}
-                        />
-                      );
-                    })}
+                    {groupedByFolder.noFolderList.map(renderItemCard)}
                   </div>
                 </div>
               )}
@@ -1322,42 +1396,7 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
       ) : (
         /* STANDARD CARDS GRID VIEW */
         <div className={`grid ${categoryKey === 'peril' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 min-[1800px]:grid-cols-4 gap-3 sm:gap-4' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 min-[1800px]:grid-cols-5 2xl:grid-cols-5 gap-3 sm:gap-3.5'} items-stretch`}>
-          {sortedEntities.map((item) => {
-            if (item.category === 'ancestry') {
-              return (
-                <AncestryCard
-                  key={item.id}
-                  entity={item}
-                  onSelect={onSelectEntity}
-                  onEdit={onEditEntity}
-                  onDelete={onDeleteEntity}
-                  isGmMode={isActualGm}
-                />
-              );
-            }
-            if (item.category === 'peril' || item.category === 'creature' || item.perilData) {
-              return (
-                <PerilCard
-                  key={item.id}
-                  entity={item}
-                  onSelect={onSelectEntity}
-                  onEdit={onEditEntity}
-                  onDelete={onDeleteEntity}
-                  isGmMode={isActualGm}
-                />
-              );
-            }
-            return (
-              <EntityCard
-                key={item.id}
-                entity={item}
-                onSelect={onSelectEntity}
-                onEdit={onEditEntity}
-                onDelete={onDeleteEntity}
-                isGmMode={isActualGm}
-              />
-            );
-          })}
+          {sortedEntities.map(renderItemCard)}
         </div>
       )}
 

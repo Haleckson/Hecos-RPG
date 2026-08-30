@@ -7,6 +7,7 @@ import { TraitBadge } from './TraitBadge';
 import { HecosStorage } from '../services/storage';
 import { getCardVisibilityClasses } from '../utils/cardVisibility';
 import { sortTraitsHierarchically } from '../utils/traitUtils';
+import { getCategoryTheme } from '../utils/categories';
 import {
   Heart,
   Maximize2,
@@ -77,20 +78,35 @@ export const AncestryCard: React.FC<AncestryCardProps> = ({
     (data.feats?.rank13?.length || 0) +
     (data.feats?.rank17?.length || 0);
 
+  const theme = getCategoryTheme('ancestry');
   const coverImage = currentEntity.coverImage;
 
   // Visibility Card Borders & Glow based on target rule
   const visStyle = getCardVisibilityClasses(currentEntity.visibility, currentEntity.isSecret);
 
+  // Open in Lateral Drawer as standard for entity exploration
+  const handleOpenInDrawer = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    window.dispatchEvent(
+      new CustomEvent('hecos:open-entity-drawer', {
+        detail: { entityId: currentEntity.id, slug: currentEntity.slug }
+      })
+    );
+  };
+
   return (
     <div
       id={`ancestry-card-${currentEntity.id}`}
-      className={`group relative flex flex-col justify-between rounded-2xl bg-[#0e0a17] hover:bg-[#130d22] border ${visStyle.border} ${visStyle.shadow} transition-all duration-200 overflow-hidden h-full min-h-[460px] shadow-lg`}
+      onClick={handleOpenInDrawer}
+      className={`group relative flex flex-col justify-between rounded-2xl bg-[#0e0a17] hover:bg-[#150d18] border ${visStyle.border} ${visStyle.shadow} transition-all duration-200 overflow-hidden h-full min-h-[460px] shadow-lg cursor-pointer`}
     >
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
       {/* IMAGEM DO CARD (Proporção vertical clássica de card / códice)               */}
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
-      <div className="relative w-full h-40 sm:h-44 bg-[#18112b] overflow-hidden border-b border-zinc-800/60 select-none shrink-0">
+      <div className="relative w-full h-40 sm:h-44 bg-[#1b120c] overflow-hidden border-b border-zinc-800/60 select-none shrink-0">
         {coverImage ? (
           <AdjustableImage
             src={coverImage}
@@ -100,8 +116,8 @@ export const AncestryCard: React.FC<AncestryCardProps> = ({
             containerClassName="relative w-full h-full overflow-hidden bg-[#0c0915]"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-[#1b1236] via-[#100b21] to-[#0a0714] flex items-center justify-center p-4">
-            <div className="w-14 h-14 rounded-2xl bg-cyan-950/30 border border-cyan-800/30 flex items-center justify-center text-cyan-400/50 group-hover:text-cyan-300 group-hover:scale-105 transition-all overflow-hidden">
+          <div className="w-full h-full bg-gradient-to-br from-[#24130a] via-[#160d07] to-[#0a0714] flex items-center justify-center p-4">
+            <div className="w-14 h-14 rounded-2xl bg-orange-950/30 border border-orange-800/30 flex items-center justify-center text-orange-400/50 group-hover:text-orange-300 group-hover:scale-105 transition-all overflow-hidden">
               <EntityIcon
                 icon={currentEntity.icon}
                 category="ancestry"
@@ -118,8 +134,8 @@ export const AncestryCard: React.FC<AncestryCardProps> = ({
         {/* Top Floating Elements */}
         <div className="absolute top-2 left-2 right-2 flex items-center justify-between pointer-events-none">
           {/* Identificador do tipo de artigo (Sempre Visível no canto superior esquerdo) */}
-          <span className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-lg bg-black/85 text-cyan-300 border border-cyan-700/60 backdrop-blur-md flex items-center gap-1 shadow-md pointer-events-auto">
-            <EntityIcon icon={currentEntity.icon} category="ancestry" className="w-2.5 h-2.5 text-cyan-400" />
+          <span className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-lg bg-black/85 text-orange-300 border border-orange-700/60 backdrop-blur-md flex items-center gap-1 shadow-md pointer-events-auto">
+            <EntityIcon icon={currentEntity.icon} category="ancestry" className="w-2.5 h-2.5 text-orange-400" />
             <span>Ancestralidade</span>
           </span>
 
@@ -142,7 +158,7 @@ export const AncestryCard: React.FC<AncestryCardProps> = ({
                 <button
                   type="button"
                   onClick={() => onEdit(currentEntity.id)}
-                  className="p-1 rounded-lg hover:bg-cyan-950 text-zinc-400 hover:text-cyan-300 transition-colors cursor-pointer"
+                  className="p-1 rounded-lg hover:bg-orange-950 text-zinc-400 hover:text-orange-300 transition-colors cursor-pointer"
                   title="Editar Artigo de Ancestralidade"
                 >
                   <Edit3 className="w-3.5 h-3.5" />
@@ -169,34 +185,39 @@ export const AncestryCard: React.FC<AncestryCardProps> = ({
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
       <div className="p-3.5 space-y-3 flex-1 flex flex-col justify-between">
         <div className="space-y-3">
-          {/* ÍCONE, NOME (ÚNICA ÁREA CLICÁVEL DO CARD) E SUBTÍTULO */}
+          {/* ÍCONE, NOME (CLICÁVEIS PARA ABRIR NO DRAWER) E SUBTÍTULO */}
           <div className="flex items-start gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-[#1b1430] border border-cyan-500/40 flex items-center justify-center text-cyan-300 shrink-0 shadow-md mt-0.5 group-hover:border-cyan-400 group-hover:scale-105 transition-all overflow-hidden">
+            <button
+              type="button"
+              onClick={handleOpenInDrawer}
+              className="w-9 h-9 rounded-xl bg-[#24130a] border border-orange-500/40 flex items-center justify-center text-orange-300 shrink-0 shadow-md mt-0.5 group-hover:border-orange-400 group-hover:scale-105 transition-all overflow-hidden cursor-pointer"
+              title={`Abrir ${currentEntity.title}`}
+            >
               <EntityIcon
                 icon={currentEntity.icon}
                 category="ancestry"
                 className="w-4.5 h-4.5"
                 imageClassName="w-full h-full object-cover rounded-xl"
               />
-            </div>
+            </button>
 
             <div className="min-w-0 flex-1">
               <button
                 type="button"
-                onClick={() => onSelect(currentEntity.id)}
+                onClick={handleOpenInDrawer}
                 className="text-left w-full group/title focus:outline-none cursor-pointer block transition-all"
                 title={`Abrir ancestralidade ${currentEntity.title}`}
               >
-                <h3 className="text-base sm:text-lg font-black text-zinc-100 group-hover/title:text-cyan-300 font-serif group-hover/title:drop-shadow-[0_0_15px_rgba(6,182,212,0.9)] flex items-center gap-1.5 leading-snug break-words transition-all">
-                  <span className="group-hover/title:underline decoration-cyan-400 decoration-2 underline-offset-2">
+                <h3 className="text-base sm:text-lg font-black text-zinc-100 group-hover/title:text-orange-300 font-serif group-hover/title:drop-shadow-[0_0_15px_rgba(249,115,22,0.9)] flex items-center gap-1.5 leading-snug break-words transition-all">
+                  <span className="group-hover/title:underline decoration-orange-400 decoration-2 underline-offset-2">
                     {currentEntity.title || 'Sem Título'}
                   </span>
-                  <ArrowRight className="w-4 h-4 opacity-0 group-hover/title:opacity-100 text-cyan-400 group-hover/title:translate-x-0.5 transition-all shrink-0" />
+                  <ArrowRight className="w-4 h-4 opacity-0 group-hover/title:opacity-100 text-orange-400 group-hover/title:translate-x-0.5 transition-all shrink-0 ml-auto" />
                 </h3>
               </button>
 
               {currentEntity.subtitle && (
-                <p className="text-[11px] text-[#b19ecc] font-medium mt-0.5 break-words">
+                <p className="text-[11px] text-[#cca58e] font-medium mt-0.5 break-words">
                   {currentEntity.subtitle}
                 </p>
               )}
@@ -208,9 +229,9 @@ export const AncestryCard: React.FC<AncestryCardProps> = ({
           {/* Linha 1: [ PV ] [ Tamanho ]                                           */}
           {/* Linha 2: [ Desloc. ] [ Modif. ]                                       */}
           {/* ═══════════════════════════════════════════════════════════════════════ */}
-          <div className="grid grid-cols-2 gap-1.5 bg-[#140f24] p-2 rounded-xl border border-zinc-800/90 shadow-inner">
+          <div className="grid grid-cols-2 gap-1.5 bg-[#170f0b] p-2 rounded-xl border border-zinc-800/90 shadow-inner">
             {/* Linha 1, Coluna 1: PV */}
-            <div className="flex items-start gap-1.5 min-w-0 p-1.5 rounded-lg bg-[#181023]/90 border border-rose-900/40">
+            <div className="flex items-start gap-1.5 min-w-0 p-1.5 rounded-lg bg-[#201018]/90 border border-rose-900/40">
               <Heart className="w-3.5 h-3.5 text-rose-400 shrink-0 fill-rose-400/20 mt-0.5" />
               <div className="min-w-0 flex-1">
                 <div className="text-[9px] uppercase font-bold tracking-wider text-rose-300/90 font-mono">PV</div>
@@ -219,11 +240,11 @@ export const AncestryCard: React.FC<AncestryCardProps> = ({
             </div>
 
             {/* Linha 1, Coluna 2: Tamanho */}
-            <div className="flex items-start gap-1.5 min-w-0 p-1.5 rounded-lg bg-[#0e1622]/90 border border-cyan-900/40">
-              <Maximize2 className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
+            <div className="flex items-start gap-1.5 min-w-0 p-1.5 rounded-lg bg-[#22170d]/90 border border-orange-900/40">
+              <Maximize2 className="w-3.5 h-3.5 text-orange-400 shrink-0 mt-0.5" />
               <div className="min-w-0 flex-1">
-                <div className="text-[9px] uppercase font-bold tracking-wider text-cyan-300/90 font-mono">Tamanho</div>
-                <div className="font-black text-cyan-100 text-sm sm:text-base leading-tight break-words">{size}</div>
+                <div className="text-[9px] uppercase font-bold tracking-wider text-orange-300/90 font-mono">Tamanho</div>
+                <div className="font-black text-orange-100 text-sm sm:text-base leading-tight break-words">{size}</div>
               </div>
             </div>
 
@@ -249,10 +270,10 @@ export const AncestryCard: React.FC<AncestryCardProps> = ({
           {/* ═══════════════════════════════════════════════════════════════════════ */}
           {/* MENOR DESTAQUE (Texto integral acomodado): Sentidos & Inato           */}
           {/* ═══════════════════════════════════════════════════════════════════════ */}
-          <div className="space-y-1 text-xs text-zinc-300 bg-[#0d0a15] p-2 rounded-xl border border-zinc-800/60">
+          <div className="space-y-1 text-xs text-zinc-300 bg-[#120c09] p-2 rounded-xl border border-zinc-800/60">
             <div className="flex items-start gap-1.5">
-              <span className="text-cyan-400 font-bold font-mono text-[10px] shrink-0 flex items-center gap-1 mt-0.5">
-                <Eye className="w-3 h-3 text-cyan-400 shrink-0" />
+              <span className="text-orange-400 font-bold font-mono text-[10px] shrink-0 flex items-center gap-1 mt-0.5">
+                <Eye className="w-3 h-3 text-orange-400 shrink-0" />
                 <span>Sentidos:</span>
               </span>
               <span className="text-zinc-300 text-xs break-words flex-1 leading-snug font-medium">
@@ -262,8 +283,8 @@ export const AncestryCard: React.FC<AncestryCardProps> = ({
 
             {innate && innate !== '—' && (
               <div className="flex items-start gap-1.5 pt-1 border-t border-zinc-800/50">
-                <span className="text-purple-400 font-bold font-mono text-[10px] shrink-0 flex items-center gap-1 mt-0.5">
-                  <Sparkles className="w-3 h-3 text-purple-400 shrink-0" />
+                <span className="text-amber-400 font-bold font-mono text-[10px] shrink-0 flex items-center gap-1 mt-0.5">
+                  <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
                   <span>Inato:</span>
                 </span>
                 <span className="text-zinc-300 text-xs break-words flex-1 leading-snug font-medium">
@@ -298,8 +319,8 @@ export const AncestryCard: React.FC<AncestryCardProps> = ({
                 </span>
               )}
               {totalFeats > 0 && (
-                <span className="flex items-center gap-1 text-cyan-300 bg-cyan-950/60 border border-cyan-800/70 px-1.5 py-0.5 rounded-lg text-[10px]">
-                  <Award className="w-3 h-3 text-cyan-400" />
+                <span className="flex items-center gap-1 text-orange-300 bg-orange-950/60 border border-orange-800/70 px-1.5 py-0.5 rounded-lg text-[10px]">
+                  <Award className="w-3 h-3 text-orange-400" />
                   <span>{totalFeats} talento{totalFeats > 1 ? 's' : ''}</span>
                 </span>
               )}

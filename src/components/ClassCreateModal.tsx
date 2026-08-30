@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { HecosStorage } from '../services/storage';
 import {
   HecosEntity,
   ClassAttributes,
@@ -271,6 +272,7 @@ ${gmNotes.trim() ? `\n:::gm\n**Notas do Mestre:**\n${gmNotes.trim()}\n:::\n` : '
       classData
     };
 
+    HecosStorage.saveEntity(newEntity);
     onSave(newEntity);
     onClose();
   };
@@ -280,11 +282,11 @@ ${gmNotes.trim() ? `\n:::gm\n**Notas do Mestre:**\n${gmNotes.trim()}\n:::\n` : '
   return (
     <div
       id="class-create-modal-overlay"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-1 sm:p-2 md:p-3 bg-black/90 backdrop-blur-md overflow-hidden animate-in fade-in duration-200"
     >
       <div
         id="class-create-modal-container"
-        className="relative w-full max-w-4xl max-h-[90vh] bg-[#0c0915] border border-purple-900/40 rounded-3xl shadow-2xl flex flex-col overflow-hidden text-zinc-200"
+        className="w-[95vw] h-[95vh] max-w-[98vw] max-h-[98vh] bg-[#0c0915] border border-purple-900/60 rounded-2xl shadow-[0_0_60px_rgba(0,0,0,0.95)] flex flex-col overflow-hidden text-zinc-100"
       >
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-zinc-800/80 flex items-center justify-between bg-[#120e20]">

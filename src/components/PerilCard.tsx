@@ -657,8 +657,7 @@ export const PerilCard: React.FC<PerilCardProps> = ({
   return (
     <div
       id={`peril-card-${currentEntity.id}`}
-      onClick={handleOpenInDrawer}
-      className={`group relative flex flex-col justify-between rounded-2xl bg-[#0e0a17] hover:bg-[#140e22] border ${visStyle.border} ${visStyle.shadow} transition-all duration-200 overflow-hidden h-full min-h-[460px] shadow-lg cursor-pointer`}
+      className={`group relative flex flex-col justify-between rounded-2xl bg-[#0e0a17] hover:bg-[#140e22] border ${visStyle.border} ${visStyle.shadow} transition-all duration-200 overflow-hidden h-full min-h-[460px] shadow-lg`}
     >
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
       {/* RETRATO COMO COVER DO CARD (Igual aos cards de Ancestralidade)               */}
@@ -765,8 +764,7 @@ export const PerilCard: React.FC<PerilCardProps> = ({
               placement="right"
             >
               <div
-                onClick={handleOpenInDrawer}
-                className="w-10 h-10 rounded-xl bg-[#1b1228] border border-rose-500/40 flex items-center justify-center text-rose-300 shrink-0 shadow-md mt-0.5 group-hover:border-rose-400 group-hover:scale-105 transition-all overflow-hidden cursor-pointer"
+                className="w-10 h-10 rounded-xl bg-[#1b1228] border border-rose-500/40 flex items-center justify-center text-rose-300 shrink-0 shadow-md mt-0.5 group-hover:border-rose-400 group-hover:scale-105 transition-all overflow-hidden"
               >
                 {tokenImage && (tokenImage.startsWith('http') || tokenImage.startsWith('data:')) ? (
                   <img
@@ -793,14 +791,19 @@ export const PerilCard: React.FC<PerilCardProps> = ({
                 side="right"
                 className="w-full"
               >
-                <div className="text-left w-full group/title focus:outline-none cursor-pointer block transition-all">
+                <button
+                  type="button"
+                  onClick={handleOpenInDrawer}
+                  className="text-left w-full group/title focus:outline-none cursor-pointer block transition-all"
+                  title={`Abrir ${currentEntity.title}`}
+                >
                   <h3 className="text-base sm:text-lg font-black text-zinc-100 group-hover/title:text-rose-300 font-serif group-hover/title:drop-shadow-[0_0_15px_rgba(244,63,94,0.9)] flex items-center gap-1.5 leading-snug break-words transition-all">
                     <span className="group-hover/title:underline decoration-rose-500 decoration-2 underline-offset-2">
                       {currentEntity.title || 'Sem Título'}
                     </span>
                     <ArrowRight className="w-4 h-4 opacity-0 group-hover/title:opacity-100 text-rose-400 group-hover/title:translate-x-0.5 transition-all shrink-0 ml-auto" />
                   </h3>
-                </div>
+                </button>
               </Tooltip>
 
               {(canViewDescription || canViewTraits || effectiveIsGm) && currentEntity.subtitle && (

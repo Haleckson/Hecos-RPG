@@ -147,7 +147,7 @@ export const SpellView: React.FC<SpellViewProps> = ({
       {/* CARD PRINCIPAL DO FEITIÇO PF2E */}
       <div className="rounded-2xl bg-[#09080e] border border-zinc-800 shadow-2xl overflow-hidden">
         {/* CABEÇALHO DO STATBLOCK */}
-        <div className="p-6 bg-gradient-to-r from-[#0c131d] via-[#0a1018] to-[#120d1c] border-b border-zinc-800/80 space-y-4">
+        <div className="p-6 bg-gradient-to-r from-[#1d0c18] via-[#150a14] to-[#120d1c] border-b border-zinc-800/80 space-y-4">
           {/* Top Bar: Pastas/Subcategorias, Category & Quick Actions */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -157,15 +157,15 @@ export const SpellView: React.FC<SpellViewProps> = ({
                   key={subcat}
                   type="button"
                   onClick={() => onTagClick(subcat)}
-                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-cyan-950/60 hover:bg-cyan-900/70 text-cyan-300 border border-cyan-700/40 transition-colors shadow-sm cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-pink-950/60 hover:bg-pink-900/70 text-pink-300 border border-pink-700/40 transition-colors shadow-sm cursor-pointer"
                   title={`Filtrar pela pasta ${subcat}`}
                 >
-                  <Folder className="w-3 h-3 text-cyan-400" />
+                  <Folder className="w-3 h-3 text-pink-400" />
                   <span>{subcat}</span>
                 </button>
               ))}
 
-              <span className="px-2.5 py-0.5 text-[11px] font-bold uppercase rounded-md bg-purple-950/60 text-purple-300 border border-purple-800/50">
+              <span className="px-2.5 py-0.5 text-[11px] font-bold uppercase rounded-md bg-pink-950/60 text-pink-300 border border-pink-800/50">
                 {getSpellTypeLabel(spellData.spellType)}
               </span>
             </div>
@@ -205,7 +205,7 @@ export const SpellView: React.FC<SpellViewProps> = ({
                 <>
                   <button
                     onClick={onEdit}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-950/90 hover:bg-cyan-900 border border-cyan-600/60 text-cyan-200 text-xs font-bold transition-all cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-pink-950/90 hover:bg-pink-900 border border-pink-600/60 text-pink-200 text-xs font-bold transition-all cursor-pointer"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                     <span>Editar</span>
@@ -227,7 +227,7 @@ export const SpellView: React.FC<SpellViewProps> = ({
           {/* Title Row: Title & Action Glyphs on the Left, Círculo/Rank na Extrema Direita */}
           <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
             <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-2xl sm:text-3xl font-black text-cyan-300 tracking-tight flex items-center gap-3">
+              <h2 className="text-2xl sm:text-3xl font-black text-pink-300 tracking-tight flex items-center gap-3">
                 <span>{entity.title}</span>
                 {actionGlyph.show && (
                   <PF2eActionGlyph type={actionGlyph.type} size="lg" />
@@ -236,7 +236,7 @@ export const SpellView: React.FC<SpellViewProps> = ({
             </div>
 
             {/* Círculo da Magia na Extrema Direita */}
-            <div className="px-3.5 py-1 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-mono font-bold text-sm uppercase shadow-sm shrink-0">
+            <div className="px-3.5 py-1 rounded-xl bg-pink-500/20 text-pink-300 border border-pink-500/40 font-mono font-bold text-sm uppercase shadow-sm shrink-0">
               {spellData.rank === 0 ? 'Truque (Rank 0)' : `${spellData.rank}º Círculo`}
             </div>
           </div>
@@ -250,7 +250,7 @@ export const SpellView: React.FC<SpellViewProps> = ({
           {/* Traços PF2e ([Raridade] + [Tradição] + [Tamanho] + [Outros Traits em Ordem Alfabética]) */}
           <div className="space-y-2 mt-3 pt-3 border-t border-zinc-800/60">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-cyan-400/80 mr-1 shrink-0">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-pink-400/80 mr-1 shrink-0">
                 TRAÇOS:
               </span>
 
@@ -281,7 +281,7 @@ export const SpellView: React.FC<SpellViewProps> = ({
                     key={`tag-${tag}`}
                     type="button"
                     onClick={() => onTagClick(tag)}
-                    className="px-2 py-0.5 rounded-md bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-700/60 hover:border-purple-500/50 text-zinc-400 hover:text-purple-300 text-[11px] font-medium transition-colors cursor-pointer"
+                    className="px-2 py-0.5 rounded-md bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-700/60 hover:border-pink-500/50 text-zinc-400 hover:text-pink-300 text-[11px] font-medium transition-colors cursor-pointer"
                   >
                     #{tag}
                   </button>
@@ -423,9 +423,9 @@ export const SpellView: React.FC<SpellViewProps> = ({
 
           {/* INTENSIFICADO / AMPLIAÇÃO (HEIGHTENED) */}
           {spellData.heightened && (
-            <div className="p-4 rounded-xl bg-[#09141c] border border-cyan-500/30 text-xs sm:text-sm text-cyan-200 space-y-2">
-              <strong className="text-cyan-300 font-bold uppercase font-mono text-[11px] flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+            <div className="p-4 rounded-xl bg-[#1c0916] border border-pink-500/30 text-xs sm:text-sm text-pink-200 space-y-2">
+              <strong className="text-pink-300 font-bold uppercase font-mono text-[11px] flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-pink-400" />
                 <span>Intensificado (Heightened):</span>
               </strong>
               <div className="space-y-2 pl-1 text-zinc-200">
@@ -437,7 +437,7 @@ export const SpellView: React.FC<SpellViewProps> = ({
                   .filter(Boolean)
                   .map((line, idx) => (
                     <div key={`view-heightened-${idx}`} className="flex items-start gap-2 text-xs sm:text-sm text-zinc-200 leading-relaxed">
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-2 shrink-0" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-pink-400 mt-2 shrink-0" />
                       <div className="flex-1">
                         <RichContentRenderer content={line} onNavigate={onNavigate} />
                       </div>
@@ -452,15 +452,15 @@ export const SpellView: React.FC<SpellViewProps> = ({
       {/* SEÇÃO DE LORE & SEGREDO DO MESTRE EM HECOS */}
       {(spellData.hecosLore || spellData.gmNotes) && (
         <div className="p-6 rounded-2xl bg-[#09080e] border border-zinc-800 space-y-4">
-          <h3 className="text-base font-bold text-[#74b6c2] flex items-center gap-2.5 font-serif border-b border-zinc-800 pb-2">
-            <Scroll className="w-4 h-4 text-cyan-400" />
+          <h3 className="text-base font-bold text-pink-300 flex items-center gap-2.5 font-serif border-b border-zinc-800 pb-2">
+            <Scroll className="w-4 h-4 text-pink-400" />
             <span>Contexto & Tradição no Mundo de Hecos</span>
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs sm:text-sm text-zinc-300">
             {spellData.hecosLore && (
               <div className="p-4 rounded-xl bg-black/40 border border-zinc-800 space-y-1">
-                <h4 className="text-[11px] font-bold text-cyan-300 uppercase font-mono mb-1">
+                <h4 className="text-[11px] font-bold text-pink-300 uppercase font-mono mb-1">
                   Origem do Encantamento
                 </h4>
                 <RichContentRenderer content={spellData.hecosLore} onNavigate={onNavigate} />

@@ -960,11 +960,11 @@ ${gmNotes.trim() ? `\n:::gm\n**Notas Secretas do Mestre:**\n${gmNotes.trim()}\n:
   return (
     <div
       id="peril-create-modal-backdrop"
-      className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-1 sm:p-2 md:p-3 overflow-hidden animate-in fade-in duration-200"
     >
       <div
         id="peril-create-modal-container"
-        className="relative w-full max-w-6xl w-[95vw] h-[92vh] max-h-[95vh] bg-[#0c0915] border border-rose-900/50 rounded-3xl shadow-2xl flex overflow-hidden text-zinc-200"
+        className="w-[95vw] h-[95vh] max-w-[98vw] max-h-[98vh] bg-[#0c0915] border border-rose-900/60 rounded-2xl shadow-[0_0_60px_rgba(0,0,0,0.95)] flex overflow-hidden text-zinc-100"
       >
         {/* ═════════════════════════════════════════════════════════════════════════ */}
         {/* LEFT VERTICAL DOCK: CATEGORIES SIDEBAR */}

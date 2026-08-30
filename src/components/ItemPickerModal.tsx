@@ -3,6 +3,7 @@ import { HecosEntity, ItemCategoryType, PerilLootItem, PF2eItemAttributes } from
 import { HecosStorage } from '../services/storage';
 import { parseItemFromContent } from '../utils/itemSerializer';
 import { TraitBadge } from './TraitBadge';
+import { ItemDrawer } from './ItemDrawer';
 import {
   Search,
   CheckSquare,
@@ -25,6 +26,8 @@ import {
   Plus,
   Minus,
   CheckCircle2,
+  Eye,
+  ExternalLink,
 } from 'lucide-react';
 
 interface ItemPickerModalProps {
@@ -43,6 +46,7 @@ interface ItemPickerModalProps {
   alreadyAddedItemNames?: string[];
   perilName?: string;
   onNavigate?: (id: string) => void;
+  onCreateNewItem?: () => void;
 }
 
 const ITEM_CATEGORY_LABELS: Record<string, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
@@ -66,12 +70,14 @@ export const ItemPickerModal: React.FC<ItemPickerModalProps> = ({
   alreadyAddedItemNames = [],
   perilName = '',
   onNavigate,
+  onCreateNewItem,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
   const [selectedRarityFilter, setSelectedRarityFilter] = useState<string>('all');
   const [selectedLevelFilter, setSelectedLevelFilter] = useState<string>('all');
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [drawerItemId, setDrawerItemId] = useState<string | null>(null);
 
   // Map of selected entity ID to { quantity, notes }
   const [selectedItemsMap, setSelectedItemsMap] = useState<
@@ -263,14 +269,30 @@ export const ItemPickerModal: React.FC<ItemPickerModalProps> = ({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100 transition-colors border border-zinc-800 cursor-pointer"
-            title="Fechar busca de itens"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {onCreateNewItem && (
+              <button
+                type="button"
+                onClick={() => {
+                  onCreateNewItem();
+                }}
+                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-zinc-950 text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-950/40 transition-all cursor-pointer"
+                title="Criar um novo item no compêndio"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                <span className="whitespace-nowrap">Criar Novo Item</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100 transition-colors border border-zinc-800 cursor-pointer"
+              title="Fechar busca de itens"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* CONTROLS & SEARCH BAR */}
@@ -391,12 +413,24 @@ export const ItemPickerModal: React.FC<ItemPickerModalProps> = ({
         {/* ITEMS LIST BODY */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-2.5 custom-scrollbar bg-[#090710]">
           {filteredItems.length === 0 ? (
-            <div className="py-12 text-center text-zinc-500 space-y-2">
+            <div className="py-12 text-center text-zinc-500 space-y-3">
               <Package className="w-10 h-10 mx-auto text-zinc-600 opacity-50" />
               <p className="text-sm font-medium">Nenhum item encontrado para os filtros aplicados.</p>
               <p className="text-xs text-zinc-600">
                 Tente ajustar a busca por texto ou os seletores de categoria/nível acima.
               </p>
+              {onCreateNewItem && (
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => onCreateNewItem()}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-950/80 hover:bg-amber-900 border border-amber-800 text-amber-300 text-xs font-bold transition-all shadow-sm cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Criar Novo Item Agora</span>
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             filteredItems.map(({ entity, parsed }) => {
@@ -472,7 +506,7 @@ export const ItemPickerModal: React.FC<ItemPickerModalProps> = ({
                           )}
                         </div>
 
-                        {/* Price & Bulk Details */}
+                        {/* Price & Bulk Details and Action Buttons */}
                         <div className="flex items-center gap-2 text-xs font-mono shrink-0">
                           {parsed.price && (
                             <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-950/50 text-amber-300 border border-amber-800/60 font-bold">
@@ -486,6 +520,19 @@ export const ItemPickerModal: React.FC<ItemPickerModalProps> = ({
                               <span>Vol. {parsed.bulk}</span>
                             </span>
                           )}
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDrawerItemId(entity.id);
+                            }}
+                            className="p-1.5 rounded-lg bg-zinc-900 hover:bg-amber-950/80 border border-zinc-800 hover:border-amber-700 text-zinc-400 hover:text-amber-300 transition-colors flex items-center gap-1 text-[11px] font-sans font-semibold cursor-pointer"
+                            title="Abrir ficha completa do item na gaveta lateral"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Ver Ficha</span>
+                          </button>
                         </div>
                       </div>
 
@@ -643,6 +690,24 @@ export const ItemPickerModal: React.FC<ItemPickerModalProps> = ({
         </div>
 
       </div>
+
+      {/* Item Full Details Drawer */}
+      {drawerItemId && (
+        <ItemDrawer
+          isOpen={Boolean(drawerItemId)}
+          itemId={drawerItemId}
+          entities={allItemEntities}
+          onClose={() => setDrawerItemId(null)}
+          onNavigateFullPage={(id) => {
+            if (onNavigate) {
+              onNavigate(id);
+            } else {
+              window.open(`/?article=${id}`, '_blank');
+            }
+          }}
+          isGmMode={true}
+        />
+      )}
     </div>
   );
 };

@@ -293,14 +293,14 @@ IDIOMAS: ${data.languages || 'Humani'}`;
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
       {/* CABEÇALHO PERMANENTE DA ANCESTRALIDADE (FORA DAS ABAS & SEMPRE ACESSÍVEL)   */}
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
-      <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-b from-[#120e1e] to-[#0a0812] border border-[#272338] shadow-xl relative overflow-hidden group">
+      <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-b from-[#1c120c] to-[#0f0a07] border border-[#382618] shadow-xl relative overflow-hidden group">
         {/* Glow de fundo */}
-        <div className="absolute top-0 right-0 w-72 h-72 bg-[#74b6c2]/5 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-72 h-72 bg-[#b19ecc]/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 right-0 w-72 h-72 bg-[#f97316]/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-72 h-72 bg-[#ea580c]/5 rounded-full blur-3xl pointer-events-none" />
 
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1 flex items-start gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-[#1b1430] border border-cyan-500/40 flex items-center justify-center text-cyan-300 shrink-0 shadow-lg mt-0.5 group-hover:scale-105 transition-all overflow-hidden">
+            <div className="w-16 h-16 rounded-2xl bg-[#29170e] border border-orange-500/40 flex items-center justify-center text-orange-300 shrink-0 shadow-lg mt-0.5 group-hover:scale-105 transition-all overflow-hidden">
               <EntityIcon
                 icon={entity.icon}
                 category="ancestry"
@@ -311,8 +311,8 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#18262b] text-[#74b6c2] border border-[#74b6c2]/30 font-mono flex items-center gap-1">
-                  <EntityIcon icon={entity.icon} category="ancestry" className="w-3 h-3 text-cyan-400" />
+                <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#2a170a] text-orange-300 border border-orange-500/40 font-mono flex items-center gap-1">
+                  <EntityIcon icon={entity.icon} category="ancestry" className="w-3 h-3 text-orange-400" />
                   Ancestralidade PF2e
                 </span>
                 {entity.isSecret && (
@@ -322,11 +322,11 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                 )}
               </div>
 
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-zinc-100 via-cyan-100 to-[#74b6c2] tracking-tight font-serif break-words">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-zinc-100 via-orange-100 to-orange-400 tracking-tight font-serif break-words">
                 {entity.title || '[NOME DA ANCESTRALIDADE]'}
               </h1>
               {entity.subtitle && (
-                <p className="text-sm sm:text-base text-[#b19ecc] font-medium mt-1 break-words">
+                <p className="text-sm sm:text-base text-orange-200/80 font-medium mt-1 break-words">
                   {entity.subtitle}
                 </p>
               )}
@@ -349,10 +349,10 @@ IDIOMAS: ${data.languages || 'Humani'}`;
               <button
                 type="button"
                 onClick={() => onEdit(activeMainTab === 'gm' ? 'gm' : activeMainTab === 'lore' ? 'lore' : 'mechanics')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-950/70 hover:bg-cyan-900/90 border border-cyan-500/50 text-cyan-200 text-xs font-bold transition-all cursor-pointer shadow-sm hover:shadow-[0_0_15px_rgba(6,182,212,0.35)]"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-950/70 hover:bg-orange-900/90 border border-orange-500/50 text-orange-200 text-xs font-bold transition-all cursor-pointer shadow-sm hover:shadow-[0_0_15px_rgba(249,115,22,0.35)]"
                 title="Editar Artigo de Ancestralidade"
               >
-                <Edit3 className="w-3.5 h-3.5 text-cyan-400" />
+                <Edit3 className="w-3.5 h-3.5 text-orange-400" />
                 <span>Editar Artigo</span>
               </button>
             )}
@@ -360,7 +360,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
             <button
               type="button"
               onClick={copyStatblockText}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#141220] hover:bg-[#1c1830] border border-[#272338] hover:border-[#74b6c2]/50 text-zinc-300 hover:text-cyan-300 text-xs font-semibold transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#17100b] hover:bg-[#241710] border border-[#382618] hover:border-orange-500/50 text-zinc-300 hover:text-orange-300 text-xs font-semibold transition-all cursor-pointer"
               title="Copiar cabeçalho da ficha para a área de transferência"
             >
               {copiedStatblock ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
@@ -373,10 +373,10 @@ IDIOMAS: ${data.languages || 'Humani'}`;
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
       {/* NAVEGAÇÃO DAS ABAS (MECÂNICAS, LORE, GM) COM ALTÍSSIMO DESTAQUE & CLAREZA  */}
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
-      <div className="p-2 sm:p-2.5 rounded-2xl bg-[#0a0814] border-2 border-[#362f4c] shadow-2xl space-y-2">
+      <div className="p-2 sm:p-2.5 rounded-2xl bg-[#0e0a07] border-2 border-[#382618] shadow-2xl space-y-2">
         <div className="flex items-center justify-between px-2 pt-1 pb-0.5">
-          <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-[#74b6c2] font-mono flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+          <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-orange-400 font-mono flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
             Abas de Navegação do Artigo
           </span>
           <span className="text-[10px] text-zinc-500 font-mono hidden sm:inline-block">
@@ -391,22 +391,22 @@ IDIOMAS: ${data.languages || 'Humani'}`;
             onClick={() => setActiveMainTab('mechanics')}
             className={`flex-1 flex items-center justify-center gap-2.5 py-3 sm:py-3.5 px-4 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all cursor-pointer select-none font-serif ${
               activeMainTab === 'mechanics'
-                ? 'bg-gradient-to-r from-[#132e36] via-[#10242b] to-[#173842] text-cyan-200 border-2 border-cyan-400 shadow-[0_0_25px_rgba(6,182,212,0.45)] ring-1 ring-cyan-300/40 scale-[1.01]'
-                : 'bg-[#120f1f]/80 hover:bg-[#19152b] text-zinc-400 hover:text-cyan-200 border border-[#2d2740] hover:border-cyan-600/50'
+                ? 'bg-gradient-to-r from-[#3a1d0d] via-[#2a1409] to-[#422210] text-orange-200 border-2 border-orange-500 shadow-[0_0_25px_rgba(249,115,22,0.45)] ring-1 ring-orange-300/40 scale-[1.01]'
+                : 'bg-[#18110b]/80 hover:bg-[#241710] text-zinc-400 hover:text-orange-200 border border-[#382618] hover:border-orange-600/50'
             }`}
           >
-            <div className={`p-1.5 rounded-lg shrink-0 ${activeMainTab === 'mechanics' ? 'bg-cyan-950/90 text-cyan-300 border border-cyan-400/60' : 'bg-black/40 text-zinc-400'}`}>
+            <div className={`p-1.5 rounded-lg shrink-0 ${activeMainTab === 'mechanics' ? 'bg-orange-950/90 text-orange-300 border border-orange-400/60' : 'bg-black/40 text-zinc-400'}`}>
               <Swords className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
             </div>
             <div className="flex flex-col items-start leading-tight">
               <span className="font-extrabold tracking-wide">Mecânicas</span>
-              <span className={`text-[9px] font-mono font-normal lowercase tracking-normal ${activeMainTab === 'mechanics' ? 'text-cyan-300' : 'text-zinc-500'}`}>
+              <span className={`text-[9px] font-mono font-normal lowercase tracking-normal ${activeMainTab === 'mechanics' ? 'text-orange-300' : 'text-zinc-500'}`}>
                 regras & talentos
               </span>
             </div>
             <span className={`ml-auto text-[11px] px-2 py-0.5 rounded-full font-mono font-bold border ${
               activeMainTab === 'mechanics'
-                ? 'bg-cyan-950 text-cyan-300 border-cyan-400/70 shadow-sm'
+                ? 'bg-orange-950 text-orange-300 border-orange-400/70 shadow-sm'
                 : 'bg-black/50 text-zinc-400 border-zinc-700/50'
             }`}>
               {totalFeatsCount + (data.heritages?.length || 0)}
@@ -420,7 +420,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
             className={`flex-1 flex items-center justify-center gap-2.5 py-3 sm:py-3.5 px-4 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all cursor-pointer select-none font-serif ${
               activeMainTab === 'lore'
                 ? 'bg-gradient-to-r from-[#2a1b42] via-[#201433] to-[#341f52] text-purple-200 border-2 border-purple-400 shadow-[0_0_25px_rgba(168,85,247,0.45)] ring-1 ring-purple-300/40 scale-[1.01]'
-                : 'bg-[#120f1f]/80 hover:bg-[#19152b] text-zinc-400 hover:text-purple-200 border border-[#2d2740] hover:border-purple-600/50'
+                : 'bg-[#18110b]/80 hover:bg-[#241710] text-zinc-400 hover:text-purple-200 border border-[#382618] hover:border-purple-600/50'
             }`}
           >
             <div className={`p-1.5 rounded-lg shrink-0 ${activeMainTab === 'lore' ? 'bg-purple-950/90 text-purple-300 border border-purple-400/60' : 'bg-black/40 text-zinc-400'}`}>
@@ -483,17 +483,17 @@ IDIOMAS: ${data.languages || 'Humani'}`;
           {/* ═══════════════════════════════════════════════════════════════════════ */}
           {/* ÍNDICE TÉCNICO DA ANCESTRALIDADE (COMPACTO, DESTACADO E FUNCIONAL)    */}
           {/* ═══════════════════════════════════════════════════════════════════════ */}
-          <section className="p-4 sm:p-5 rounded-2xl bg-gradient-to-b from-[#120f1e] to-[#0c0a15] border border-cyan-500/30 shadow-lg space-y-3.5">
+          <section className="p-4 sm:p-5 rounded-2xl bg-gradient-to-b from-[#1a110a] to-[#0c0906] border border-orange-500/30 shadow-lg space-y-3.5">
             <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2.5">
-              <span className="text-xs font-black uppercase tracking-wider text-cyan-300 font-mono flex items-center gap-1.5">
-                <Scale className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="text-xs font-black uppercase tracking-wider text-orange-300 font-mono flex items-center gap-1.5">
+                <Scale className="w-3.5 h-3.5 text-orange-400" />
                 <span>Índice de Atributos & Características Básicas</span>
               </span>
               {isActualGm && onEdit && (
                 <button
                   type="button"
                   onClick={() => onEdit('mechanics')}
-                  className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-700/50 text-cyan-300 text-[11px] font-semibold transition-colors cursor-pointer"
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-orange-950/60 hover:bg-orange-900 border border-orange-700/50 text-orange-300 text-[11px] font-semibold transition-colors cursor-pointer"
                 >
                   <Edit3 className="w-3 h-3" />
                   <span>Editar Atributos</span>
@@ -515,12 +515,12 @@ IDIOMAS: ${data.languages || 'Humani'}`;
               </div>
 
               {/* Tamanho */}
-              <div className="p-3 rounded-xl bg-[#0e1620] border border-cyan-600/40 hover:border-cyan-500/70 transition-all flex flex-col justify-start gap-0.5 shadow-sm">
-                <span className="text-[11px] font-bold text-cyan-300 uppercase tracking-wider font-mono flex items-center gap-1.5 leading-none">
-                  <Scale className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <div className="p-3 rounded-xl bg-[#1d120a] border border-orange-600/40 hover:border-orange-500/70 transition-all flex flex-col justify-start gap-0.5 shadow-sm">
+                <span className="text-[11px] font-bold text-orange-300 uppercase tracking-wider font-mono flex items-center gap-1.5 leading-none">
+                  <Scale className="w-3.5 h-3.5 text-orange-400 shrink-0" />
                   <span>Tamanho</span>
                 </span>
-                <span className="text-lg sm:text-xl font-black text-cyan-100 break-words leading-tight">
+                <span className="text-lg sm:text-xl font-black text-orange-100 break-words leading-tight">
                   {data.size || 'Médio'}
                 </span>
               </div>
@@ -552,9 +552,9 @@ IDIOMAS: ${data.languages || 'Humani'}`;
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1 text-xs">
               {/* Sentidos */}
               <div className="p-3 rounded-xl bg-[#0e0c18] border border-zinc-800 flex items-start gap-2.5 min-w-0">
-                <Eye className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                <Eye className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
                 <div className="min-w-0 flex-1 space-y-0.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-300 font-mono block">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-orange-300 font-mono block">
                     Sentidos
                   </span>
                   <div className="text-zinc-200 text-xs sm:text-sm font-medium break-words leading-relaxed">
@@ -604,9 +604,9 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
               {/* Idiomas */}
               <div className="p-3 rounded-xl bg-[#0e0c18] border border-zinc-800 flex items-start gap-2.5 min-w-0">
-                <Globe className="w-4 h-4 text-[#74b6c2] shrink-0 mt-0.5" />
+                <Globe className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
                 <div className="min-w-0 flex-1 space-y-0.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#74b6c2] font-mono block">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-orange-300 font-mono block">
                     Idiomas
                   </span>
                   <div className="text-zinc-200 text-xs sm:text-sm font-medium break-words leading-relaxed">
@@ -619,15 +619,15 @@ IDIOMAS: ${data.languages || 'Humani'}`;
           {/* HERANÇAS DE LINHAGEM */}
           <section className="p-5 rounded-2xl bg-[#0f0e18] border border-[#272438] space-y-4">
             <div className="flex items-center justify-between border-b border-[#272438] pb-3">
-              <h3 className="text-lg font-black text-[#74b6c2] flex items-center gap-2.5 font-serif">
-                <Sparkles className="w-4 h-4 text-[#74b6c2]" />
+              <h3 className="text-lg font-black text-orange-300 flex items-center gap-2.5 font-serif">
+                <Sparkles className="w-4 h-4 text-orange-400" />
                 <span>Heranças de Linhagem</span>
               </h3>
               {onEdit && (
                 <button
                   type="button"
                   onClick={() => onEdit('mechanics')}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-cyan-300 text-xs font-semibold transition-colors cursor-pointer"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-orange-300 text-xs font-semibold transition-colors cursor-pointer"
                 >
                   <Edit3 className="w-3 h-3" />
                   <span>Editar Heranças</span>
@@ -640,11 +640,11 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                 visibleHeritages.map((h, i) => (
                   <div
                     key={h.id || i}
-                    className="p-4 rounded-xl bg-[#131120] border border-[#272438] hover:border-[#74b6c2]/50 transition-all space-y-2 min-w-0 break-words"
+                    className="p-4 rounded-xl bg-[#131120] border border-[#272438] hover:border-orange-500/50 transition-all space-y-2 min-w-0 break-words"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <h4 className="text-base font-bold text-[#b19ecc] font-serif flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-[#74b6c2] shrink-0" />
+                      <h4 className="text-base font-bold text-orange-200 font-serif flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-orange-400 shrink-0" />
                         <span>{h.name}</span>
                       </h4>
                       {isActualGm && h.visibility && h.visibility !== 'all' && (
@@ -675,15 +675,15 @@ IDIOMAS: ${data.languages || 'Humani'}`;
           {/* ARSENAL CULTURAL E EQUIPAMENTOS */}
           <section className="p-5 rounded-2xl bg-[#0f0e18] border border-[#272438] space-y-4">
             <div className="flex items-center justify-between border-b border-[#272438] pb-3">
-              <h3 className="text-lg font-black text-[#b19ecc] flex items-center gap-2.5 font-serif">
-                <Shield className="w-4 h-4 text-[#b19ecc]" />
+              <h3 className="text-lg font-black text-amber-300 flex items-center gap-2.5 font-serif">
+                <Shield className="w-4 h-4 text-amber-400" />
                 <span>Arsenal Cultural & Equipamentos Tradicionais</span>
               </h3>
               {isActualGm && onEdit && (
                 <button
                   type="button"
                   onClick={() => onEdit('mechanics')}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-purple-300 text-xs font-semibold transition-colors cursor-pointer"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-amber-300 text-xs font-semibold transition-colors cursor-pointer"
                 >
                   <Edit3 className="w-3 h-3" />
                   <span>Editar Arsenal</span>
@@ -693,7 +693,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
               <div className="space-y-2 p-4 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
-                <h4 className="text-sm font-bold text-[#b19ecc]">
+                <h4 className="text-sm font-bold text-amber-200">
                   Proficiências e Armas Tradicionais
                 </h4>
                 <div className="text-sm text-zinc-300 leading-relaxed min-w-0 break-words">
@@ -705,7 +705,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
               </div>
 
               <div className="space-y-2 p-4 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
-                <h4 className="text-sm font-bold text-[#b19ecc]">
+                <h4 className="text-sm font-bold text-amber-200">
                   Itens Únicos e Arquétipos Recomendados
                 </h4>
                 <div className="text-sm text-zinc-300 leading-relaxed min-w-0 break-words">
@@ -722,15 +722,15 @@ IDIOMAS: ${data.languages || 'Humani'}`;
           <section className="p-5 rounded-2xl bg-[#0f0e18] border border-[#272438] space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#272438] pb-3">
               <div className="flex items-center gap-3">
-                <h3 className="text-lg font-black text-[#74b6c2] flex items-center gap-2.5 font-serif">
-                  <Zap className="w-4 h-4 text-[#74b6c2]" />
+                <h3 className="text-lg font-black text-orange-300 flex items-center gap-2.5 font-serif">
+                  <Zap className="w-4 h-4 text-orange-400" />
                   <span>Talentos de Ancestralidade</span>
                 </h3>
                 {isActualGm && onEdit && (
                   <button
                     type="button"
                     onClick={() => onEdit('mechanics')}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-cyan-300 text-xs font-semibold transition-colors cursor-pointer"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-orange-300 text-xs font-semibold transition-colors cursor-pointer"
                   >
                     <Edit3 className="w-3 h-3" />
                     <span>Editar Talentos</span>
@@ -745,7 +745,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                   onClick={() => setActiveFeatRank('all')}
                   className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                     activeFeatRank === 'all'
-                      ? 'bg-[#18262b] text-[#74b6c2] border border-[#74b6c2]/40'
+                      ? 'bg-[#2a170a] text-orange-300 border border-orange-500/40'
                       : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
@@ -758,7 +758,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                     onClick={() => setActiveFeatRank(r)}
                     className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                       activeFeatRank === r
-                        ? 'bg-[#251e33] text-[#b19ecc] border border-[#b19ecc]/40'
+                        ? 'bg-[#2a170a] text-orange-300 border border-orange-500/40'
                         : 'text-zinc-400 hover:text-zinc-200'
                     }`}
                   >
@@ -786,7 +786,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
                   return (
                     <div key={r} className="space-y-3">
                       {activeFeatRank === 'all' && (
-                        <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-[#74b6c2] px-2.5 py-1 bg-[#18262b] rounded-lg border-l-4 border-[#74b6c2] flex items-center justify-between">
+                        <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-orange-300 px-2.5 py-1 bg-[#24130a] rounded-lg border-l-4 border-orange-500 flex items-center justify-between">
                           <span>Talentos de Rank {r}</span>
                           <span className="text-[10px] text-zinc-400">{feats.length} talento(s)</span>
                         </h4>
@@ -1168,15 +1168,15 @@ IDIOMAS: ${data.languages || 'Humani'}`;
           {/* IDENTIDADE & PSICOLOGIA */}
           <section className="p-5 rounded-2xl bg-[#0f0e18] border border-[#272438] space-y-4">
             <div className="flex items-center justify-between border-b border-[#272438] pb-3">
-              <h3 className="text-lg font-black text-[#74b6c2] flex items-center gap-2.5 font-serif">
-                <Compass className="w-4 h-4 text-[#74b6c2]" />
+              <h3 className="text-lg font-black text-orange-300 flex items-center gap-2.5 font-serif">
+                <Compass className="w-4 h-4 text-orange-400" />
                 <span>Identidade, Psicologia & Mentalidade</span>
               </h3>
               {isActualGm && onEdit && (
                 <button
                   type="button"
                   onClick={() => onEdit('lore')}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-cyan-300 text-xs font-semibold transition-colors cursor-pointer"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-orange-300 text-xs font-semibold transition-colors cursor-pointer"
                 >
                   <Edit3 className="w-3 h-3" />
                   <span>Editar Identidade</span>
@@ -1186,14 +1186,14 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
             <div className="space-y-4 text-sm text-zinc-300 leading-relaxed">
               {data.identity?.narrativeHook && (
-                <div className="p-4 rounded-xl bg-[#18262b] border border-[#2d3a42] text-[#88c5d0] font-medium italic min-w-0 break-words">
+                <div className="p-4 rounded-xl bg-[#23140b] border border-orange-500/30 text-orange-200 font-medium italic min-w-0 break-words">
                   "{data.identity.narrativeHook}"
                 </div>
               )}
 
               {data.identity?.psychologyAndPhilosophy && (
                 <div className="space-y-1 min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono">
+                  <h4 className="text-xs font-bold text-orange-300 uppercase font-mono">
                     Psicologia e Filosofia
                   </h4>
                   <RichContentRenderer content={data.identity.psychologyAndPhilosophy} onNavigate={onNavigate} />
@@ -1203,7 +1203,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {data.identity?.creationMyth && (
                   <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
-                    <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
+                    <h4 className="text-xs font-bold text-orange-300 uppercase font-mono mb-1">
                       Mito da Criação
                     </h4>
                     <RichContentRenderer content={data.identity.creationMyth} onNavigate={onNavigate} />
@@ -1212,7 +1212,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
                 {data.identity?.epicsAndFigures && (
                   <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
-                    <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
+                    <h4 className="text-xs font-bold text-orange-300 uppercase font-mono mb-1">
                       Épicos e Figuras Históricas
                     </h4>
                     <RichContentRenderer content={data.identity.epicsAndFigures} onNavigate={onNavigate} />
@@ -1223,7 +1223,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {data.identity?.purpose && (
                   <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
-                    <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
+                    <h4 className="text-xs font-bold text-orange-300 uppercase font-mono mb-1">
                       Propósito Existencial
                     </h4>
                     <RichContentRenderer content={data.identity.purpose} onNavigate={onNavigate} />
@@ -1232,7 +1232,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
                 {data.identity?.theAdventurer && (
                   <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
-                    <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
+                    <h4 className="text-xs font-bold text-orange-300 uppercase font-mono mb-1">
                       O Aventureiro
                     </h4>
                     <RichContentRenderer content={data.identity.theAdventurer} onNavigate={onNavigate} />
@@ -1245,15 +1245,15 @@ IDIOMAS: ${data.languages || 'Humani'}`;
           {/* CULTURA & COTIDIANO */}
           <section className="p-5 rounded-2xl bg-[#0f0e18] border border-[#272438] space-y-4">
             <div className="flex items-center justify-between border-b border-[#272438] pb-3">
-              <h3 className="text-lg font-black text-[#b19ecc] flex items-center gap-2.5 font-serif">
-                <Feather className="w-4 h-4 text-[#b19ecc]" />
+              <h3 className="text-lg font-black text-amber-300 flex items-center gap-2.5 font-serif">
+                <Feather className="w-4 h-4 text-amber-400" />
                 <span>Cultura, Tradições & Cotidiano</span>
               </h3>
               {isActualGm && onEdit && (
                 <button
                   type="button"
                   onClick={() => onEdit('lore')}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-purple-300 text-xs font-semibold transition-colors cursor-pointer"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-amber-300 text-xs font-semibold transition-colors cursor-pointer"
                 >
                   <Edit3 className="w-3 h-3" />
                   <span>Editar Cultura</span>
@@ -1264,7 +1264,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-zinc-300 leading-relaxed">
               {data.culture?.etiquetteAndCustoms && (
                 <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
+                  <h4 className="text-xs font-bold text-amber-300 uppercase font-mono mb-1">
                     Etiqueta e Costumes
                   </h4>
                   <RichContentRenderer content={data.culture.etiquetteAndCustoms} onNavigate={onNavigate} />
@@ -1273,7 +1273,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
               {data.culture?.namesAndMeanings && (
                 <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
+                  <h4 className="text-xs font-bold text-amber-300 uppercase font-mono mb-1">
                     Nomes e Significados
                   </h4>
                   <RichContentRenderer content={data.culture.namesAndMeanings} onNavigate={onNavigate} />
@@ -1282,7 +1282,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
               {data.culture?.clothingAndFashion && (
                 <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
+                  <h4 className="text-xs font-bold text-amber-300 uppercase font-mono mb-1">
                     Vestimenta e Estética
                   </h4>
                   <RichContentRenderer content={data.culture.clothingAndFashion} onNavigate={onNavigate} />
@@ -1291,7 +1291,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
               {data.culture?.artisticExpressions && (
                 <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
+                  <h4 className="text-xs font-bold text-amber-300 uppercase font-mono mb-1">
                     Expressões Artísticas
                   </h4>
                   <RichContentRenderer content={data.culture.artisticExpressions} onNavigate={onNavigate} />
@@ -1300,7 +1300,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
               {data.culture?.gastronomy && (
                 <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
+                  <h4 className="text-xs font-bold text-amber-300 uppercase font-mono mb-1">
                     Gastronomia Tradicional
                   </h4>
                   <RichContentRenderer content={data.culture.gastronomy} onNavigate={onNavigate} />
@@ -1309,7 +1309,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
               {data.culture?.leisureAndSports && (
                 <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
+                  <h4 className="text-xs font-bold text-amber-300 uppercase font-mono mb-1">
                     Lazer e Competições
                   </h4>
                   <RichContentRenderer content={data.culture.leisureAndSports} onNavigate={onNavigate} />
@@ -1321,15 +1321,15 @@ IDIOMAS: ${data.languages || 'Humani'}`;
           {/* SOCIEDADE & ORGANIZAÇÃO */}
           <section className="p-5 rounded-2xl bg-[#0f0e18] border border-[#272438] space-y-4">
             <div className="flex items-center justify-between border-b border-[#272438] pb-3">
-              <h3 className="text-lg font-black text-[#74b6c2] flex items-center gap-2.5 font-serif">
-                <Users className="w-4 h-4 text-[#74b6c2]" />
+              <h3 className="text-lg font-black text-orange-300 flex items-center gap-2.5 font-serif">
+                <Users className="w-4 h-4 text-orange-400" />
                 <span>Sociedade, Política & Economia</span>
               </h3>
               {isActualGm && onEdit && (
                 <button
                   type="button"
                   onClick={() => onEdit('lore')}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-cyan-300 text-xs font-semibold transition-colors cursor-pointer"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-orange-300 text-xs font-semibold transition-colors cursor-pointer"
                 >
                   <Edit3 className="w-3 h-3" />
                   <span>Editar Sociedade</span>
@@ -1340,7 +1340,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-zinc-300 leading-relaxed">
               {data.society?.socialStructure && (
                 <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
+                  <h4 className="text-xs font-bold text-orange-300 uppercase font-mono mb-1">
                     Estrutura Social
                   </h4>
                   <RichContentRenderer content={data.society.socialStructure} onNavigate={onNavigate} />
@@ -1349,7 +1349,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
               {data.society?.lawsAndTaboos && (
                 <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
+                  <h4 className="text-xs font-bold text-orange-300 uppercase font-mono mb-1">
                     Leis, Justiça e Tabus
                   </h4>
                   <RichContentRenderer content={data.society.lawsAndTaboos} onNavigate={onNavigate} />
@@ -1358,7 +1358,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
               {data.society?.economyAndTrade && (
                 <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
+                  <h4 className="text-xs font-bold text-orange-300 uppercase font-mono mb-1">
                     Economia e Comércio
                   </h4>
                   <RichContentRenderer content={data.society.economyAndTrade} onNavigate={onNavigate} />
@@ -1367,7 +1367,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
               {data.society?.educationAndRites && (
                 <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
+                  <h4 className="text-xs font-bold text-orange-300 uppercase font-mono mb-1">
                     Educação e Ritos de Passagem
                   </h4>
                   <RichContentRenderer content={data.society.educationAndRites} onNavigate={onNavigate} />
@@ -1379,15 +1379,15 @@ IDIOMAS: ${data.languages || 'Humani'}`;
           {/* ESPIRITUALIDADE & MUNDO */}
           <section className="p-5 rounded-2xl bg-[#0f0e18] border border-[#272438] space-y-4">
             <div className="flex items-center justify-between border-b border-[#272438] pb-3">
-              <h3 className="text-lg font-black text-[#b19ecc] flex items-center gap-2.5 font-serif">
-                <Globe className="w-4 h-4 text-[#b19ecc]" />
+              <h3 className="text-lg font-black text-amber-300 flex items-center gap-2.5 font-serif">
+                <Globe className="w-4 h-4 text-amber-400" />
                 <span>Espiritualidade & Relações no Mundo</span>
               </h3>
               {isActualGm && onEdit && (
                 <button
                   type="button"
                   onClick={() => onEdit('lore')}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-purple-300 text-xs font-semibold transition-colors cursor-pointer"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-amber-300 text-xs font-semibold transition-colors cursor-pointer"
                 >
                   <Edit3 className="w-3 h-3" />
                   <span>Editar Relações</span>
@@ -1398,7 +1398,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-zinc-300 leading-relaxed">
               {data.spirituality?.nativePantheon && (
                 <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
+                  <h4 className="text-xs font-bold text-amber-300 uppercase font-mono mb-1">
                     Panteão e Divindades Nativas
                   </h4>
                   <RichContentRenderer content={data.spirituality.nativePantheon} onNavigate={onNavigate} />
@@ -1407,7 +1407,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
               {data.spirituality?.funeraryPractices && (
                 <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#b19ecc] uppercase font-mono mb-1">
+                  <h4 className="text-xs font-bold text-amber-300 uppercase font-mono mb-1">
                     Práticas Funerárias e Pós-Vida
                   </h4>
                   <RichContentRenderer content={data.spirituality.funeraryPractices} onNavigate={onNavigate} />
@@ -1416,7 +1416,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
               {data.world?.geographicalDistribution && (
                 <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
+                  <h4 className="text-xs font-bold text-orange-300 uppercase font-mono mb-1">
                     Distribuição Geográfica em Hecos
                   </h4>
                   <RichContentRenderer content={data.world.geographicalDistribution} onNavigate={onNavigate} />
@@ -1425,7 +1425,7 @@ IDIOMAS: ${data.languages || 'Humani'}`;
 
               {data.world?.diplomaticRelations && (
                 <div className="p-3 rounded-xl bg-[#131120] border border-[#272438] min-w-0 break-words">
-                  <h4 className="text-xs font-bold text-[#74b6c2] uppercase font-mono mb-1">
+                  <h4 className="text-xs font-bold text-orange-300 uppercase font-mono mb-1">
                     Relações Diplomáticas
                   </h4>
                   <RichContentRenderer content={data.world.diplomaticRelations} onNavigate={onNavigate} />

@@ -10,19 +10,19 @@ import {
   Shield,
   Swords,
   Layers,
-  Zap,
   Sparkles,
   Gem,
   Compass,
-  TreePine,
   Flower2,
-  Building2,
   BookOpen,
   Scroll,
   Lock,
   Clock,
   ArrowRight,
-  Plus
+  Plus,
+  CheckSquare,
+  PawPrint,
+  Award
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -32,46 +32,82 @@ export interface CategoryOption {
   badge: string;
   description: string;
   icon: React.ComponentType<{ className?: string }>;
-  colorTheme: 'cyan' | 'purple' | 'rose' | 'amber' | 'emerald';
+  color: string;
   suggestedTags: string[];
 }
 
 export const CATEGORY_OPTIONS: CategoryOption[] = [
   {
-    category: 'ancestry',
-    name: 'Ancestralidade',
-    badge: 'Hecos Pattern',
-    description: 'Raças, linhagens, heranças culturais, arsenal tradicional e progressão de talentos por ranks.',
-    icon: Dna,
-    colorTheme: 'cyan',
-    suggestedTags: ['ancestry', 'humanoide'],
-  },
-  {
     category: 'pc',
-    name: 'Personagem Jogador (PC)',
+    name: 'PC',
     badge: 'Herói do Grupo',
     description: 'Fichas completas de jogadores, histórico de campanha, habilidades e inventário pessoal.',
     icon: Users,
-    colorTheme: 'cyan',
+    color: '#38bdf8', // Sky Blue
     suggestedTags: ['pc', 'jogador', 'heroi'],
   },
   {
+    category: 'fauna',
+    name: 'Fauna',
+    badge: 'Ecossistema',
+    description: 'Espécies animais, montarias, predadores e criaturas nativas dos biomas de Hecos.',
+    icon: PawPrint,
+    color: '#10b981', // Emerald
+    suggestedTags: ['fauna', 'animais', 'bioma'],
+  },
+  {
+    category: 'flora',
+    name: 'Flora',
+    badge: 'Reagentes & Ervas',
+    description: 'Plantas curativas, fungos bioluminescentes, venenos naturais e árvores sagradas.',
+    icon: Flower2,
+    color: '#84cc16', // Lime
+    suggestedTags: ['flora', 'alquimia', 'ervas'],
+  },
+  {
+    category: 'location',
+    name: 'Locais',
+    badge: 'Geografia & Mapa',
+    description: 'Cidades, masmorras, ruínas antigas, assentamentos e pontos de interesse do mapa.',
+    icon: Compass,
+    color: '#3b82f6', // Blue
+    suggestedTags: ['local', 'mapa', 'regiao'],
+  },
+  {
     category: 'npc',
-    name: 'NPC / Contato',
+    name: 'NPC',
     badge: 'Narrativa',
     description: 'Mentores, aliados, patronos, nobres e contatos importantes do mestre na história.',
     icon: User,
-    colorTheme: 'purple',
+    color: '#a855f7', // Purple
     suggestedTags: ['npc', 'mestre', 'contato'],
   },
   {
-    category: 'creature',
-    name: 'Perigos & Ameaças',
-    badge: 'Perigo / Monstro',
-    description: 'Monstros, perigos simples ou complexos, assombrações e ameaças de combate com revelação campo a campo.',
-    icon: Skull,
-    colorTheme: 'rose',
-    suggestedTags: ['perigo', 'monstro', 'combate'],
+    category: 'organization',
+    name: 'Organizações',
+    badge: 'Poder & Política',
+    description: 'Guildas de ladrões, governos, ordens de cavalaria, seitas e corporações comerciais.',
+    icon: Shield,
+    color: '#d946ef', // Fuchsia
+    suggestedTags: ['faccao', 'politica', 'guilda'],
+  },
+  {
+    category: 'timeline',
+    name: 'Timeline',
+    badge: 'História & Eras',
+    description: 'Eventos históricos, quedas de impérios, tratados e momentos decisivos de Hecos.',
+    icon: Clock,
+    color: '#14b8a6', // Teal
+    suggestedTags: ['timeline', 'historia', 'era'],
+  },
+  {
+    category: 'ancestry',
+    name: 'Ancestralidades',
+    badge: 'Hecos Pattern',
+    description: 'Raças, linhagens, heranças culturais, arsenal tradicional e progressão de talentos por ranks.',
+    icon: Dna,
+    color: '#f97316', // Orange
+    suggestedTags: ['ancestry', 'humanoide'],
   },
   {
     category: 'class',
@@ -79,116 +115,89 @@ export const CATEGORY_OPTIONS: CategoryOption[] = [
     badge: 'Classe Base',
     description: 'Classes principais de Hecos, progressão de nível, dados de vida, perícias e proficiências.',
     icon: Swords,
-    colorTheme: 'purple',
+    color: '#6366f1', // Indigo
     suggestedTags: ['classe', 'combate', 'evolucao'],
   },
   {
-    category: 'archetype',
-    name: 'Vocação (Arquétipo)',
-    badge: 'Dedicação & Prestígio',
-    description: 'Vocações do cenário de Hecos, caminhos arcanos, ordens marciais e dedicações de prestígio.',
-    icon: Layers,
-    colorTheme: 'cyan',
-    suggestedTags: ['vocacao', 'arquetipo', 'dedicacao'],
-  },
-  {
-    category: 'feat',
-    name: 'Talento (Feat)',
-    badge: 'Mecânica Hecos',
-    description: 'Talentos gerais, perícias especiais ou talentos adicionais do sistema.',
-    icon: Zap,
-    colorTheme: 'amber',
-    suggestedTags: ['talento', 'feat'],
-  },
-  {
     category: 'spell',
-    name: 'Magia & Ritual',
+    name: 'Feitiços',
     badge: 'Tradições Arcanas',
     description: 'Feitiços arcanos, divinos, ocultos e primais com tempo de conjuração e graus de sucesso.',
     icon: Sparkles,
-    colorTheme: 'cyan',
+    color: '#ec4899', // Pink
     suggestedTags: ['magia', 'spell', 'oculto'],
   },
   {
     category: 'item',
-    name: 'Item & Equipamento',
+    name: 'Itens',
     badge: 'Tesouro & Relíquia',
     description: 'Armas raras, armaduras, consumíveis, artefatos mágicos e itens de sobrevivência.',
     icon: Gem,
-    colorTheme: 'amber',
+    color: '#f59e0b', // Amber
     suggestedTags: ['item', 'equipamento', 'tesouro'],
   },
   {
-    category: 'location',
-    name: 'Local / Região',
-    badge: 'Geografia & Mapa',
-    description: 'Cidades, masmorras, ruínas antigas, assentamentos e pontos de interesse do mapa.',
-    icon: Compass,
-    colorTheme: 'cyan',
-    suggestedTags: ['local', 'mapa', 'regiao'],
+    category: 'creature',
+    name: 'Perigos',
+    badge: 'Perigo / Monstro',
+    description: 'Monstros, perigos simples ou complexos, assombrações e ameaças de combate com revelação campo a campo.',
+    icon: Skull,
+    color: '#ef4444', // Red
+    suggestedTags: ['perigo', 'monstro', 'combate'],
   },
   {
-    category: 'fauna',
-    name: 'Fauna Selvagem',
-    badge: 'Ecossistema',
-    description: 'Espécies animais, montarias, predadores e criaturas nativas dos biomas de Hecos.',
-    icon: TreePine,
-    colorTheme: 'emerald',
-    suggestedTags: ['fauna', 'animais', 'bioma'],
-  },
-  {
-    category: 'flora',
-    name: 'Flora & Alquimia',
-    badge: 'Reagentes & Ervas',
-    description: 'Plantas curativas, fungos bioluminescentes, venenos naturais e árvores sagradas.',
-    icon: Flower2,
-    colorTheme: 'emerald',
-    suggestedTags: ['flora', 'alquimia', 'ervas'],
-  },
-  {
-    category: 'organization',
-    name: 'Facção & Organização',
-    badge: 'Poder & Política',
-    description: 'Guildas de ladrões, governos, ordens de cavalaria, seitas e corporações comerciais.',
-    icon: Building2,
-    colorTheme: 'rose',
-    suggestedTags: ['faccao', 'politica', 'guilda'],
+    category: 'quest',
+    name: 'Quests',
+    badge: 'Kanban & Contratos',
+    description: 'Contratos de aventura, rumores, objetivos em etapas, recompensas e rastreador Kanban de progresso.',
+    icon: CheckSquare,
+    color: '#eab308', // Gold Yellow
+    suggestedTags: ['quest', 'missao', 'contrato'],
   },
   {
     category: 'rule',
-    name: 'Regra da Casa / Sistema',
+    name: 'Regras',
     badge: 'Guia de Jogo',
     description: 'Regras da casa, modificadores de campanha, mecânicas personalizadas e guias de jogo.',
     icon: Scroll,
-    colorTheme: 'cyan',
+    color: '#94a3b8', // Slate
     suggestedTags: ['regras', 'sistema', 'hecos'],
   },
   {
+    category: 'feat',
+    name: 'Talentos',
+    badge: 'Mecânica Hecos',
+    description: 'Talentos gerais, de ancestralidade, perícia ou talentos adicionais do sistema.',
+    icon: Award,
+    color: '#d97706', // Amber-Dark
+    suggestedTags: ['talento', 'feat'],
+  },
+  {
+    category: 'archetype',
+    name: 'Vocação',
+    badge: 'Dedicação & Prestígio',
+    description: 'Vocações do cenário de Hecos, caminhos arcanos, ordens marciais e dedicações de prestígio.',
+    icon: Layers,
+    color: '#8b5cf6', // Violet
+    suggestedTags: ['vocacao', 'arquetipo', 'dedicacao'],
+  },
+  {
     category: 'session',
-    name: 'Diário de Sessão',
+    name: 'Diário',
     badge: 'Crônica da Campanha',
     description: 'Resumos narrativos das sessões, diários de viagem, recompensas e marcos da aventura.',
     icon: BookOpen,
-    colorTheme: 'purple',
+    color: '#0ea5e9', // Ocean Sky
     suggestedTags: ['sessao', 'diario', 'cronica'],
   },
   {
     category: 'gm_note',
-    name: 'Nota Secreta do GM',
+    name: 'Notas do GM',
     badge: 'Confidencial (Mestre)',
     description: 'Segredos da trama, planejamento futuro, ganchos e revelações ocultas dos jogadores.',
     icon: Lock,
-    colorTheme: 'rose',
+    color: '#e11d48', // Ruby Rose
     suggestedTags: ['gm-only', 'segredo', 'mestre'],
-  },
-  {
-    category: 'timeline',
-    name: 'Marco da Linha do Tempo',
-    badge: 'História & Eras',
-    description: 'Eventos históricos, quedas de impérios, tratados e momentos decisivos de Hecos.',
-    icon: Clock,
-    colorTheme: 'purple',
-    suggestedTags: ['timeline', 'historia', 'era'],
   },
 ];
 
@@ -207,6 +216,7 @@ export const NewArticleModal: React.FC<NewArticleModalProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [initialTitle, setInitialTitle] = useState('');
+  const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
 
   const filteredOptions = useMemo(() => {
     if (!searchTerm.trim()) return CATEGORY_OPTIONS;
@@ -229,74 +239,28 @@ export const NewArticleModal: React.FC<NewArticleModalProps> = ({
     onClose();
   };
 
-  const getThemeClasses = (theme: CategoryOption['colorTheme']) => {
-    switch (theme) {
-      case 'amber':
-        return {
-          card: 'border-amber-500/30 hover:border-amber-400 bg-gradient-to-b from-[#18120a] to-[#0a0812] hover:shadow-[0_0_25px_rgba(245,158,11,0.2)]',
-          badge: 'bg-amber-950/80 text-amber-300 border-amber-800/80',
-          iconBg: 'bg-amber-950/60 text-amber-300 border-amber-500/40 group-hover:bg-amber-900/80 group-hover:border-amber-400',
-          title: 'group-hover:text-amber-200',
-          arrow: 'text-amber-400 group-hover:translate-x-1',
-        };
-      case 'emerald':
-        return {
-          card: 'border-emerald-500/30 hover:border-emerald-400 bg-gradient-to-b from-[#0c1611] to-[#0a0812] hover:shadow-[0_0_25px_rgba(16,185,129,0.2)]',
-          badge: 'bg-emerald-950/80 text-emerald-300 border-emerald-800/80',
-          iconBg: 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40 group-hover:bg-emerald-900/80 group-hover:border-emerald-400',
-          title: 'group-hover:text-emerald-200',
-          arrow: 'text-emerald-400 group-hover:translate-x-1',
-        };
-      case 'cyan':
-        return {
-          card: 'border-cyan-500/30 hover:border-cyan-400 bg-gradient-to-b from-[#100f1c] to-[#0a0812] hover:shadow-[0_0_25px_rgba(6,182,212,0.2)]',
-          badge: 'bg-cyan-950/80 text-cyan-300 border-cyan-800/80',
-          iconBg: 'bg-cyan-950/60 text-cyan-300 border-cyan-500/40 group-hover:bg-cyan-900/80 group-hover:border-cyan-400',
-          title: 'group-hover:text-cyan-200',
-          arrow: 'text-cyan-400 group-hover:translate-x-1',
-        };
-      case 'purple':
-        return {
-          card: 'border-purple-500/30 hover:border-purple-400 bg-gradient-to-b from-[#120d1e] to-[#0a0812] hover:shadow-[0_0_25px_rgba(184,119,219,0.2)]',
-          badge: 'bg-purple-950/80 text-purple-300 border-purple-800/80',
-          iconBg: 'bg-purple-950/60 text-purple-300 border-purple-500/40 group-hover:bg-purple-900/80 group-hover:border-purple-400',
-          title: 'group-hover:text-purple-200',
-          arrow: 'text-purple-400 group-hover:translate-x-1',
-        };
-      case 'rose':
-      default:
-        return {
-          card: 'border-rose-500/30 hover:border-rose-400 bg-gradient-to-b from-[#150d18] to-[#0a0812] hover:shadow-[0_0_25px_rgba(244,63,94,0.2)]',
-          badge: 'bg-rose-950/80 text-rose-300 border-rose-800/80',
-          iconBg: 'bg-rose-950/60 text-rose-300 border-rose-500/40 group-hover:bg-rose-900/80 group-hover:border-rose-400',
-          title: 'group-hover:text-rose-200',
-          arrow: 'text-rose-400 group-hover:translate-x-1',
-        };
-    }
-  };
-
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-1 sm:p-2 md:p-3 overflow-hidden">
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="fixed inset-0 bg-black/80 backdrop-blur-md"
+          className="fixed inset-0 bg-black/90 backdrop-blur-md"
         />
 
         {/* Modal Window */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 15 }}
+          initial={{ opacity: 0, scale: 0.98, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 15 }}
+          exit={{ opacity: 0, scale: 0.98, y: 10 }}
           transition={{ duration: 0.2 }}
-          className="relative w-full max-w-4xl max-h-[90vh] bg-[#0c0915] border border-cyan-500/40 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col z-10"
+          className="relative w-[95vw] h-[95vh] max-w-[98vw] max-h-[98vh] bg-[#0c0915] border border-cyan-500/40 rounded-2xl shadow-[0_0_60px_rgba(0,0,0,0.95)] overflow-hidden flex flex-col z-10"
         >
           {/* Header */}
-          <div className="px-6 py-5 bg-[#120e20] border-b border-zinc-800 flex items-center justify-between gap-4">
+          <div className="px-6 py-4 bg-[#120e20] border-b border-zinc-800 flex items-center justify-between gap-4 shrink-0">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-600/20 border border-cyan-500/40 text-cyan-300">
                 <Plus className="w-5 h-5 stroke-[2.5]" />
@@ -324,7 +288,7 @@ export const NewArticleModal: React.FC<NewArticleModalProps> = ({
           </div>
 
           {/* Search & Optional Initial Title Bar */}
-          <div className="p-5 bg-black/40 border-b border-zinc-800/80 grid grid-cols-1 sm:grid-cols-12 gap-3">
+          <div className="p-4 bg-black/40 border-b border-zinc-800/80 grid grid-cols-1 sm:grid-cols-12 gap-3 shrink-0">
             <div className="sm:col-span-6 relative">
               <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
@@ -332,8 +296,8 @@ export const NewArticleModal: React.FC<NewArticleModalProps> = ({
                 autoFocus
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Filtrar categorias (ex: Ancestralidade, Magia, Monstro)..."
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-zinc-900/90 border border-zinc-700/80 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 text-xs sm:text-sm text-zinc-100 placeholder-zinc-500 outline-none transition-colors"
+                placeholder="Filtrar categorias (ex: PC, Fauna, Perigos, Magia)..."
+                className="w-full pl-10 pr-4 py-2 rounded-xl bg-zinc-900/90 border border-zinc-700/80 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 text-xs sm:text-sm text-zinc-100 placeholder-zinc-500 outline-none transition-colors"
               />
             </div>
 
@@ -343,35 +307,59 @@ export const NewArticleModal: React.FC<NewArticleModalProps> = ({
                 value={initialTitle}
                 onChange={(e) => setInitialTitle(e.target.value)}
                 placeholder="Nome/Título inicial (opcional)..."
-                className="w-full px-4 py-2.5 rounded-xl bg-zinc-900/90 border border-zinc-700/80 focus:border-purple-400 focus:ring-1 focus:ring-purple-400 text-xs sm:text-sm text-zinc-100 placeholder-zinc-500 outline-none transition-colors"
+                className="w-full px-4 py-2 rounded-xl bg-zinc-900/90 border border-zinc-700/80 focus:border-purple-400 focus:ring-1 focus:ring-purple-400 text-xs sm:text-sm text-zinc-100 placeholder-zinc-500 outline-none transition-colors"
               />
             </div>
           </div>
 
           {/* Categories Grid Container */}
-          <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
               {filteredOptions.map((opt) => {
                 const IconComponent = opt.icon;
-                const theme = getThemeClasses(opt.colorTheme);
+                const isHovered = hoveredCategory === opt.category;
 
                 return (
                   <button
                     key={opt.category}
                     type="button"
                     onClick={() => handleSelect(opt.category)}
-                    className={`group relative flex items-start gap-4 p-4 rounded-xl border transition-all text-left cursor-pointer ${theme.card}`}
+                    onMouseEnter={() => setHoveredCategory(opt.category)}
+                    onMouseLeave={() => setHoveredCategory(null)}
+                    style={{
+                      borderColor: isHovered ? opt.color : `${opt.color}35`,
+                      backgroundColor: isHovered ? `${opt.color}12` : `${opt.color}06`,
+                      boxShadow: isHovered ? `0 0 24px ${opt.color}25` : 'none'
+                    }}
+                    className="group relative flex items-start gap-3.5 p-4 rounded-xl border transition-all text-left cursor-pointer"
                   >
-                    <div className={`p-2.5 rounded-xl border transition-all shrink-0 ${theme.iconBg}`}>
+                    <div
+                      style={{
+                        backgroundColor: isHovered ? `${opt.color}30` : `${opt.color}18`,
+                        borderColor: isHovered ? opt.color : `${opt.color}50`,
+                        color: opt.color
+                      }}
+                      className="p-2.5 rounded-xl border transition-all shrink-0"
+                    >
                       <IconComponent className="w-5 h-5" />
                     </div>
 
                     <div className="flex-1 min-w-0 space-y-1">
                       <div className="flex items-center justify-between gap-2">
-                        <h4 className={`text-sm font-bold text-zinc-100 transition-colors truncate ${theme.title}`}>
+                        <h4
+                          style={{ color: isHovered ? opt.color : '#f4f4f5' }}
+                          className="text-sm font-bold transition-colors truncate"
+                        >
                           {opt.name}
                         </h4>
-                        <span className={`text-[9px] uppercase font-mono font-bold px-2 py-0.5 rounded border shrink-0 ${theme.badge}`}>
+                        <span
+                          style={{
+                            backgroundColor: `${opt.color}18`,
+                            color: opt.color,
+                            borderColor: `${opt.color}40`
+                          }}
+                          className="text-[9px] uppercase font-mono font-bold px-2 py-0.5 rounded border shrink-0"
+                        >
                           {opt.badge}
                         </span>
                       </div>
@@ -381,7 +369,10 @@ export const NewArticleModal: React.FC<NewArticleModalProps> = ({
                     </div>
 
                     <div className="self-center pl-1 shrink-0">
-                      <ArrowRight className={`w-4 h-4 transition-transform ${theme.arrow}`} />
+                      <ArrowRight
+                        style={{ color: opt.color }}
+                        className="w-4 h-4 transition-transform group-hover:translate-x-1"
+                      />
                     </div>
                   </button>
                 );
@@ -413,3 +404,4 @@ export const NewArticleModal: React.FC<NewArticleModalProps> = ({
     </AnimatePresence>
   );
 };
+

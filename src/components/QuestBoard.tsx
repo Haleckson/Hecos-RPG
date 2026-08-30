@@ -1,35 +1,44 @@
-import React, { useState } from 'react';
-import { HecosEntity, QuestAttributes, QuestStatus, QuestDifficulty } from '../types';
+import React, { useState, useEffect } from 'react';
+import {
+  HecosEntity,
+  QuestStatus,
+  QuestDifficulty,
+  QuestType,
+  QuestPriority,
+} from '../types';
 import { HecosStorage } from '../services/storage';
 import {
   CheckSquare,
   Plus,
-  Clock,
-  Coins,
-  MapPin,
-  User,
-  AlertTriangle,
-  ChevronRight,
-  Shield,
   Search,
   Filter,
+  ArrowUpDown,
   CheckCircle2,
   XCircle,
   PlayCircle,
   HelpCircle,
+  SlidersHorizontal,
+  Flame,
+  Layers,
 } from 'lucide-react';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
-import { TraitBadge } from './TraitBadge';
-import { sortTraitsHierarchically } from '../utils/traitUtils';
+import { QuestCard } from './QuestCard';
 
 interface QuestBoardProps {
   onNavigateEntity: (id: string) => void;
   onEditEntity?: (entity: HecosEntity) => void;
   onCreateQuest?: () => void;
+  onDeleteEntity?: (id: string) => void;
   isGmMode?: boolean;
 }
 
-const COLUMNS: { id: QuestStatus; label: string; color: string; badgeColor: string; icon: React.ReactNode }[] = [
+const COLUMNS: {
+  id: QuestStatus;
+  label: string;
+  color: string;
+  badgeColor: string;
+  icon: React.ReactNode;
+}[] = [
   {
     id: 'not_started',
     label: 'Disponíveis / Rumores',
@@ -60,61 +69,124 @@ const COLUMNS: { id: QuestStatus; label: string; color: string; badgeColor: stri
   },
 ];
 
-const DIFFICULTY_MAP: Record<QuestDifficulty, { label: string; color: string }> = {
-  Trivial: { label: 'Trivial', color: 'text-emerald-400 border-emerald-800/80 bg-emerald-950/50' },
-  Baixa: { label: 'Baixa', color: 'text-sky-400 border-sky-800/80 bg-sky-950/50' },
-  Moderada: { label: 'Moderada', color: 'text-amber-400 border-amber-800/80 bg-amber-950/50' },
-  Severa: { label: 'Severa', color: 'text-orange-400 border-orange-800/80 bg-orange-950/50' },
-  Extrema: { label: 'Extrema', color: 'text-rose-400 border-rose-800/80 bg-rose-950/50' },
-  Lendária: { label: 'Lendária', color: 'text-purple-400 border-purple-800/80 bg-purple-950/50' },
-};
+type SortOption =
+  | 'recent'
+  | 'level_asc'
+  | 'level_desc'
+  | 'alpha_asc'
+  | 'alpha_desc'
+  | 'priority';
 
 export const QuestBoard: React.FC<QuestBoardProps> = ({
   onNavigateEntity,
   onEditEntity,
   onCreateQuest,
+  onDeleteEntity,
   isGmMode,
 }) => {
+  const [entities, setEntities] = useState<HecosEntity[]>(() => HecosStorage.getEntities());
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
+  const [selectedType, setSelectedType] = useState<string>('all');
+  const [selectedPriority, setSelectedPriority] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<SortOption>('recent');
+
   const currentUser = HecosStorage.getCurrentUser();
   const isActualGm = Boolean(isGmMode || currentUser?.role === 'gm');
 
-  const allEntities = HecosStorage.getEntities();
+  // Keep entities in sync with storage & real-time events
+  useEffect(() => {
+    const unsub = HecosStorage.subscribeEntities((list) => {
+      setEntities(list);
+    });
+    return () => unsub();
+  }, []);
+
   // Filter for quests accessible by the user
-  const questEntities = allEntities
-    .filter((e) => e.category === 'quest')
+  const questEntities = entities
+    .filter((e) => e.category === 'quest' || Boolean(e.questData))
     .filter((e) => HecosStorage.canUserAccessItem(e, currentUser));
 
+  // Multi-criteria filtering
   const filteredQuests = questEntities.filter((q) => {
     const matchesSearch =
+      !searchQuery.trim() ||
       q.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (q.subtitle && q.subtitle.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (q.questData?.questGiver && q.questData.questGiver.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (q.questData?.location && q.questData.location.toLowerCase().includes(searchQuery.toLowerCase()));
+      (q.questData?.location && q.questData.location.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (q.summary && q.summary.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (q.tags && q.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase())));
 
     const matchesDifficulty =
       selectedDifficulty === 'all' || q.questData?.difficulty === selectedDifficulty;
 
-    return matchesSearch && matchesDifficulty;
+    const matchesType =
+      selectedType === 'all' || q.questData?.questType === selectedType;
+
+    const matchesPriority =
+      selectedPriority === 'all' || q.questData?.priority === selectedPriority;
+
+    return matchesSearch && matchesDifficulty && matchesType && matchesPriority;
   });
 
-  const handleStatusChange = (entity: HecosEntity, newStatus: QuestStatus) => {
-    const defaultQuestData: QuestAttributes = {
+  // Sorting
+  const sortedQuests = [...filteredQuests].sort((a, b) => {
+    switch (sortBy) {
+      case 'level_asc': {
+        const lvlA = a.questData?.recommendedLevel ?? 999;
+        const lvlB = b.questData?.recommendedLevel ?? 999;
+        return lvlA - lvlB;
+      }
+      case 'level_desc': {
+        const lvlA = a.questData?.recommendedLevel ?? -1;
+        const lvlB = b.questData?.recommendedLevel ?? -1;
+        return lvlB - lvlA;
+      }
+      case 'alpha_asc':
+        return a.title.localeCompare(b.title, 'pt-BR');
+      case 'alpha_desc':
+        return b.title.localeCompare(a.title, 'pt-BR');
+      case 'priority': {
+        const prioRank: Record<QuestPriority, number> = {
+          Urgente: 4,
+          Alta: 3,
+          Normal: 2,
+          Baixa: 1,
+        };
+        const rankA = a.questData?.priority ? prioRank[a.questData.priority] : 2;
+        const rankB = b.questData?.priority ? prioRank[b.questData.priority] : 2;
+        return rankB - rankA;
+      }
+      case 'recent':
+      default: {
+        const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+        const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+        return timeB - timeA;
+      }
+    }
+  });
+
+  const handleStatusChange = (id: string, newStatus: QuestStatus) => {
+    const ent = HecosStorage.getEntityById(id);
+    if (!ent) return;
+
+    const defaultQuestData = {
       status: newStatus,
-      difficulty: 'Moderada',
+      difficulty: 'Moderada' as QuestDifficulty,
       objectives: [],
     };
 
     const updated: HecosEntity = {
-      ...entity,
+      ...ent,
       questData: {
-        ...(entity.questData || defaultQuestData),
+        ...(ent.questData || defaultQuestData),
         status: newStatus,
       },
       updatedAt: new Date().toISOString(),
     };
     HecosStorage.saveEntity(updated);
+    setEntities(HecosStorage.getEntities());
   };
 
   const questFolderPerm = HecosStorage.getFolderPermission('quests');
@@ -130,6 +202,9 @@ export const QuestBoard: React.FC<QuestBoardProps> = ({
                 <CheckSquare className="w-7 h-7 text-cyan-400" />
                 <span>Quadro de Missões & Quests</span>
               </h1>
+              <span className="text-xs px-2.5 py-0.5 rounded-full font-mono font-bold bg-cyan-950/80 border border-cyan-800/60 text-cyan-300">
+                {sortedQuests.length} {sortedQuests.length === 1 ? 'missão' : 'missões'}
+              </span>
               {isActualGm && (
                 <VisibilityBadgeMenu
                   visibility={questFolderPerm.visibility}
@@ -141,7 +216,7 @@ export const QuestBoard: React.FC<QuestBoardProps> = ({
               )}
             </div>
             <p className="text-sm text-zinc-400 mt-1">
-              Gerencie contratos, rumores, missões principais e secundárias dos heróis de Hecos em formato Kanban.
+              Gerencie contratos, rumores, missões principais e secundárias dos heróis de Hecos em formato Kanban interativo com filtros e ordenação.
             </p>
           </div>
 
@@ -160,29 +235,31 @@ export const QuestBoard: React.FC<QuestBoardProps> = ({
         </div>
 
         {/* Filter & Search Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="relative flex-1 min-w-[240px] max-w-md">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[240px]">
             <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar missões por título, contratante, local..."
+              placeholder="Buscar missões por título, contratante, local, resumo..."
               className="w-full pl-10 pr-4 py-2 bg-black/60 border border-zinc-800 rounded-xl text-xs sm:text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-zinc-400 font-semibold flex items-center gap-1">
+          {/* Dificuldade */}
+          <div className="flex items-center gap-1.5 bg-black/50 border border-zinc-800/80 px-2.5 py-1.5 rounded-xl text-xs">
+            <span className="text-zinc-400 font-semibold flex items-center gap-1">
               <Filter className="w-3.5 h-3.5 text-zinc-500" />
               Dificuldade:
             </span>
             <select
               value={selectedDifficulty}
               onChange={(e) => setSelectedDifficulty(e.target.value)}
-              className="px-3 py-1.5 bg-black/60 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-cyan-400"
+              className="bg-transparent border-0 text-zinc-200 focus:outline-none cursor-pointer"
             >
-              <option value="all">Todas as Dificuldades</option>
+              <option value="all">Todas</option>
               <option value="Trivial">Trivial</option>
               <option value="Baixa">Baixa</option>
               <option value="Moderada">Moderada</option>
@@ -191,13 +268,73 @@ export const QuestBoard: React.FC<QuestBoardProps> = ({
               <option value="Lendária">Lendária</option>
             </select>
           </div>
+
+          {/* Tipo de Quest */}
+          <div className="flex items-center gap-1.5 bg-black/50 border border-zinc-800/80 px-2.5 py-1.5 rounded-xl text-xs">
+            <span className="text-zinc-400 font-semibold flex items-center gap-1">
+              <Layers className="w-3.5 h-3.5 text-zinc-500" />
+              Tipo:
+            </span>
+            <select
+              value={selectedType}
+              onChange={(e) => setSelectedType(e.target.value)}
+              className="bg-transparent border-0 text-zinc-200 focus:outline-none cursor-pointer"
+            >
+              <option value="all">Todos os Tipos</option>
+              <option value="Principal">Principal</option>
+              <option value="Secundária">Secundária</option>
+              <option value="Contrato de Caça">Contrato de Caça</option>
+              <option value="Pessoal">Pessoal</option>
+              <option value="Rumor">Rumor</option>
+              <option value="Facção">Facção</option>
+            </select>
+          </div>
+
+          {/* Prioridade */}
+          <div className="flex items-center gap-1.5 bg-black/50 border border-zinc-800/80 px-2.5 py-1.5 rounded-xl text-xs">
+            <span className="text-zinc-400 font-semibold flex items-center gap-1">
+              <Flame className="w-3.5 h-3.5 text-rose-400" />
+              Prioridade:
+            </span>
+            <select
+              value={selectedPriority}
+              onChange={(e) => setSelectedPriority(e.target.value)}
+              className="bg-transparent border-0 text-zinc-200 focus:outline-none cursor-pointer"
+            >
+              <option value="all">Todas</option>
+              <option value="Urgente">Urgente</option>
+              <option value="Alta">Alta</option>
+              <option value="Normal">Normal</option>
+              <option value="Baixa">Baixa</option>
+            </select>
+          </div>
+
+          {/* Ordenação */}
+          <div className="flex items-center gap-1.5 bg-black/50 border border-zinc-800/80 px-2.5 py-1.5 rounded-xl text-xs">
+            <span className="text-zinc-400 font-semibold flex items-center gap-1">
+              <ArrowUpDown className="w-3.5 h-3.5 text-cyan-400" />
+              Ordenar por:
+            </span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              className="bg-transparent border-0 text-cyan-300 font-semibold focus:outline-none cursor-pointer"
+            >
+              <option value="recent">Mais Recentes</option>
+              <option value="level_asc">Nível (Menor → Maior)</option>
+              <option value="level_desc">Nível (Maior → Menor)</option>
+              <option value="alpha_asc">Alfabética (A → Z)</option>
+              <option value="alpha_desc">Alfabética (Z → A)</option>
+              <option value="priority">Prioridade (Urgente 1º)</option>
+            </select>
+          </div>
         </div>
       </div>
 
       {/* Kanban Board Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
         {COLUMNS.map((column) => {
-          const colQuests = filteredQuests.filter(
+          const colQuests = sortedQuests.filter(
             (q) => (q.questData?.status || 'not_started') === column.id
           );
 
@@ -222,119 +359,21 @@ export const QuestBoard: React.FC<QuestBoardProps> = ({
               {/* Quest Cards in Column */}
               <div className="space-y-3 flex-1">
                 {colQuests.length === 0 ? (
-                  <div className="p-6 text-center border border-dashed border-zinc-800 rounded-xl text-xs text-zinc-500">
+                  <div className="p-8 text-center border border-dashed border-zinc-800 rounded-xl text-xs text-zinc-500">
                     Nenhuma missão nesta coluna.
                   </div>
                 ) : (
-                  colQuests.map((quest) => {
-                    const qData: QuestAttributes = quest.questData || {
-                      status: 'not_started',
-                      difficulty: 'Moderada',
-                      objectives: [],
-                    };
-                    const diffInfo = DIFFICULTY_MAP[qData.difficulty || 'Moderada'] || DIFFICULTY_MAP.Moderada;
-
-                    return (
-                      <div
-                        key={quest.id}
-                        onClick={() => onNavigateEntity(quest.id)}
-                        className="group relative flex flex-col p-4 rounded-xl bg-[#120f1c] hover:bg-[#181326] border border-zinc-800 hover:border-cyan-500/60 shadow-lg transition-all cursor-pointer space-y-2.5"
-                      >
-                        {/* Top Meta: Category & Difficulty */}
-                        <div className="flex items-center justify-between gap-1.5">
-                          <span className="text-[10px] uppercase font-bold tracking-wider text-cyan-400 font-mono">
-                            {quest.subtitle || 'Missão'}
-                          </span>
-                          <span
-                            className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded border ${diffInfo.color}`}
-                          >
-                            {diffInfo.label}
-                          </span>
-                        </div>
-
-                        {/* Title */}
-                        <h4 className="text-sm font-bold text-zinc-100 group-hover:text-cyan-300 transition-colors break-words">
-                          {quest.title}
-                        </h4>
-
-                        {/* Summary / Snippet */}
-                        {quest.summary && (
-                          <p className="text-xs text-zinc-400 leading-relaxed break-words">
-                            {quest.summary}
-                          </p>
-                        )}
-
-                        {/* Quick Attributes */}
-                        <div className="pt-2 border-t border-zinc-800/60 grid grid-cols-1 gap-1 text-[11px] text-zinc-400">
-                          {qData.questGiver && (
-                            <div className="flex items-center gap-1.5 break-words">
-                              <User className="w-3 h-3 text-purple-400 shrink-0" />
-                              <span className="text-zinc-500">Contratante:</span>
-                              <span className="text-zinc-300 font-medium break-words">
-                                {qData.questGiver}
-                              </span>
-                            </div>
-                          )}
-                          {qData.location && (
-                            <div className="flex items-center gap-1.5 break-words">
-                              <MapPin className="w-3 h-3 text-rose-400 shrink-0" />
-                              <span className="text-zinc-500">Local:</span>
-                              <span className="text-zinc-300 font-medium break-words">
-                                {qData.location}
-                              </span>
-                            </div>
-                          )}
-                          {(qData.rewards?.gold || qData.rewards?.xp) && (
-                            <div className="flex items-center gap-1.5 break-words">
-                              <Coins className="w-3 h-3 text-amber-400 shrink-0" />
-                              <span className="text-zinc-500">Recompensa:</span>
-                              <span className="text-amber-300 font-medium break-words">
-                                {qData.rewards?.gold || `${qData.rewards?.xp} XP`}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Traits and Tags */}
-                        {((quest.traits && quest.traits.length > 0) ||
-                          (quest.tags && quest.tags.length > 0)) && (
-                          <div className="flex flex-wrap gap-1 pt-1">
-                            {sortTraitsHierarchically(quest.traits || []).map((tr) => (
-                              <TraitBadge key={tr} trait={tr} className="text-[9px] py-0 px-1.5" />
-                            ))}
-                            {(quest.tags || []).map((tg) => (
-                              <span
-                                key={tg}
-                                className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 font-mono"
-                              >
-                                #{tg}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Status Quick Selector (For quick Kanban state transitions) */}
-                        <div
-                          className="pt-2 flex items-center justify-between gap-1 border-t border-zinc-800/80 mt-1"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <span className="text-[10px] text-zinc-500">Mover para:</span>
-                          <select
-                            value={qData.status || 'not_started'}
-                            onChange={(e) =>
-                              handleStatusChange(quest, e.target.value as QuestStatus)
-                            }
-                            className="text-[10px] bg-black/80 border border-zinc-700/80 rounded px-1.5 py-0.5 text-cyan-300 focus:outline-none focus:border-cyan-400 font-semibold"
-                          >
-                            <option value="not_started">Disponível</option>
-                            <option value="in_progress">Em Andamento</option>
-                            <option value="completed">Concluída</option>
-                            <option value="failed">Falha/Cancelada</option>
-                          </select>
-                        </div>
-                      </div>
-                    );
-                  })
+                  colQuests.map((quest) => (
+                    <QuestCard
+                      key={quest.id}
+                      entity={quest}
+                      onSelect={onNavigateEntity}
+                      onEdit={() => onEditEntity?.(quest)}
+                      onDelete={onDeleteEntity}
+                      onStatusChange={handleStatusChange}
+                      isGm={isActualGm}
+                    />
+                  ))
                 )}
               </div>
             </div>

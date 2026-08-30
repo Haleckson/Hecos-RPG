@@ -10,6 +10,12 @@ import { PerilView } from './PerilView';
 import { ClassView } from './ClassView';
 import { SpellView } from './SpellView';
 import { ItemView } from './ItemView';
+import { NPCView } from './NPCView';
+import { PCView } from './PCView';
+import { FaunaView } from './FaunaView';
+import { FloraView } from './FloraView';
+import { LocationView } from './LocationView';
+import { OrganizationView } from './OrganizationView';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { AdjustableImage } from './AdjustableImage';
 import { TraitBadge } from './TraitBadge';
@@ -130,6 +136,78 @@ export const EntityView: React.FC<EntityViewProps> = ({
   if (entity.category === 'item' || entity.itemData) {
     return (
       <ItemView
+        entity={entity}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onNavigate={onNavigate}
+        onTagClick={onTagClick}
+      />
+    );
+  }
+
+  if (entity.category === 'npc' || entity.npcData) {
+    return (
+      <NPCView
+        entity={entity}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onNavigate={onNavigate}
+        onTagClick={onTagClick}
+      />
+    );
+  }
+
+  if (entity.category === 'pc' || entity.pcData) {
+    return (
+      <PCView
+        entity={entity}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onNavigate={onNavigate}
+        onTagClick={onTagClick}
+      />
+    );
+  }
+
+  if (entity.category === 'fauna' || entity.faunaData) {
+    return (
+      <FaunaView
+        entity={entity}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onNavigate={onNavigate}
+        onTagClick={onTagClick}
+      />
+    );
+  }
+
+  if (entity.category === 'flora' || entity.floraData) {
+    return (
+      <FloraView
+        entity={entity}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onNavigate={onNavigate}
+        onTagClick={onTagClick}
+      />
+    );
+  }
+
+  if (entity.category === 'location' || entity.locationData) {
+    return (
+      <LocationView
+        entity={entity}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onNavigate={onNavigate}
+        onTagClick={onTagClick}
+      />
+    );
+  }
+
+  if (entity.category === 'organization' || entity.organizationData) {
+    return (
+      <OrganizationView
         entity={entity}
         onEdit={onEdit}
         onDelete={onDelete}
