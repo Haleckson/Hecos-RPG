@@ -710,6 +710,43 @@ export async function syncMapToFirebase(mapData: any): Promise<boolean> {
 }
 
 /**
+ * Delete a map from Firebase Realtime Database
+ */
+export async function deleteMapFromFirebase(mapId: string): Promise<boolean> {
+  if (!isFirebaseAvailable || !db || !mapId) return false;
+  try {
+    const safeKey = toSafeKey(mapId);
+    const mapRef = ref(db, `hecos_maps/${safeKey}`);
+    await withTimeout(remove(mapRef), 15000);
+    return true;
+  } catch (err) {
+    console.error("Error deleting map from Firebase:", err);
+    return false;
+  }
+}
+
+/**
+ * Sync entire array of maps to Firebase Realtime Database
+ */
+export async function syncAllMapsToFirebase(maps: any[]): Promise<boolean> {
+  if (!isFirebaseAvailable || !db || !Array.isArray(maps)) return false;
+  try {
+    const mapsRef = ref(db, 'hecos_maps');
+    const batch: Record<string, any> = {};
+    maps.forEach((m) => {
+      if (m && m.id) {
+        batch[toSafeKey(m.id)] = cleanForFirebase(m);
+      }
+    });
+    await withTimeout(set(mapsRef, batch), 15000);
+    return true;
+  } catch (err) {
+    console.error("Error syncing all maps to Firebase:", err);
+    return false;
+  }
+}
+
+/**
  * Load maps from Firebase Realtime Database
  */
 export async function loadMapsFromFirebase(): Promise<any[] | null> {
@@ -728,6 +765,194 @@ export async function loadMapsFromFirebase(): Promise<any[] | null> {
     return list.length > 0 ? list : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Sync YouTube tracks to Firebase Realtime Database
+ */
+export async function syncTracksToFirebase(tracks: any[]): Promise<boolean> {
+  if (!isFirebaseAvailable || !db || !Array.isArray(tracks)) return false;
+  try {
+    const tracksRef = ref(db, 'hecos_youtube_tracks');
+    const batch: Record<string, any> = {};
+    tracks.forEach((t) => {
+      if (t && t.id) {
+        batch[toSafeKey(t.id)] = cleanForFirebase(t);
+      }
+    });
+    await withTimeout(set(tracksRef, batch), 15000);
+    return true;
+  } catch (err) {
+    console.error("Error syncing tracks to Firebase:", err);
+    return false;
+  }
+}
+
+/**
+ * Load YouTube tracks from Firebase Realtime Database
+ */
+export async function loadTracksFromFirebase(): Promise<any[] | null> {
+  if (!isFirebaseAvailable || !db) return null;
+  try {
+    const tracksRef = ref(db, 'hecos_youtube_tracks');
+    const snap = await withTimeout(get(tracksRef), 15000);
+    if (!snap.exists()) return null;
+    const val = snap.val();
+    const list: any[] = [];
+    if (Array.isArray(val)) {
+      val.forEach(t => { if (t && t.id) list.push(t); });
+    } else if (typeof val === 'object') {
+      Object.values(val).forEach((t: any) => { if (t && t.id) list.push(t); });
+    }
+    return list.length > 0 ? list : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Subscribe to YouTube tracks in Realtime
+ */
+export function subscribeToTracksRealtime(callback: (tracks: any[]) => void): Unsubscribe {
+  if (!isFirebaseAvailable || !db) return () => {};
+  try {
+    const tracksRef = ref(db, 'hecos_youtube_tracks');
+    return onValue(tracksRef, (snap) => {
+      if (!snap.exists()) return;
+      const val = snap.val();
+      const list: any[] = [];
+      if (Array.isArray(val)) {
+        val.forEach(t => { if (t && t.id) list.push(t); });
+      } else if (typeof val === 'object') {
+        Object.values(val).forEach((t: any) => { if (t && t.id) list.push(t); });
+      }
+      if (list.length > 0) {
+        callback(list);
+      }
+    }, (error) => {
+      console.warn("Real-time tracks error:", error);
+    });
+  } catch {
+    return () => {};
+  }
+}
+
+/**
+ * Delete a track from Firebase Realtime Database
+ */
+export async function deleteTrackFromFirebase(trackId: string): Promise<boolean> {
+  if (!isFirebaseAvailable || !db || !trackId) return false;
+  try {
+    const safeKey = toSafeKey(trackId);
+    const trackRef = ref(db, `hecos_youtube_tracks/${safeKey}`);
+    await withTimeout(remove(trackRef), 15000);
+    return true;
+  } catch (err) {
+    console.error("Error deleting track from Firebase:", err);
+    return false;
+  }
+}
+
+/**
+ * Sync Google Drive resources to Firebase Realtime Database
+ */
+export async function syncDriveResourcesToFirebase(resources: any[]): Promise<boolean> {
+  if (!isFirebaseAvailable || !db || !Array.isArray(resources)) return false;
+  try {
+    const driveRef = ref(db, 'hecos_drive_resources');
+    const batch: Record<string, any> = {};
+    resources.forEach((r) => {
+      if (r && r.id) {
+        batch[toSafeKey(r.id)] = cleanForFirebase(r);
+      }
+    });
+    await withTimeout(set(driveRef, batch), 15000);
+    return true;
+  } catch (err) {
+    console.error("Error syncing drive resources to Firebase:", err);
+    return false;
+  }
+}
+
+/**
+ * Load Google Drive resources from Firebase Realtime Database
+ */
+export async function loadDriveResourcesFromFirebase(): Promise<any[] | null> {
+  if (!isFirebaseAvailable || !db) return null;
+  try {
+    const driveRef = ref(db, 'hecos_drive_resources');
+    const snap = await withTimeout(get(driveRef), 15000);
+    if (!snap.exists()) return null;
+    const val = snap.val();
+    const list: any[] = [];
+    if (Array.isArray(val)) {
+      val.forEach(r => { if (r && r.id) list.push(r); });
+    } else if (typeof val === 'object') {
+      Object.values(val).forEach((r: any) => { if (r && r.id) list.push(r); });
+    }
+    return list.length > 0 ? list : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Subscribe to Google Drive resources in Realtime
+ */
+export function subscribeToDriveResourcesRealtime(callback: (resources: any[]) => void): Unsubscribe {
+  if (!isFirebaseAvailable || !db) return () => {};
+  try {
+    const driveRef = ref(db, 'hecos_drive_resources');
+    return onValue(driveRef, (snap) => {
+      if (!snap.exists()) return;
+      const val = snap.val();
+      const list: any[] = [];
+      if (Array.isArray(val)) {
+        val.forEach(r => { if (r && r.id) list.push(r); });
+      } else if (typeof val === 'object') {
+        Object.values(val).forEach((r: any) => { if (r && r.id) list.push(r); });
+      }
+      if (list.length > 0) {
+        callback(list);
+      }
+    }, (error) => {
+      console.warn("Real-time drive resources error:", error);
+    });
+  } catch {
+    return () => {};
+  }
+}
+
+/**
+ * Delete a Google Drive resource from Firebase Realtime Database
+ */
+export async function deleteDriveResourceFromFirebase(resourceId: string): Promise<boolean> {
+  if (!isFirebaseAvailable || !db || !resourceId) return false;
+  try {
+    const safeKey = toSafeKey(resourceId);
+    const resourceRef = ref(db, `hecos_drive_resources/${safeKey}`);
+    await withTimeout(remove(resourceRef), 15000);
+    return true;
+  } catch (err) {
+    console.error("Error deleting drive resource from Firebase:", err);
+    return false;
+  }
+}
+
+/**
+ * Delete a user from Firebase Realtime Database
+ */
+export async function deleteUserFromFirebase(userId: string): Promise<boolean> {
+  if (!isFirebaseAvailable || !db || !userId) return false;
+  try {
+    const safeKey = toSafeKey(userId);
+    const userRef = ref(db, `hecos_users/${safeKey}`);
+    await withTimeout(remove(userRef), 15000);
+    return true;
+  } catch (err) {
+    console.error("Error deleting user from Firebase:", err);
+    return false;
   }
 }
 
@@ -1054,7 +1279,12 @@ export function subscribeToCustomTagsRealtime(callback: (tags: Record<string, an
 /**
  * Seed initial database if completely empty
  */
-export async function seedDatabaseIfEmpty(initialEntities: any[]): Promise<boolean> {
+export async function seedDatabaseIfEmpty(
+  initialEntities: any[],
+  initialMaps?: any[],
+  initialTracks?: any[],
+  initialDriveResources?: any[]
+): Promise<boolean> {
   if (!isFirebaseAvailable || !db) return false;
   try {
     const entitiesRef = ref(db, 'hecos_entities');
@@ -1067,9 +1297,41 @@ export async function seedDatabaseIfEmpty(initialEntities: any[]): Promise<boole
         batchObj[safeKey] = cleanForFirebase(ent);
       });
       await set(entitiesRef, batchObj);
-      return true;
     }
-    return false;
+    if (initialMaps && initialMaps.length > 0) {
+      const mapsRef = ref(db, 'hecos_maps');
+      const mapsSnap = await withTimeout(get(mapsRef), 10000).catch(() => null);
+      if (!mapsSnap || !mapsSnap.exists() || Object.keys(mapsSnap.val() || {}).length === 0) {
+        const mapsBatch: Record<string, any> = {};
+        initialMaps.forEach((m) => {
+          if (m && m.id) mapsBatch[toSafeKey(m.id)] = cleanForFirebase(m);
+        });
+        await set(mapsRef, mapsBatch).catch(() => {});
+      }
+    }
+    if (initialTracks && initialTracks.length > 0) {
+      const tracksRef = ref(db, 'hecos_youtube_tracks');
+      const tracksSnap = await withTimeout(get(tracksRef), 10000).catch(() => null);
+      if (!tracksSnap || !tracksSnap.exists() || Object.keys(tracksSnap.val() || {}).length === 0) {
+        const tracksBatch: Record<string, any> = {};
+        initialTracks.forEach((t) => {
+          if (t && t.id) tracksBatch[toSafeKey(t.id)] = cleanForFirebase(t);
+        });
+        await set(tracksRef, tracksBatch).catch(() => {});
+      }
+    }
+    if (initialDriveResources && initialDriveResources.length > 0) {
+      const driveRef = ref(db, 'hecos_drive_resources');
+      const driveSnap = await withTimeout(get(driveRef), 10000).catch(() => null);
+      if (!driveSnap || !driveSnap.exists() || Object.keys(driveSnap.val() || {}).length === 0) {
+        const driveBatch: Record<string, any> = {};
+        initialDriveResources.forEach((r) => {
+          if (r && r.id) driveBatch[toSafeKey(r.id)] = cleanForFirebase(r);
+        });
+        await set(driveRef, driveBatch).catch(() => {});
+      }
+    }
+    return true;
   } catch (e) {
     console.warn("Could not seed RTDB:", e);
     return false;

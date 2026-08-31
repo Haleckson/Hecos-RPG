@@ -52,6 +52,7 @@ import { getEmptyAncestryData, serializeAncestryToHTML } from './utils/ancestryS
 import { getEmptyFeatData, serializeFeatToHTML } from './utils/featSerializer';
 import { getEmptySpellData, serializeSpellToHTML } from './utils/spellSerializer';
 import { getEmptyItemData, serializeItemToHTML } from './utils/itemSerializer';
+import { ImageCacheService } from './services/imageCacheService';
 import {
   subscribeFirebaseStatus,
   getFirebaseConnectionState,
@@ -347,6 +348,15 @@ export function App() {
     // 1. Subscribe to real-time entities updates (Firestore onSnapshot + Local sync)
     const unsubEntities = HecosStorage.subscribeEntities((list) => {
       setEntities(list);
+      // Preload images into cache in the background for zero-latency UI
+      try {
+        const imageUrls = list
+          .map((e) => e.coverImage || e.npcData?.portraitImage || e.perilData?.portraitImage || e.organizationData?.symbolImage)
+          .filter((url): url is string => Boolean(url && url.startsWith('http')));
+        ImageCacheService.preloadImages(imageUrls.slice(0, 30));
+      } catch (e) {
+        console.warn('Preload images warning:', e);
+      }
     });
 
     // 2. Subscribe to Firebase connection & sync status

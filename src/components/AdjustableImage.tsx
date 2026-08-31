@@ -13,6 +13,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { HecosStorage } from '../services/storage';
 import { ImageAdjustment } from '../types';
+import { ImageCacheService } from '../services/imageCacheService';
 
 export interface AdjustableImageProps {
   src: string;
@@ -45,9 +46,35 @@ export const AdjustableImage: React.FC<AdjustableImageProps> = ({
   children,
   referrerPolicy = 'no-referrer',
   onClick,
+  priority = false,
 }) => {
   const effectiveKey = imageKey || src;
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Intelligent cached image resolution
+  const [resolvedSrc, setResolvedSrc] = useState<string>(() => {
+    return ImageCacheService.getCachedObjectURL(src) || src;
+  });
+
+  useEffect(() => {
+    let isCurrent = true;
+    if (src) {
+      const cached = ImageCacheService.getCachedObjectURL(src);
+      if (cached) {
+        setResolvedSrc(cached);
+      } else {
+        setResolvedSrc(src);
+        ImageCacheService.loadAndCacheImage(src).then((cachedUrl) => {
+          if (isCurrent && cachedUrl) {
+            setResolvedSrc(cachedUrl);
+          }
+        });
+      }
+    }
+    return () => {
+      isCurrent = false;
+    };
+  }, [src]);
 
   // GM status
   const currentUser = HecosStorage.getCurrentUser();
@@ -322,23 +349,16 @@ export const AdjustableImage: React.FC<AdjustableImageProps> = ({
       onTouchEnd={isEditing ? handleTouchEnd : undefined}
       onClick={!isEditing ? onClick : (e) => { e.stopPropagation(); e.preventDefault(); }}
     >
-      {/* 
-        ═══════════════════════════════════════════════════════════════════════
-        ZERO-CROPPING RENDERING CANVAS:
-        1. Ambient Blurred Backdrop: Provides an elegant atmospheric fill when the image
-           is contained or zoomed out, preventing dead space without cropping the artwork.
-        2. Flexible Transform Canvas: Scales and translates the full uncropped image
-           smoothly without clipping margins.
-        ═══════════════════════════════════════════════════════════════════════
-      */}
+      {/* Zero-Cropping Ambient Blurred Backdrop */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30 filter blur-xl scale-125">
         <img
-          src={src}
+          src={resolvedSrc}
           alt=""
           aria-hidden="true"
           referrerPolicy={referrerPolicy}
           className="w-full h-full object-cover"
           draggable={false}
+          loading={priority ? 'eager' : 'lazy'}
         />
       </div>
 
@@ -351,7 +371,7 @@ export const AdjustableImage: React.FC<AdjustableImageProps> = ({
         }}
       >
         <img
-          src={src}
+          src={resolvedSrc}
           alt={alt}
           referrerPolicy={referrerPolicy}
           className={`select-none pointer-events-none ${className}`}
@@ -363,13 +383,14 @@ export const AdjustableImage: React.FC<AdjustableImageProps> = ({
             objectFit: activeFitMode === 'cover' ? 'cover' : 'contain',
           }}
           draggable={false}
+          loading={priority ? 'eager' : 'lazy'}
         />
       </div>
 
       {/* Optional Gradient Overlay */}
       {overlayGradient}
 
-      {/* Children elements (e.g. badges, title overlays) */}
+      {/* Children elements */}
       <div className={`relative z-10 w-full h-full pointer-events-none ${isEditing ? 'opacity-20' : ''}`}>
         {children}
       </div>
@@ -395,7 +416,7 @@ export const AdjustableImage: React.FC<AdjustableImageProps> = ({
         </div>
       )}
 
-      {/* Active GM Gesture Mode: Floating Ultra-Compact Icon Toolbar */}
+      {/* Active GM Gesture Mode Toolbar */}
       <AnimatePresence>
         {isEditing && (
           <motion.div
@@ -435,7 +456,7 @@ export const AdjustableImage: React.FC<AdjustableImageProps> = ({
             {/* Separator */}
             <div className="w-px h-3.5 bg-zinc-800 mx-0.5" />
 
-            {/* Fit Mode Toggle (Cover / Contain) */}
+            {/* Fit Mode Toggle */}
             <button
               type="button"
               onClick={() => {
@@ -462,7 +483,7 @@ export const AdjustableImage: React.FC<AdjustableImageProps> = ({
             {/* Separator */}
             <div className="w-px h-3.5 bg-zinc-800 mx-0.5" />
 
-            {/* Reset to 100% / Center */}
+            {/* Reset */}
             <button
               type="button"
               onClick={handleReset}
@@ -482,7 +503,7 @@ export const AdjustableImage: React.FC<AdjustableImageProps> = ({
               <X className="w-3.5 h-3.5" />
             </button>
 
-            {/* Save (Disquete / Floppy) */}
+            {/* Save */}
             <button
               type="button"
               onClick={handleSave}
@@ -495,7 +516,7 @@ export const AdjustableImage: React.FC<AdjustableImageProps> = ({
         )}
       </AnimatePresence>
 
-      {/* Floating Save Toast Notification */}
+      {/* Save Toast Notification */}
       <AnimatePresence>
         {saveToast && (
           <motion.div

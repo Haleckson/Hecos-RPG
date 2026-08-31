@@ -193,6 +193,8 @@ export interface LocationPointOfInterest {
   name: string;
   type?: string;
   description?: string;
+  notes?: string;
+  district?: string;
   linkedEntityId?: string;
   isSecret?: boolean;
 }
@@ -210,6 +212,10 @@ export interface LocationAttributes {
   factionEntityIds?: string[];
   inhabitantNpcIds?: string[]; // IDs de NPCs residentes / figuras notáveis vinculadas
   questIds?: string[]; // IDs de Quests vinculadas a este local
+  fauna?: string[];
+  faunaEntityIds?: string[];
+  flora?: string[];
+  floraEntityIds?: string[];
   pointsOfInterest?: LocationPointOfInterest[];
   districts?: string[];
   coordinates?: { x: number; y: number };
@@ -337,6 +343,10 @@ export interface FaunaHarvestPart {
 
 export interface FaunaAttributes {
   habitat?: string;
+  locationEntityId?: string;
+  linkedLocationIds?: string[];
+  habitatLocationIds?: string[];
+  classification?: string;
   diet?: 'Carnívoro' | 'Herbívoro' | 'Onívoro' | 'Mágico / Cristalino' | 'Necrófago' | string;
   temperament?: 'Dócil' | 'Arisco' | 'Territorial' | 'Predador Agressivo' | 'Treinável' | string;
   dangerLevel?: 'Inofensivo' | 'Baixo' | 'Médio' | 'Perigoso' | 'Mortal' | string;
@@ -354,6 +364,10 @@ export interface FaunaAttributes {
 
 export interface FloraAttributes {
   habitat?: string;
+  locationEntityId?: string;
+  linkedLocationIds?: string[];
+  habitatLocationIds?: string[];
+  classification?: string;
   properties?: ('Medicinal' | 'Venenosa' | 'Reagente Alquímico' | 'Alucinógena' | 'Nutritiva' | 'Mágica' | string)[];
   rarity?: 'Comum' | 'Incomum' | 'Raro' | 'Único' | string;
   harvestSeason?: string;
@@ -501,6 +515,7 @@ export interface NPCAttributes {
   location?: string;      // Onde reside / Local atual
   locationEntityId?: string; // ID da entidade de local vinculada
   linkedLocationIds?: string[]; // IDs de locais vinculados
+  locationIds?: string[]; // Alias para linkedLocationIds
   questIds?: string[];    // IDs de quests vinculadas
   pronouns?: string;      // ex: Ele/Dele, Ela/Dela, Neutro
   age?: string;           // Idade aparente ou real
@@ -1156,4 +1171,48 @@ export interface ImageAdjustment {
   y: number; // vertical translation % (-200 to 200, default 0)
   scale: number; // zoom scale multiplier (0.15 to 8.0, default 1.0)
   fitMode?: 'cover' | 'contain' | 'custom';
+}
+
+export interface EntityRelationshipUpdates {
+  /** IDs of Locations to link bidirectionally */
+  addLocationIds?: string[];
+  /** IDs of Locations to unlink bidirectionally */
+  removeLocationIds?: string[];
+  /** Exact full list of Location IDs (synchronizes additions and removals) */
+  locationIds?: string[];
+
+  /** IDs of Organizations to link bidirectionally */
+  addOrganizationIds?: string[];
+  /** IDs of Organizations to unlink bidirectionally */
+  removeOrganizationIds?: string[];
+  /** Exact full list of Organization IDs */
+  organizationIds?: string[];
+
+  /** IDs of Quests to link bidirectionally */
+  addQuestIds?: string[];
+  /** IDs of Quests to unlink bidirectionally */
+  removeQuestIds?: string[];
+  /** Exact full list of Quest IDs */
+  questIds?: string[];
+
+  /** IDs of NPCs to link bidirectionally */
+  addNpcIds?: string[];
+  /** IDs of NPCs to unlink bidirectionally */
+  removeNpcIds?: string[];
+  /** Exact full list of NPC IDs */
+  npcIds?: string[];
+
+  /** IDs of Fauna to link bidirectionally */
+  addFaunaIds?: string[];
+  /** IDs of Fauna to unlink bidirectionally */
+  removeFaunaIds?: string[];
+  /** Exact full list of Fauna IDs */
+  faunaIds?: string[];
+
+  /** IDs of Flora to link bidirectionally */
+  addFloraIds?: string[];
+  /** IDs of Flora to unlink bidirectionally */
+  removeFloraIds?: string[];
+  /** Exact full list of Flora IDs */
+  floraIds?: string[];
 }

@@ -1,6 +1,7 @@
-import { HecosEntity, InteractiveMapData, YouTubeAmbianceTrack, GoogleDriveResource, TagInfo, HecosUser, FolderPermission, ItemVisibility, TrashedEntity, ImageAdjustment } from '../types';
+import { HecosEntity, InteractiveMapData, YouTubeAmbianceTrack, GoogleDriveResource, TagInfo, HecosUser, FolderPermission, ItemVisibility, TrashedEntity, ImageAdjustment, EntityRelationshipUpdates } from '../types';
 import { INITIAL_ENTITIES, INITIAL_MAPS, INITIAL_YOUTUBE_TRACKS, INITIAL_DRIVE_RESOURCES } from '../data/initialHecosData';
 import { migrateAllSpellEntities, migrateSpellEntity } from '../utils/spellMigration';
+import { MutualLinkService } from './mutualLinkService';
 import {
   syncEntityToFirebase,
   deleteEntityFromFirebase,
@@ -12,7 +13,18 @@ import {
   loadTrashFromFirebase,
   subscribeToMapsRealtime,
   syncMapToFirebase,
+  deleteMapFromFirebase,
+  syncAllMapsToFirebase,
   loadMapsFromFirebase,
+  syncTracksToFirebase,
+  loadTracksFromFirebase,
+  subscribeToTracksRealtime,
+  deleteTrackFromFirebase,
+  syncDriveResourcesToFirebase,
+  loadDriveResourcesFromFirebase,
+  subscribeToDriveResourcesRealtime,
+  deleteDriveResourceFromFirebase,
+  deleteUserFromFirebase,
   seedDatabaseIfEmpty,
   subscribeToFeatCategoriesRealtime,
   syncFeatCategoriesToFirebase,
@@ -324,7 +336,7 @@ export class HecosStorage {
     this.isRealtimeInitialized = true;
 
     // Seed RTDB with initial lore if completely empty
-    seedDatabaseIfEmpty(INITIAL_ENTITIES).catch(() => {});
+    seedDatabaseIfEmpty(INITIAL_ENTITIES, INITIAL_MAPS, INITIAL_YOUTUBE_TRACKS, INITIAL_DRIVE_RESOURCES).catch(() => {});
 
     // Listen for deleted entities in real-time from other devices
     subscribeToDeletedEntitiesRealtime((deletedMap) => {
@@ -542,6 +554,47 @@ export class HecosStorage {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('hecos:tags-updated'));
       }
+    });
+
+    // Start real-time listener for YouTube ambiance tracks
+    subscribeToTracksRealtime((tracksList) => {
+      if (!tracksList || tracksList.length === 0) return;
+      this.tracksCache = tracksList;
+      try {
+        localStorage.setItem(STORAGE_KEYS.YOUTUBE_TRACKS, JSON.stringify(tracksList));
+      } catch (e) {
+        console.warn("Error saving tracks to localStorage:", e);
+      }
+    });
+
+    // Start real-time listener for Google Drive resources
+    subscribeToDriveResourcesRealtime((driveList) => {
+      if (!driveList || driveList.length === 0) return;
+      this.driveCache = driveList;
+      try {
+        localStorage.setItem(STORAGE_KEYS.DRIVE_RESOURCES, JSON.stringify(driveList));
+      } catch (e) {
+        console.warn("Error saving drive resources to localStorage:", e);
+      }
+    });
+
+    // Start real-time listener for all scope category configurations
+    const scopesToListen = ['item', 'peril', 'class', 'archetype', 'ancestry', 'fauna', 'flora', 'location', 'pc', 'npc', 'organization', 'map', 'tag'];
+    scopesToListen.forEach((sc) => {
+      subscribeToScopeCategoriesRealtime(sc, (config) => {
+        if (!config || typeof config !== 'object') return;
+        const key = sc === 'item' ? STORAGE_KEYS.ITEM_CATEGORIES : `hecos_${sc}_categories_v1`;
+        try {
+          localStorage.setItem(key, JSON.stringify(config));
+        } catch (e) {
+          console.warn(`Error saving ${sc} categories to localStorage:`, e);
+        }
+        if (sc === 'item') {
+          this.itemCategoriesCache = config;
+          this.notifyItemCategoriesSubscribers();
+        }
+        this.notifyEntitySubscribers();
+      });
     });
   }
 
@@ -780,6 +833,729 @@ export class HecosStorage {
   }
 
   /**
+   * Manages bidirectional link inclusion and exclusion across reference arrays
+   * (locations, organizations, quests, NPCs, fauna, flora) strictly by ID,
+   * guaranteeing referential integrity without creating 3-way transitive cycles.
+   */
+  static updateEntityRelationships(
+    sourceEntityOrId: HecosEntity | string,
+    updates?: EntityRelationshipUpdates
+  ): HecosEntity | null {
+    const sourceEntity = typeof sourceEntityOrId === 'string'
+      ? this.getEntityById(sourceEntityOrId)
+      : sourceEntityOrId;
+
+    if (!sourceEntity) return null;
+
+    const sourceId = sourceEntity.id;
+    const clonedSource: HecosEntity = JSON.parse(JSON.stringify(sourceEntity));
+
+    if (updates) {
+      // ─────────────────────────────────────────────────────────────
+      // 1. LOCATIONS LINK / UNLINK
+      // ─────────────────────────────────────────────────────────────
+      const toAddLocs = new Set<string>(updates.addLocationIds || []);
+      const toRemoveLocs = new Set<string>(updates.removeLocationIds || []);
+
+      if (updates.locationIds) {
+        const targetSet = new Set(updates.locationIds);
+        const currentLocs = new Set<string>();
+        if (clonedSource.npcData) {
+          (clonedSource.npcData.linkedLocationIds || clonedSource.npcData.locationIds || []).forEach((id) => currentLocs.add(id));
+          if (clonedSource.npcData.locationEntityId) currentLocs.add(clonedSource.npcData.locationEntityId);
+        }
+        if (clonedSource.organizationData) {
+          (clonedSource.organizationData.affiliatedLocationIds || []).forEach((id) => currentLocs.add(id));
+          if (clonedSource.organizationData.headquartersLocationId) currentLocs.add(clonedSource.organizationData.headquartersLocationId);
+        }
+        if (clonedSource.questData) {
+          (clonedSource.questData.involvedLocationIds || []).forEach((id) => currentLocs.add(id));
+          if (clonedSource.questData.locationEntityId) currentLocs.add(clonedSource.questData.locationEntityId);
+        }
+        if (clonedSource.faunaData) {
+          (clonedSource.faunaData.linkedLocationIds || clonedSource.faunaData.habitatLocationIds || []).forEach((id) => currentLocs.add(id));
+          if (clonedSource.faunaData.locationEntityId) currentLocs.add(clonedSource.faunaData.locationEntityId);
+        }
+        if (clonedSource.floraData) {
+          (clonedSource.floraData.linkedLocationIds || clonedSource.floraData.habitatLocationIds || []).forEach((id) => currentLocs.add(id));
+          if (clonedSource.floraData.locationEntityId) currentLocs.add(clonedSource.floraData.locationEntityId);
+        }
+
+        targetSet.forEach((id) => { if (!currentLocs.has(id)) toAddLocs.add(id); });
+        currentLocs.forEach((id) => { if (!targetSet.has(id)) toRemoveLocs.add(id); });
+      }
+
+      // Apply location updates to source entity
+      if (clonedSource.npcData) {
+        const nd = clonedSource.npcData;
+        const locList = new Set<string>([...(nd.linkedLocationIds || []), ...(nd.locationIds || [])]);
+        if (nd.locationEntityId) locList.add(nd.locationEntityId);
+
+        toAddLocs.forEach((id) => locList.add(id));
+        toRemoveLocs.forEach((id) => locList.delete(id));
+
+        const newArr = Array.from(locList);
+        nd.linkedLocationIds = newArr;
+        nd.locationIds = newArr;
+        if (nd.locationEntityId && toRemoveLocs.has(nd.locationEntityId)) {
+          nd.locationEntityId = newArr[0] || undefined;
+          if (!nd.locationEntityId) nd.location = undefined;
+        } else if (!nd.locationEntityId && newArr.length > 0) {
+          nd.locationEntityId = newArr[0];
+        }
+      }
+
+      if (clonedSource.organizationData) {
+        const od = clonedSource.organizationData;
+        const locList = new Set<string>(od.affiliatedLocationIds || []);
+        if (od.headquartersLocationId) locList.add(od.headquartersLocationId);
+
+        toAddLocs.forEach((id) => locList.add(id));
+        toRemoveLocs.forEach((id) => locList.delete(id));
+
+        const newArr = Array.from(locList);
+        od.affiliatedLocationIds = newArr;
+        if (od.headquartersLocationId && toRemoveLocs.has(od.headquartersLocationId)) {
+          od.headquartersLocationId = undefined;
+          od.headquarters = undefined;
+        }
+      }
+
+      if (clonedSource.questData) {
+        const qd = clonedSource.questData;
+        const locList = new Set<string>(qd.involvedLocationIds || []);
+        if (qd.locationEntityId) locList.add(qd.locationEntityId);
+
+        toAddLocs.forEach((id) => locList.add(id));
+        toRemoveLocs.forEach((id) => locList.delete(id));
+
+        const newArr = Array.from(locList);
+        qd.involvedLocationIds = newArr;
+        if (qd.locationEntityId && toRemoveLocs.has(qd.locationEntityId)) {
+          qd.locationEntityId = newArr[0] || undefined;
+          if (!qd.locationEntityId) qd.location = undefined;
+        } else if (!qd.locationEntityId && newArr.length > 0) {
+          qd.locationEntityId = newArr[0];
+        }
+      }
+
+      if (clonedSource.faunaData) {
+        const fd = clonedSource.faunaData;
+        const locList = new Set<string>([...(fd.linkedLocationIds || []), ...(fd.habitatLocationIds || [])]);
+        if (fd.locationEntityId) locList.add(fd.locationEntityId);
+
+        toAddLocs.forEach((id) => locList.add(id));
+        toRemoveLocs.forEach((id) => locList.delete(id));
+
+        const newArr = Array.from(locList);
+        fd.linkedLocationIds = newArr;
+        fd.habitatLocationIds = newArr;
+        if (fd.locationEntityId && toRemoveLocs.has(fd.locationEntityId)) {
+          fd.locationEntityId = newArr[0] || undefined;
+        } else if (!fd.locationEntityId && newArr.length > 0) {
+          fd.locationEntityId = newArr[0];
+        }
+      }
+
+      if (clonedSource.floraData) {
+        const fld = clonedSource.floraData;
+        const locList = new Set<string>([...(fld.linkedLocationIds || []), ...(fld.habitatLocationIds || [])]);
+        if (fld.locationEntityId) locList.add(fld.locationEntityId);
+
+        toAddLocs.forEach((id) => locList.add(id));
+        toRemoveLocs.forEach((id) => locList.delete(id));
+
+        const newArr = Array.from(locList);
+        fld.linkedLocationIds = newArr;
+        fld.habitatLocationIds = newArr;
+        if (fld.locationEntityId && toRemoveLocs.has(fld.locationEntityId)) {
+          fld.locationEntityId = newArr[0] || undefined;
+        } else if (!fld.locationEntityId && newArr.length > 0) {
+          fld.locationEntityId = newArr[0];
+        }
+      }
+
+      // Apply counterpart 2-way links on Location entities
+      toAddLocs.forEach((locId) => {
+        const locEnt = this.getEntityById(locId);
+        if (!locEnt || (!locEnt.locationData && locEnt.category !== 'location')) return;
+        const ld = { ...(locEnt.locationData || {}) };
+        let locMod = false;
+
+        if (clonedSource.category === 'npc' || clonedSource.npcData) {
+          const inhab = new Set<string>(ld.inhabitantNpcIds || []);
+          if (!inhab.has(sourceId)) {
+            inhab.add(sourceId);
+            ld.inhabitantNpcIds = Array.from(inhab);
+            locMod = true;
+          }
+        } else if (clonedSource.category === 'organization' || clonedSource.organizationData) {
+          const facs = new Set<string>(ld.factionEntityIds || []);
+          if (!facs.has(sourceId)) {
+            facs.add(sourceId);
+            ld.factionEntityIds = Array.from(facs);
+            locMod = true;
+          }
+        } else if (clonedSource.category === 'quest' || clonedSource.questData) {
+          const qids = new Set<string>(ld.questIds || []);
+          if (!qids.has(sourceId)) {
+            qids.add(sourceId);
+            ld.questIds = Array.from(qids);
+            locMod = true;
+          }
+        } else if (clonedSource.category === 'fauna' || clonedSource.faunaData) {
+          const fids = new Set<string>(ld.faunaEntityIds || []);
+          if (!fids.has(sourceId)) {
+            fids.add(sourceId);
+            ld.faunaEntityIds = Array.from(fids);
+            locMod = true;
+          }
+        } else if (clonedSource.category === 'flora' || clonedSource.floraData) {
+          const flids = new Set<string>(ld.floraEntityIds || []);
+          if (!flids.has(sourceId)) {
+            flids.add(sourceId);
+            ld.floraEntityIds = Array.from(flids);
+            locMod = true;
+          }
+        }
+
+        if (locMod) {
+          this.saveEntity({ ...locEnt, locationData: ld });
+        }
+      });
+
+      toRemoveLocs.forEach((locId) => {
+        const locEnt = this.getEntityById(locId);
+        if (!locEnt || (!locEnt.locationData && locEnt.category !== 'location')) return;
+        const ld = { ...(locEnt.locationData || {}) };
+        let locMod = false;
+
+        if (clonedSource.category === 'npc' || clonedSource.npcData) {
+          const inhab = ld.inhabitantNpcIds || [];
+          if (inhab.includes(sourceId)) {
+            ld.inhabitantNpcIds = inhab.filter((id) => id !== sourceId);
+            locMod = true;
+          }
+        } else if (clonedSource.category === 'organization' || clonedSource.organizationData) {
+          const facs = ld.factionEntityIds || [];
+          if (facs.includes(sourceId)) {
+            ld.factionEntityIds = facs.filter((id) => id !== sourceId);
+            locMod = true;
+          }
+        } else if (clonedSource.category === 'quest' || clonedSource.questData) {
+          const qids = ld.questIds || [];
+          if (qids.includes(sourceId)) {
+            ld.questIds = qids.filter((id) => id !== sourceId);
+            locMod = true;
+          }
+        } else if (clonedSource.category === 'fauna' || clonedSource.faunaData) {
+          const fids = ld.faunaEntityIds || [];
+          if (fids.includes(sourceId)) {
+            ld.faunaEntityIds = fids.filter((id) => id !== sourceId);
+            locMod = true;
+          }
+        } else if (clonedSource.category === 'flora' || clonedSource.floraData) {
+          const flids = ld.floraEntityIds || [];
+          if (flids.includes(sourceId)) {
+            ld.floraEntityIds = flids.filter((id) => id !== sourceId);
+            locMod = true;
+          }
+        }
+
+        if (locMod) {
+          this.saveEntity({ ...locEnt, locationData: ld });
+        }
+      });
+
+      // ─────────────────────────────────────────────────────────────
+      // 2. ORGANIZATIONS LINK / UNLINK
+      // ─────────────────────────────────────────────────────────────
+      const toAddOrgs = new Set<string>(updates.addOrganizationIds || []);
+      const toRemoveOrgs = new Set<string>(updates.removeOrganizationIds || []);
+
+      if (updates.organizationIds) {
+        const targetSet = new Set(updates.organizationIds);
+        const currentOrgs = new Set<string>();
+        if (clonedSource.npcData) {
+          (clonedSource.npcData.linkedOrganizationIds || clonedSource.npcData.organizationIds || []).forEach((id) => currentOrgs.add(id));
+          if (clonedSource.npcData.organizationEntityId) currentOrgs.add(clonedSource.npcData.organizationEntityId);
+          if (clonedSource.npcData.factionEntityId) currentOrgs.add(clonedSource.npcData.factionEntityId);
+        }
+        if (clonedSource.locationData) {
+          (clonedSource.locationData.factionEntityIds || []).forEach((id) => currentOrgs.add(id));
+        }
+        if (clonedSource.questData) {
+          (clonedSource.questData.involvedOrgIds || []).forEach((id) => currentOrgs.add(id));
+          if (clonedSource.questData.organizationEntityId) currentOrgs.add(clonedSource.questData.organizationEntityId);
+        }
+        targetSet.forEach((id) => { if (!currentOrgs.has(id)) toAddOrgs.add(id); });
+        currentOrgs.forEach((id) => { if (!targetSet.has(id)) toRemoveOrgs.add(id); });
+      }
+
+      // Apply org updates to source entity
+      if (clonedSource.npcData) {
+        const nd = clonedSource.npcData;
+        const orgList = new Set<string>([...(nd.linkedOrganizationIds || []), ...(nd.organizationIds || [])]);
+        if (nd.organizationEntityId) orgList.add(nd.organizationEntityId);
+        if (nd.factionEntityId) orgList.add(nd.factionEntityId);
+
+        toAddOrgs.forEach((id) => orgList.add(id));
+        toRemoveOrgs.forEach((id) => orgList.delete(id));
+
+        const newArr = Array.from(orgList);
+        nd.linkedOrganizationIds = newArr;
+        nd.organizationIds = newArr;
+        if (nd.organizationEntityId && toRemoveOrgs.has(nd.organizationEntityId)) {
+          nd.organizationEntityId = newArr[0] || undefined;
+          nd.factionEntityId = newArr[0] || undefined;
+          if (!nd.organizationEntityId) {
+            nd.organization = undefined;
+            nd.faction = undefined;
+          }
+        } else if (!nd.organizationEntityId && newArr.length > 0) {
+          nd.organizationEntityId = newArr[0];
+          nd.factionEntityId = newArr[0];
+        }
+      }
+
+      if (clonedSource.locationData) {
+        const ld = clonedSource.locationData;
+        const orgList = new Set<string>(ld.factionEntityIds || []);
+        toAddOrgs.forEach((id) => orgList.add(id));
+        toRemoveOrgs.forEach((id) => orgList.delete(id));
+        ld.factionEntityIds = Array.from(orgList);
+      }
+
+      if (clonedSource.questData) {
+        const qd = clonedSource.questData;
+        const orgList = new Set<string>(qd.involvedOrgIds || []);
+        if (qd.organizationEntityId) orgList.add(qd.organizationEntityId);
+
+        toAddOrgs.forEach((id) => orgList.add(id));
+        toRemoveOrgs.forEach((id) => orgList.delete(id));
+
+        const newArr = Array.from(orgList);
+        qd.involvedOrgIds = newArr;
+        if (qd.organizationEntityId && toRemoveOrgs.has(qd.organizationEntityId)) {
+          qd.organizationEntityId = newArr[0] || undefined;
+          if (!qd.organizationEntityId) qd.organization = undefined;
+        } else if (!qd.organizationEntityId && newArr.length > 0) {
+          qd.organizationEntityId = newArr[0];
+        }
+      }
+
+      // Apply counterpart 2-way links on Organization entities
+      toAddOrgs.forEach((orgId) => {
+        const orgEnt = this.getEntityById(orgId);
+        if (!orgEnt || (!orgEnt.organizationData && orgEnt.category !== 'organization')) return;
+        const od = { ...(orgEnt.organizationData || {}) };
+        let orgMod = false;
+
+        if (clonedSource.category === 'npc' || clonedSource.npcData) {
+          const members = new Set<string>(od.memberNpcIds || []);
+          if (!members.has(sourceId)) {
+            members.add(sourceId);
+            od.memberNpcIds = Array.from(members);
+            orgMod = true;
+          }
+        } else if (clonedSource.category === 'location' || clonedSource.locationData) {
+          const affLocs = new Set<string>(od.affiliatedLocationIds || []);
+          if (!affLocs.has(sourceId)) {
+            affLocs.add(sourceId);
+            od.affiliatedLocationIds = Array.from(affLocs);
+            orgMod = true;
+          }
+        } else if (clonedSource.category === 'quest' || clonedSource.questData) {
+          const qids = new Set<string>(od.questIds || []);
+          if (!qids.has(sourceId)) {
+            qids.add(sourceId);
+            od.questIds = Array.from(qids);
+            orgMod = true;
+          }
+        }
+
+        if (orgMod) {
+          this.saveEntity({ ...orgEnt, organizationData: od });
+        }
+      });
+
+      toRemoveOrgs.forEach((orgId) => {
+        const orgEnt = this.getEntityById(orgId);
+        if (!orgEnt || (!orgEnt.organizationData && orgEnt.category !== 'organization')) return;
+        const od = { ...(orgEnt.organizationData || {}) };
+        let orgMod = false;
+
+        if (clonedSource.category === 'npc' || clonedSource.npcData) {
+          const members = od.memberNpcIds || [];
+          if (members.includes(sourceId)) {
+            od.memberNpcIds = members.filter((id) => id !== sourceId);
+            orgMod = true;
+          }
+          if (od.leaderEntityId === sourceId) {
+            od.leaderEntityId = undefined;
+            od.leader = undefined;
+            orgMod = true;
+          }
+        } else if (clonedSource.category === 'location' || clonedSource.locationData) {
+          const affLocs = od.affiliatedLocationIds || [];
+          if (affLocs.includes(sourceId)) {
+            od.affiliatedLocationIds = affLocs.filter((id) => id !== sourceId);
+            orgMod = true;
+          }
+          if (od.headquartersLocationId === sourceId) {
+            od.headquartersLocationId = undefined;
+            od.headquarters = undefined;
+            orgMod = true;
+          }
+        } else if (clonedSource.category === 'quest' || clonedSource.questData) {
+          const qids = od.questIds || [];
+          if (qids.includes(sourceId)) {
+            od.questIds = qids.filter((id) => id !== sourceId);
+            orgMod = true;
+          }
+        }
+
+        if (orgMod) {
+          this.saveEntity({ ...orgEnt, organizationData: od });
+        }
+      });
+
+      // ─────────────────────────────────────────────────────────────
+      // 3. QUESTS LINK / UNLINK
+      // ─────────────────────────────────────────────────────────────
+      const toAddQuests = new Set<string>(updates.addQuestIds || []);
+      const toRemoveQuests = new Set<string>(updates.removeQuestIds || []);
+
+      if (updates.questIds) {
+        const targetSet = new Set(updates.questIds);
+        const currentQuests = new Set<string>();
+        if (clonedSource.npcData) {
+          (clonedSource.npcData.questIds || []).forEach((id) => currentQuests.add(id));
+          (clonedSource.npcData.quests || []).forEach((q) => { if (q.questEntityId) currentQuests.add(q.questEntityId); });
+        }
+        if (clonedSource.locationData) {
+          (clonedSource.locationData.questIds || []).forEach((id) => currentQuests.add(id));
+        }
+        if (clonedSource.organizationData) {
+          (clonedSource.organizationData.questIds || []).forEach((id) => currentQuests.add(id));
+        }
+        targetSet.forEach((id) => { if (!currentQuests.has(id)) toAddQuests.add(id); });
+        currentQuests.forEach((id) => { if (!targetSet.has(id)) toRemoveQuests.add(id); });
+      }
+
+      // Apply quest updates to source entity
+      if (clonedSource.npcData) {
+        const nd = clonedSource.npcData;
+        const questList = new Set<string>(nd.questIds || []);
+        let questObjs = nd.quests ? [...nd.quests] : [];
+
+        toAddQuests.forEach((qId) => {
+          questList.add(qId);
+          if (!questObjs.some((q) => q.questEntityId === qId)) {
+            const questEnt = this.getEntityById(qId);
+            questObjs.push({
+              id: 'q-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+              questEntityId: qId,
+              title: questEnt ? questEnt.title : 'Missão Vinculada',
+              roleInQuest: 'NPC Envolvido',
+              description: questEnt?.subtitle || '',
+              isSecret: questEnt?.isSecret || questEnt?.visibility === 'gm',
+            });
+          }
+        });
+
+        toRemoveQuests.forEach((qId) => {
+          questList.delete(qId);
+          questObjs = questObjs.filter((q) => q.questEntityId !== qId);
+        });
+
+        nd.questIds = Array.from(questList);
+        nd.quests = questObjs;
+      }
+
+      if (clonedSource.locationData) {
+        const ld = clonedSource.locationData;
+        const questList = new Set<string>(ld.questIds || []);
+        toAddQuests.forEach((id) => questList.add(id));
+        toRemoveQuests.forEach((id) => questList.delete(id));
+        ld.questIds = Array.from(questList);
+      }
+
+      if (clonedSource.organizationData) {
+        const od = clonedSource.organizationData;
+        const questList = new Set<string>(od.questIds || []);
+        toAddQuests.forEach((id) => questList.add(id));
+        toRemoveQuests.forEach((id) => questList.delete(id));
+        od.questIds = Array.from(questList);
+      }
+
+      // Apply counterpart 2-way links on Quest entities
+      toAddQuests.forEach((questId) => {
+        const questEnt = this.getEntityById(questId);
+        if (!questEnt || (!questEnt.questData && questEnt.category !== 'quest')) return;
+        const qd = { ...(questEnt.questData || { status: 'not_started', objectives: [] }) };
+        let questMod = false;
+
+        if (clonedSource.category === 'npc' || clonedSource.npcData) {
+          const inv = new Set<string>(qd.involvedNpcIds || []);
+          if (!inv.has(sourceId) && qd.questGiverEntityId !== sourceId) {
+            inv.add(sourceId);
+            qd.involvedNpcIds = Array.from(inv);
+            questMod = true;
+          }
+        } else if (clonedSource.category === 'location' || clonedSource.locationData) {
+          const invLocs = new Set<string>(qd.involvedLocationIds || []);
+          if (!invLocs.has(sourceId) && qd.locationEntityId !== sourceId) {
+            invLocs.add(sourceId);
+            qd.involvedLocationIds = Array.from(invLocs);
+            if (!qd.locationEntityId) {
+              qd.locationEntityId = sourceId;
+              qd.location = clonedSource.title;
+            }
+            questMod = true;
+          }
+        } else if (clonedSource.category === 'organization' || clonedSource.organizationData) {
+          const invOrgs = new Set<string>(qd.involvedOrgIds || []);
+          if (!invOrgs.has(sourceId) && qd.organizationEntityId !== sourceId) {
+            invOrgs.add(sourceId);
+            qd.involvedOrgIds = Array.from(invOrgs);
+            if (!qd.organizationEntityId) {
+              qd.organizationEntityId = sourceId;
+              qd.organization = clonedSource.title;
+            }
+            questMod = true;
+          }
+        }
+
+        if (questMod) {
+          this.saveEntity({ ...questEnt, questData: qd });
+        }
+      });
+
+      toRemoveQuests.forEach((questId) => {
+        const questEnt = this.getEntityById(questId);
+        if (!questEnt || (!questEnt.questData && questEnt.category !== 'quest')) return;
+        const qd = { ...(questEnt.questData || { status: 'not_started', objectives: [] }) };
+        let questMod = false;
+
+        if (clonedSource.category === 'npc' || clonedSource.npcData) {
+          const inv = qd.involvedNpcIds || [];
+          if (inv.includes(sourceId)) {
+            qd.involvedNpcIds = inv.filter((id) => id !== sourceId);
+            questMod = true;
+          }
+          if (qd.questGiverEntityId === sourceId) {
+            qd.questGiverEntityId = undefined;
+            qd.questGiver = undefined;
+            questMod = true;
+          }
+        } else if (clonedSource.category === 'location' || clonedSource.locationData) {
+          const invLocs = qd.involvedLocationIds || [];
+          if (invLocs.includes(sourceId)) {
+            qd.involvedLocationIds = invLocs.filter((id) => id !== sourceId);
+            questMod = true;
+          }
+          if (qd.locationEntityId === sourceId) {
+            qd.locationEntityId = undefined;
+            qd.location = undefined;
+            questMod = true;
+          }
+        } else if (clonedSource.category === 'organization' || clonedSource.organizationData) {
+          const invOrgs = qd.involvedOrgIds || [];
+          if (invOrgs.includes(sourceId)) {
+            qd.involvedOrgIds = invOrgs.filter((id) => id !== sourceId);
+            questMod = true;
+          }
+          if (qd.organizationEntityId === sourceId) {
+            qd.organizationEntityId = undefined;
+            qd.organization = undefined;
+            questMod = true;
+          }
+        }
+
+        if (questMod) {
+          this.saveEntity({ ...questEnt, questData: qd });
+        }
+      });
+
+      // ─────────────────────────────────────────────────────────────
+      // 4. NPCS LINK / UNLINK (when source is Location, Org, Quest)
+      // ─────────────────────────────────────────────────────────────
+      const toAddNpcs = new Set<string>(updates.addNpcIds || []);
+      const toRemoveNpcs = new Set<string>(updates.removeNpcIds || []);
+
+      if (updates.npcIds) {
+        const targetSet = new Set(updates.npcIds);
+        const currentNpcs = new Set<string>();
+        if (clonedSource.locationData) {
+          (clonedSource.locationData.inhabitantNpcIds || []).forEach((id) => currentNpcs.add(id));
+          if (clonedSource.locationData.rulerEntityId) currentNpcs.add(clonedSource.locationData.rulerEntityId);
+        }
+        if (clonedSource.organizationData) {
+          (clonedSource.organizationData.memberNpcIds || []).forEach((id) => currentNpcs.add(id));
+          if (clonedSource.organizationData.leaderEntityId) currentNpcs.add(clonedSource.organizationData.leaderEntityId);
+        }
+        if (clonedSource.questData) {
+          (clonedSource.questData.involvedNpcIds || []).forEach((id) => currentNpcs.add(id));
+          if (clonedSource.questData.questGiverEntityId) currentNpcs.add(clonedSource.questData.questGiverEntityId);
+        }
+        targetSet.forEach((id) => { if (!currentNpcs.has(id)) toAddNpcs.add(id); });
+        currentNpcs.forEach((id) => { if (!targetSet.has(id)) toRemoveNpcs.add(id); });
+      }
+
+      // Apply NPC updates to source entity
+      if (clonedSource.locationData) {
+        const ld = clonedSource.locationData;
+        const inhabList = new Set<string>(ld.inhabitantNpcIds || []);
+        toAddNpcs.forEach((id) => inhabList.add(id));
+        toRemoveNpcs.forEach((id) => inhabList.delete(id));
+        ld.inhabitantNpcIds = Array.from(inhabList);
+        if (ld.rulerEntityId && toRemoveNpcs.has(ld.rulerEntityId)) {
+          ld.rulerEntityId = undefined;
+          ld.ruler = undefined;
+        }
+      }
+
+      if (clonedSource.organizationData) {
+        const od = clonedSource.organizationData;
+        const memList = new Set<string>(od.memberNpcIds || []);
+        toAddNpcs.forEach((id) => memList.add(id));
+        toRemoveNpcs.forEach((id) => memList.delete(id));
+        od.memberNpcIds = Array.from(memList);
+        if (od.leaderEntityId && toRemoveNpcs.has(od.leaderEntityId)) {
+          od.leaderEntityId = undefined;
+          od.leader = undefined;
+        }
+      }
+
+      if (clonedSource.questData) {
+        const qd = clonedSource.questData;
+        const invList = new Set<string>(qd.involvedNpcIds || []);
+        toAddNpcs.forEach((id) => invList.add(id));
+        toRemoveNpcs.forEach((id) => invList.delete(id));
+        qd.involvedNpcIds = Array.from(invList);
+        if (qd.questGiverEntityId && toRemoveNpcs.has(qd.questGiverEntityId)) {
+          qd.questGiverEntityId = undefined;
+          qd.questGiver = undefined;
+        }
+      }
+
+      // Apply counterpart 2-way links on NPC entities
+      toAddNpcs.forEach((npcId) => {
+        const npcEnt = this.getEntityById(npcId);
+        if (!npcEnt || (!npcEnt.npcData && npcEnt.category !== 'npc')) return;
+        const nd = { ...(npcEnt.npcData || {}) };
+        let npcMod = false;
+
+        if (clonedSource.category === 'location' || clonedSource.locationData) {
+          const locs = new Set<string>([...(nd.linkedLocationIds || []), ...(nd.locationIds || [])]);
+          if (!locs.has(sourceId)) {
+            locs.add(sourceId);
+            nd.linkedLocationIds = Array.from(locs);
+            nd.locationIds = Array.from(locs);
+            if (!nd.locationEntityId) {
+              nd.locationEntityId = sourceId;
+              nd.location = clonedSource.title;
+            }
+            npcMod = true;
+          }
+        } else if (clonedSource.category === 'organization' || clonedSource.organizationData) {
+          const orgs = new Set<string>([...(nd.linkedOrganizationIds || []), ...(nd.organizationIds || [])]);
+          if (!orgs.has(sourceId)) {
+            orgs.add(sourceId);
+            nd.linkedOrganizationIds = Array.from(orgs);
+            nd.organizationIds = Array.from(orgs);
+            if (!nd.organizationEntityId) {
+              nd.organizationEntityId = sourceId;
+              nd.factionEntityId = sourceId;
+              nd.organization = clonedSource.title;
+              nd.faction = clonedSource.title;
+            }
+            npcMod = true;
+          }
+        } else if (clonedSource.category === 'quest' || clonedSource.questData) {
+          const qids = new Set<string>(nd.questIds || []);
+          if (!qids.has(sourceId)) {
+            qids.add(sourceId);
+            nd.questIds = Array.from(qids);
+            const quests = nd.quests ? [...nd.quests] : [];
+            if (!quests.some((q) => q.questEntityId === sourceId)) {
+              quests.push({
+                id: 'q-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+                questEntityId: sourceId,
+                title: clonedSource.title,
+                roleInQuest: 'NPC Envolvido',
+                description: clonedSource.subtitle || '',
+                isSecret: clonedSource.isSecret || clonedSource.visibility === 'gm',
+              });
+            }
+            nd.quests = quests;
+            npcMod = true;
+          }
+        }
+
+        if (npcMod) {
+          this.saveEntity({ ...npcEnt, npcData: nd });
+        }
+      });
+
+      toRemoveNpcs.forEach((npcId) => {
+        const npcEnt = this.getEntityById(npcId);
+        if (!npcEnt || (!npcEnt.npcData && npcEnt.category !== 'npc')) return;
+        const nd = { ...(npcEnt.npcData || {}) };
+        let npcMod = false;
+
+        if (clonedSource.category === 'location' || clonedSource.locationData) {
+          const locs = (nd.linkedLocationIds || nd.locationIds || []).filter((id) => id !== sourceId);
+          nd.linkedLocationIds = locs;
+          nd.locationIds = locs;
+          if (nd.locationEntityId === sourceId) {
+            nd.locationEntityId = locs[0] || undefined;
+            if (!nd.locationEntityId) nd.location = undefined;
+          }
+          npcMod = true;
+        } else if (clonedSource.category === 'organization' || clonedSource.organizationData) {
+          const orgs = (nd.linkedOrganizationIds || nd.organizationIds || []).filter((id) => id !== sourceId);
+          nd.linkedOrganizationIds = orgs;
+          nd.organizationIds = orgs;
+          if (nd.organizationEntityId === sourceId || nd.factionEntityId === sourceId) {
+            nd.organizationEntityId = orgs[0] || undefined;
+            nd.factionEntityId = orgs[0] || undefined;
+            if (!nd.organizationEntityId) {
+              nd.organization = undefined;
+              nd.faction = undefined;
+            }
+          }
+          npcMod = true;
+        } else if (clonedSource.category === 'quest' || clonedSource.questData) {
+          const qids = (nd.questIds || []).filter((id) => id !== sourceId);
+          nd.questIds = qids;
+          if (nd.quests) {
+            nd.quests = nd.quests.filter((q) => q.questEntityId !== sourceId);
+          }
+          npcMod = true;
+        }
+
+        if (npcMod) {
+          this.saveEntity({ ...npcEnt, npcData: nd });
+        }
+      });
+    }
+
+    // Save updated source entity
+    this.saveEntity(clonedSource);
+
+    // Run full mutual link synchronization to assure 2-way bidirectional consistency
+    try {
+      MutualLinkService.syncMutualLinksOnSave(clonedSource);
+    } catch (e) {
+      console.warn('Error during MutualLinkService.syncMutualLinksOnSave:', e);
+    }
+
+    return this.getEntityById(sourceId) || clonedSource;
+  }
+
+  /**
    * Remove a specific trait from an entity across its various sub-structures
    */
   static removeTraitFromEntity(entityId: string, traitToRemove: string): HecosEntity | null {
@@ -984,6 +1760,13 @@ export class HecosStorage {
       return;
     }
 
+    // Clean mutual relations across entities
+    try {
+      MutualLinkService.cleanMutualLinksOnDelete(id);
+    } catch (e) {
+      console.warn('Error cleaning mutual links on permanent delete:', e);
+    }
+
     const cleanId = id.toLowerCase().trim();
     const ent = this.getEntityById(id);
     const deletedIds = this.getDeletedEntityIds();
@@ -1093,6 +1876,13 @@ export class HecosStorage {
       originalCategory: entity.category,
     };
 
+    // Clean mutual relations across entities
+    try {
+      MutualLinkService.cleanMutualLinksOnDelete(entity.id);
+    } catch (e) {
+      console.warn('Error cleaning mutual links on moveToTrash:', e);
+    }
+
     // 1. Add to Trash list (syncs to Firebase)
     const currentTrash = this.getTrashedEntities().filter((t) => t.entity.id !== entity.id);
     currentTrash.unshift(trashedItem);
@@ -1196,6 +1986,7 @@ export class HecosStorage {
     } catch (e) {
       console.warn(e);
     }
+    syncAllMapsToFirebase(maps).catch(() => {});
   }
 
   static saveMap(map: InteractiveMapData): void {
@@ -1212,6 +2003,7 @@ export class HecosStorage {
     const maps = this.getMaps().filter(m => m.id !== mapId);
     this.saveMaps(maps);
     this.notifyMapSubscribers();
+    deleteMapFromFirebase(mapId).catch(() => {});
   }
 
   /**
@@ -1240,11 +2032,13 @@ export class HecosStorage {
     } catch (e) {
       console.warn(e);
     }
+    syncTracksToFirebase(tracks).catch(() => {});
   }
 
   static deleteTrack(trackId: string): void {
     const tracks = this.getTracks().filter(t => t.id !== trackId);
     this.saveTracks(tracks);
+    deleteTrackFromFirebase(trackId).catch(() => {});
   }
 
   /**
@@ -1273,11 +2067,13 @@ export class HecosStorage {
     } catch (e) {
       console.warn(e);
     }
+    syncDriveResourcesToFirebase(resources).catch(() => {});
   }
 
   static deleteDriveResource(resourceId: string): void {
     const resources = this.getDriveResources().filter(r => r.id !== resourceId);
     this.saveDriveResources(resources);
+    deleteDriveResourceFromFirebase(resourceId).catch(() => {});
   }
 
   /**
@@ -2499,6 +3295,7 @@ export class HecosStorage {
     this.saveUsersLocal(filtered);
     this.notifyUsersListSubscribers();
     syncUsersToFirebase(filtered).catch(() => {});
+    deleteUserFromFirebase(userId).catch(() => {});
 
     const current = this.getCurrentUser();
     if (current && current.id === userId) {

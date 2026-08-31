@@ -28,6 +28,9 @@ import {
   Sun,
   Globe2,
   Landmark,
+  TreePine,
+  Flower2,
+  Bug,
   Eye,
   Plus
 } from 'lucide-react';
@@ -40,7 +43,7 @@ interface LocationViewProps {
   onTagClick: (tag: string) => void;
 }
 
-export type LocationTabType = 'overview' | 'poi' | 'inhabitants' | 'quests' | 'lore' | 'backlinks';
+export type LocationTabType = 'overview' | 'poi' | 'inhabitants' | 'faunaFlora' | 'quests' | 'lore' | 'backlinks';
 
 export const LocationView: React.FC<LocationViewProps> = ({
   entity,
@@ -149,6 +152,44 @@ export const LocationView: React.FC<LocationViewProps> = ({
     });
     return allEntities.filter((e) => ids.has(e.id));
   }, [allEntities, location.questIds, currentEntity]);
+
+  // Regional Fauna resolution
+  const regionalFauna = useMemo(() => {
+    const ids = new Set(location.faunaEntityIds || []);
+    allEntities.forEach((e) => {
+      if (e.category === 'fauna' && e.faunaData) {
+        if (
+          e.faunaData.locationEntityId === currentEntity.id ||
+          e.faunaData.linkedLocationIds?.includes(currentEntity.id) ||
+          e.faunaData.habitatLocationIds?.includes(currentEntity.id) ||
+          (e.faunaData.habitat && e.faunaData.habitat.toLowerCase().includes(currentEntity.title.toLowerCase())) ||
+          (location.fauna && location.fauna.some((f) => f.toLowerCase() === e.title.toLowerCase()))
+        ) {
+          ids.add(e.id);
+        }
+      }
+    });
+    return allEntities.filter((e) => ids.has(e.id));
+  }, [allEntities, location.faunaEntityIds, location.fauna, currentEntity]);
+
+  // Regional Flora resolution
+  const regionalFlora = useMemo(() => {
+    const ids = new Set(location.floraEntityIds || []);
+    allEntities.forEach((e) => {
+      if (e.category === 'flora' && e.floraData) {
+        if (
+          e.floraData.locationEntityId === currentEntity.id ||
+          e.floraData.linkedLocationIds?.includes(currentEntity.id) ||
+          e.floraData.habitatLocationIds?.includes(currentEntity.id) ||
+          (e.floraData.habitat && e.floraData.habitat.toLowerCase().includes(currentEntity.title.toLowerCase())) ||
+          (location.flora && location.flora.some((f) => f.toLowerCase() === e.title.toLowerCase()))
+        ) {
+          ids.add(e.id);
+        }
+      }
+    });
+    return allEntities.filter((e) => ids.has(e.id));
+  }, [allEntities, location.floraEntityIds, location.flora, currentEntity]);
 
   const mapImage = location.mapImage || currentEntity.coverImage;
   const pointsOfInterest: LocationPointOfInterest[] = location.pointsOfInterest || [];
@@ -519,6 +560,21 @@ export const LocationView: React.FC<LocationViewProps> = ({
               </button>
             </Tooltip>
 
+            <Tooltip content="Ver espécies de fauna e espécimes botânicos nativos desta região">
+              <button
+                type="button"
+                onClick={() => setActiveTab('faunaFlora')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                  activeTab === 'faunaFlora'
+                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-700 shadow-md'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
+                }`}
+              >
+                <TreePine className="w-4 h-4 text-emerald-400" />
+                <span>Fauna & Flora Nativas ({regionalFauna.length + regionalFlora.length})</span>
+              </button>
+            </Tooltip>
+
             <Tooltip content="Ver missões e ganchos de aventura ambientados neste local">
               <button
                 type="button"
@@ -731,6 +787,87 @@ export const LocationView: React.FC<LocationViewProps> = ({
                           </div>
                           <ExternalLink className="w-3.5 h-3.5 text-purple-400 opacity-60 group-hover:opacity-100 shrink-0" />
                         </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ABA: FAUNA & FLORA NATIVAS */}
+            {activeTab === 'faunaFlora' && (
+              <div className="space-y-6">
+                {/* Fauna Regional */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold text-emerald-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                      <Bug className="w-3.5 h-3.5 text-emerald-400" />
+                      Espécies de Fauna Regional ({regionalFauna.length})
+                    </h3>
+                  </div>
+
+                  {regionalFauna.length === 0 ? (
+                    <div className="p-6 text-center rounded-2xl bg-zinc-950/40 border border-zinc-800/80 text-zinc-500 text-xs italic">
+                      Nenhuma criatura ou besta registrada como nativa desta região ainda.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                      {regionalFauna.map((critter) => (
+                        <Tooltip key={critter.id} content={`Abrir artigo completo de ${critter.title}`}>
+                          <button
+                            type="button"
+                            onClick={() => onNavigate(critter.id)}
+                            className="p-3 rounded-2xl bg-[#0f1f18] border border-emerald-900/40 hover:border-emerald-700/60 transition-all text-left flex items-center justify-between gap-2 group cursor-pointer"
+                          >
+                            <div className="min-w-0">
+                              <span className="text-xs font-bold text-zinc-200 group-hover:text-emerald-300 transition-colors truncate block">
+                                {critter.title}
+                              </span>
+                              <span className="text-[11px] text-emerald-400/90 truncate block">
+                                {critter.faunaData?.classification || critter.subtitle || 'Fauna'}
+                              </span>
+                            </div>
+                            <ExternalLink className="w-3.5 h-3.5 text-emerald-400 opacity-60 group-hover:opacity-100 shrink-0" />
+                          </button>
+                        </Tooltip>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Flora Regional */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold text-emerald-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                      <Flower2 className="w-3.5 h-3.5 text-emerald-400" />
+                      Espécies de Flora & Vegetação Botânica ({regionalFlora.length})
+                    </h3>
+                  </div>
+
+                  {regionalFlora.length === 0 ? (
+                    <div className="p-6 text-center rounded-2xl bg-zinc-950/40 border border-zinc-800/80 text-zinc-500 text-xs italic">
+                      Nenhuma planta, erva ou fungo registrado como nativo desta região ainda.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                      {regionalFlora.map((plant) => (
+                        <Tooltip key={plant.id} content={`Abrir artigo completo de ${plant.title}`}>
+                          <button
+                            type="button"
+                            onClick={() => onNavigate(plant.id)}
+                            className="p-3 rounded-2xl bg-[#0f1f18] border border-emerald-900/40 hover:border-emerald-700/60 transition-all text-left flex items-center justify-between gap-2 group cursor-pointer"
+                          >
+                            <div className="min-w-0">
+                              <span className="text-xs font-bold text-zinc-200 group-hover:text-emerald-300 transition-colors truncate block">
+                                {plant.title}
+                              </span>
+                              <span className="text-[11px] text-emerald-400/90 truncate block">
+                                {plant.floraData?.classification || plant.subtitle || 'Flora'}
+                              </span>
+                            </div>
+                            <ExternalLink className="w-3.5 h-3.5 text-emerald-400 opacity-60 group-hover:opacity-100 shrink-0" />
+                          </button>
+                        </Tooltip>
                       ))}
                     </div>
                   )}

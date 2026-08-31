@@ -3,11 +3,17 @@ import { HecosStorage } from './storage';
 
 /**
  * Intelligent Mutual Linking & Entity Relationship Service for Hecos
- * Automatically synchronizes and queries bidirectional relations between:
- * - NPCs
- * - Locations (Locais)
- * - Organizations (Organizações & Facções)
- * - Quests (Missões & Ganchos)
+ * 
+ * Rules:
+ * 1. Strictly Two-Way (Direto em 2 vias):
+ *    - Se NPC A for colocado no Local B e na Organização C:
+ *      -> Local B ganha NPC A (e vice-versa)
+ *      -> Organização C ganha NPC A (e vice-versa)
+ *      -> MAS Local B NÃO ganha Organização C (sem ligação indireta em 3 vias)!
+ * 
+ * 2. Preenchimento e Exclusão Mútua:
+ *    - Adição mútua imediata.
+ *    - Remoção mútua imediata (se NPC A desmarcar Local B, Local B remove NPC A da sua lista de habitantes).
  */
 
 export interface LinkedEntitiesForNPC {
@@ -86,7 +92,6 @@ export class MutualLinkService {
     // --- Locations ---
     const locationMap = new Map<string, HecosEntity>();
 
-    // Direct ID references
     if (npcData.locationEntityId) {
       const found = allEntities.find((e) => e.id === npcData.locationEntityId);
       if (found) locationMap.set(found.id, found);
@@ -102,15 +107,14 @@ export class MutualLinkService {
       }
     });
 
-    // Direct Title reference if no ID matched
-    if (npcData.location) {
+    if (npcData.location && locationMap.size === 0) {
       const found = allEntities.find(
         (e) => (e.category === 'location' || Boolean(e.locationData)) && this.matchTitle(e.title, npcData.location)
       );
       if (found) locationMap.set(found.id, found);
     }
 
-    // Mutual reverse-lookup: Locations that list this NPC as inhabitant or ruler
+    // Mutual reverse-lookup: Locations that explicitly list this NPC
     allEntities.forEach((ent) => {
       if (ent.category === 'location' || ent.locationData) {
         const loc = ent.locationData;
@@ -127,7 +131,6 @@ export class MutualLinkService {
     // --- Organizations ---
     const orgMap = new Map<string, HecosEntity>();
 
-    // Direct ID references
     const primaryOrgId = npcData.organizationEntityId || npcData.factionEntityId;
     if (primaryOrgId) {
       const found = allEntities.find((e) => e.id === primaryOrgId);
@@ -144,9 +147,8 @@ export class MutualLinkService {
       }
     });
 
-    // Direct Title reference
     const orgName = npcData.organization || npcData.faction;
-    if (orgName) {
+    if (orgName && orgMap.size === 0) {
       const found = allEntities.find(
         (e) => (e.category === 'organization' || Boolean(e.organizationData)) && this.matchTitle(e.title, orgName)
       );
@@ -177,7 +179,7 @@ export class MutualLinkService {
       isSecret?: boolean;
     }>();
 
-    // From NPC's explicit questIds
+    // Direct questIds
     (npcData.questIds || []).forEach((qId) => {
       if (qId) {
         const found = allEntities.find((e) => e.id === qId);
@@ -193,7 +195,7 @@ export class MutualLinkService {
       }
     });
 
-    // From NPC's explicit quests array
+    // Explicit quests array in NPC
     (npcData.quests || []).forEach((q) => {
       let matchedEntity: HecosEntity | undefined;
       if (q.questEntityId) {
@@ -216,7 +218,7 @@ export class MutualLinkService {
       });
     });
 
-    // Mutual reverse-lookup: Quests that list this NPC as questGiver or involvedNpc
+    // Mutual reverse-lookup: Quests that list this NPC
     allEntities.forEach((ent) => {
       if (ent.category === 'quest' || ent.questData) {
         const qd = ent.questData;
@@ -255,10 +257,8 @@ export class MutualLinkService {
     const locId = locEntity.id;
     const locTitle = locEntity.title;
 
-    // --- Inhabitant / Ruler NPCs ---
+    // Inhabitant / Ruler NPCs
     const npcMap = new Map<string, HecosEntity>();
-
-    // From Location's explicit IDs
     if (locData.rulerEntityId) {
       const found = allEntities.find((e) => e.id === locData.rulerEntityId);
       if (found) npcMap.set(found.id, found);
@@ -268,13 +268,13 @@ export class MutualLinkService {
       if (found) npcMap.set(found.id, found);
     });
 
-    // Mutual reverse-lookup: NPCs that list this Location
     allEntities.forEach((ent) => {
       if (ent.category === 'npc' || ent.npcData) {
         const nd = ent.npcData;
         if (
           nd?.locationEntityId === locId ||
           nd?.linkedLocationIds?.includes(locId) ||
+          nd?.locationIds?.includes(locId) ||
           this.matchTitle(nd?.location, locTitle)
         ) {
           npcMap.set(ent.id, ent);
@@ -282,9 +282,8 @@ export class MutualLinkService {
       }
     });
 
-    // --- Organizations Present ---
+    // Organizations directly in this Location
     const orgMap = new Map<string, HecosEntity>();
-
     (locData.factionEntityIds || []).forEach((id) => {
       const found = allEntities.find((e) => e.id === id);
       if (found) orgMap.set(found.id, found);
@@ -297,7 +296,6 @@ export class MutualLinkService {
       if (found) orgMap.set(found.id, found);
     });
 
-    // Mutual reverse-lookup: Organizations headquartered or affiliated here
     allEntities.forEach((ent) => {
       if (ent.category === 'organization' || ent.organizationData) {
         const od = ent.organizationData;
@@ -311,21 +309,20 @@ export class MutualLinkService {
       }
     });
 
-    // --- Quests in this Location ---
+    // Quests in this Location
     const questMap = new Map<string, HecosEntity>();
-
     (locData.questIds || []).forEach((id) => {
       const found = allEntities.find((e) => e.id === id);
       if (found) questMap.set(found.id, found);
     });
 
-    // Mutual reverse-lookup: Quests that take place here
     allEntities.forEach((ent) => {
       if (ent.category === 'quest' || ent.questData) {
         const qd = ent.questData;
         if (
           qd?.locationEntityId === locId ||
           qd?.involvedLocationIds?.includes(locId) ||
+          qd?.relatedLocationIds?.includes(locId) ||
           this.matchTitle(qd?.location, locTitle)
         ) {
           questMap.set(ent.id, ent);
@@ -351,7 +348,7 @@ export class MutualLinkService {
     const orgId = orgEntity.id;
     const orgTitle = orgEntity.title;
 
-    // --- Leaders & Members ---
+    // Leaders & Members
     const leaderMap = new Map<string, HecosEntity>();
     const memberMap = new Map<string, HecosEntity>();
 
@@ -370,7 +367,6 @@ export class MutualLinkService {
       if (found && !leaderMap.has(found.id)) memberMap.set(found.id, found);
     });
 
-    // Mutual reverse-lookup: NPCs affiliated with this org
     allEntities.forEach((ent) => {
       if (ent.category === 'npc' || ent.npcData) {
         const nd = ent.npcData;
@@ -378,6 +374,7 @@ export class MutualLinkService {
           nd?.organizationEntityId === orgId ||
           nd?.factionEntityId === orgId ||
           nd?.linkedOrganizationIds?.includes(orgId) ||
+          nd?.organizationIds?.includes(orgId) ||
           this.matchTitle(nd?.organization, orgTitle) ||
           this.matchTitle(nd?.faction, orgTitle);
 
@@ -389,9 +386,8 @@ export class MutualLinkService {
       }
     });
 
-    // --- Locations ---
+    // Locations
     const locMap = new Map<string, HecosEntity>();
-
     if (orgData.headquartersLocationId) {
       const found = allEntities.find((e) => e.id === orgData.headquartersLocationId);
       if (found) locMap.set(found.id, found);
@@ -407,7 +403,6 @@ export class MutualLinkService {
       if (found) locMap.set(found.id, found);
     });
 
-    // Reverse lookup: Locations listing this org
     allEntities.forEach((ent) => {
       if (ent.category === 'location' || ent.locationData) {
         const ld = ent.locationData;
@@ -420,15 +415,13 @@ export class MutualLinkService {
       }
     });
 
-    // --- Quests ---
+    // Quests
     const questMap = new Map<string, HecosEntity>();
-
     (orgData.questIds || []).forEach((id) => {
       const found = allEntities.find((e) => e.id === id);
       if (found) questMap.set(found.id, found);
     });
 
-    // Reverse lookup: Quests linked to this org
     allEntities.forEach((ent) => {
       if (ent.category === 'quest' || ent.questData) {
         const qd = ent.questData;
@@ -442,7 +435,7 @@ export class MutualLinkService {
       }
     });
 
-    // --- Allies & Rivals ---
+    // Allies & Rivals
     const allyMap = new Map<string, HecosEntity>();
     const rivalMap = new Map<string, HecosEntity>();
 
@@ -489,7 +482,6 @@ export class MutualLinkService {
     const questId = questEntity.id;
     const questTitle = questEntity.title;
 
-    // --- Quest Giver & Involved NPCs ---
     let questGiver: HecosEntity | null = null;
     const npcMap = new Map<string, HecosEntity>();
 
@@ -508,7 +500,6 @@ export class MutualLinkService {
       if (found && found.id !== questGiver?.id) npcMap.set(found.id, found);
     });
 
-    // Reverse lookup: NPCs whose quests array references this quest
     allEntities.forEach((ent) => {
       if (ent.category === 'npc' || ent.npcData) {
         const nd = ent.npcData;
@@ -532,9 +523,7 @@ export class MutualLinkService {
       }
     });
 
-    // --- Locations ---
     const locMap = new Map<string, HecosEntity>();
-
     if (questData.locationEntityId) {
       const found = allEntities.find((e) => e.id === questData.locationEntityId);
       if (found) locMap.set(found.id, found);
@@ -550,7 +539,6 @@ export class MutualLinkService {
       if (found) locMap.set(found.id, found);
     });
 
-    // Reverse lookup: Locations that list this quest
     allEntities.forEach((ent) => {
       if (ent.category === 'location' || ent.locationData) {
         const ld = ent.locationData;
@@ -560,9 +548,7 @@ export class MutualLinkService {
       }
     });
 
-    // --- Organizations ---
     const orgMap = new Map<string, HecosEntity>();
-
     if (questData.organizationEntityId) {
       const found = allEntities.find((e) => e.id === questData.organizationEntityId);
       if (found) orgMap.set(found.id, found);
@@ -578,7 +564,6 @@ export class MutualLinkService {
       if (found) orgMap.set(found.id, found);
     });
 
-    // Reverse lookup: Organizations listing this quest
     allEntities.forEach((ent) => {
       if (ent.category === 'organization' || ent.organizationData) {
         const od = ent.organizationData;
@@ -597,44 +582,54 @@ export class MutualLinkService {
   }
 
   /**
-   * 5. SYNC MUTUAL LINKS ON SAVE
+   * 5. SYNC MUTUAL LINKS ON SAVE (Strictly Two-Way & Handles Mutual Removal)
+   * 
    * Synchronizes data back-references when an entity is created or updated.
+   * - Only updates direct counterparts (2-way strictly, preventing 3-way contamination).
+   * - If an entity was unlinked from target, removes the back-reference automatically.
    */
   static syncMutualLinksOnSave(savedEntity: HecosEntity): void {
     const allEntities = HecosStorage.getEntities();
     const entityId = savedEntity.id;
 
     // ─────────────────────────────────────────────────────────────
-    // CASE A: NPC SAVED -> Update Location, Org, Quests
+    // CASE A: NPC SAVED -> Synchronize Locations, Organizations, Quests (2-way)
     // ─────────────────────────────────────────────────────────────
     if (savedEntity.category === 'npc' || savedEntity.npcData) {
       const nd = savedEntity.npcData || {};
-      const targetLocIds = [
-        nd.locationEntityId,
-        ...(nd.linkedLocationIds || []),
-        ...(nd.locationIds || []),
-      ].filter(Boolean) as string[];
+      const targetLocIds = new Set<string>(
+        [
+          nd.locationEntityId,
+          ...(nd.linkedLocationIds || []),
+          ...(nd.locationIds || []),
+        ].filter(Boolean) as string[]
+      );
 
-      const targetOrgIds = [
-        nd.organizationEntityId,
-        nd.factionEntityId,
-        ...(nd.linkedOrganizationIds || []),
-        ...(nd.organizationIds || []),
-      ].filter(Boolean) as string[];
+      const targetOrgIds = new Set<string>(
+        [
+          nd.organizationEntityId,
+          nd.factionEntityId,
+          ...(nd.linkedOrganizationIds || []),
+          ...(nd.organizationIds || []),
+        ].filter(Boolean) as string[]
+      );
 
-      const questLinks = nd.quests || [];
-      const directQuestIds = nd.questIds || [];
+      const directQuestIds = new Set<string>((nd.questIds || []).filter(Boolean) as string[]);
+      (nd.quests || []).forEach((q) => {
+        if (q.questEntityId) directQuestIds.add(q.questEntityId);
+      });
 
-      // 1. Sync Locations
+      // 1. Sync Locations: Add to selected locations, Remove from previously linked locations not selected
       allEntities.forEach((ent) => {
         if (ent.category === 'location' || ent.locationData) {
           const loc = ent.locationData || {};
           const currentInhabitants = loc.inhabitantNpcIds || [];
           const isTargetLoc =
-            targetLocIds.includes(ent.id) ||
-            (!targetLocIds.length && nd.location && this.matchTitle(ent.title, nd.location));
+            targetLocIds.has(ent.id) ||
+            (!targetLocIds.size && nd.location && this.matchTitle(ent.title, nd.location));
 
           if (isTargetLoc) {
+            // Add if missing
             if (!currentInhabitants.includes(entityId)) {
               const updatedLoc: HecosEntity = {
                 ...ent,
@@ -646,20 +641,34 @@ export class MutualLinkService {
               };
               HecosStorage.saveEntity(updatedLoc);
             }
+          } else {
+            // Remove if no longer linked
+            if (currentInhabitants.includes(entityId)) {
+              const updatedLoc: HecosEntity = {
+                ...ent,
+                locationData: {
+                  ...loc,
+                  inhabitantNpcIds: currentInhabitants.filter((id) => id !== entityId),
+                },
+                updatedAt: new Date().toISOString(),
+              };
+              HecosStorage.saveEntity(updatedLoc);
+            }
           }
         }
       });
 
-      // 2. Sync Organizations
+      // 2. Sync Organizations: Add to selected orgs, Remove from unselected
       allEntities.forEach((ent) => {
         if (ent.category === 'organization' || ent.organizationData) {
           const org = ent.organizationData || {};
           const currentMembers = org.memberNpcIds || [];
           const isTargetOrg =
-            targetOrgIds.includes(ent.id) ||
-            (!targetOrgIds.length && (nd.organization || nd.faction) && (this.matchTitle(ent.title, nd.organization) || this.matchTitle(ent.title, nd.faction)));
+            targetOrgIds.has(ent.id) ||
+            (!targetOrgIds.size && (nd.organization || nd.faction) && (this.matchTitle(ent.title, nd.organization) || this.matchTitle(ent.title, nd.faction)));
 
           if (isTargetOrg) {
+            // Add if missing
             if (!currentMembers.includes(entityId)) {
               const updatedOrg: HecosEntity = {
                 ...ent,
@@ -671,61 +680,54 @@ export class MutualLinkService {
               };
               HecosStorage.saveEntity(updatedOrg);
             }
-          }
-        }
-      });
-
-      // 3. Sync Direct Quest IDs
-      directQuestIds.forEach((qId) => {
-        const questEnt = allEntities.find((e) => e.id === qId);
-        if (questEnt && (questEnt.category === 'quest' || questEnt.questData)) {
-          const qd = questEnt.questData || { status: 'not_started', objectives: [] };
-          const involved = qd.involvedNpcIds || [];
-          if (!involved.includes(entityId)) {
-            const updatedQuest: HecosEntity = {
-              ...questEnt,
-              questData: {
-                ...qd,
-                involvedNpcIds: [...involved, entityId],
-              },
-              updatedAt: new Date().toISOString(),
-            };
-            HecosStorage.saveEntity(updatedQuest);
-          }
-        }
-      });
-
-      // 4. Sync Quests Links
-      questLinks.forEach((qLink) => {
-        if (qLink.questEntityId) {
-          const questEnt = allEntities.find((e) => e.id === qLink.questEntityId);
-          if (questEnt && (questEnt.category === 'quest' || questEnt.questData)) {
-            const qd = questEnt.questData || { status: 'not_started', objectives: [] };
-            const isGiver = qLink.roleInQuest?.toLowerCase().includes('doador') || qLink.roleInQuest?.toLowerCase().includes('giver');
-            const involved = qd.involvedNpcIds || [];
-
-            let needsUpdate = false;
-            let updatedGiverId = qd.questGiverEntityId;
-            let updatedGiverName = qd.questGiver;
-            let updatedInvolved = [...involved];
-
-            if (isGiver && qd.questGiverEntityId !== entityId) {
-              updatedGiverId = entityId;
-              updatedGiverName = savedEntity.title;
-              needsUpdate = true;
-            } else if (!isGiver && !involved.includes(entityId)) {
-              updatedInvolved.push(entityId);
-              needsUpdate = true;
+          } else {
+            // Remove if no longer linked
+            if (currentMembers.includes(entityId) || org.leaderEntityId === entityId) {
+              const updatedOrg: HecosEntity = {
+                ...ent,
+                organizationData: {
+                  ...org,
+                  memberNpcIds: currentMembers.filter((id) => id !== entityId),
+                  leaderEntityId: org.leaderEntityId === entityId ? undefined : org.leaderEntityId,
+                  leader: org.leaderEntityId === entityId ? undefined : org.leader,
+                },
+                updatedAt: new Date().toISOString(),
+              };
+              HecosStorage.saveEntity(updatedOrg);
             }
+          }
+        }
+      });
 
-            if (needsUpdate) {
+      // 3. Sync Quests: Add to selected quests, Remove from unselected
+      allEntities.forEach((ent) => {
+        if (ent.category === 'quest' || ent.questData) {
+          const qd = ent.questData || { status: 'not_started', objectives: [] };
+          const involved = qd.involvedNpcIds || [];
+          const isTargetQuest = directQuestIds.has(ent.id);
+
+          if (isTargetQuest) {
+            if (!involved.includes(entityId) && qd.questGiverEntityId !== entityId) {
               const updatedQuest: HecosEntity = {
-                ...questEnt,
+                ...ent,
                 questData: {
                   ...qd,
-                  questGiverEntityId: updatedGiverId,
-                  questGiver: updatedGiverName,
-                  involvedNpcIds: updatedInvolved,
+                  involvedNpcIds: [...involved, entityId],
+                },
+                updatedAt: new Date().toISOString(),
+              };
+              HecosStorage.saveEntity(updatedQuest);
+            }
+          } else {
+            // Remove if no longer linked
+            if (involved.includes(entityId) || qd.questGiverEntityId === entityId) {
+              const updatedQuest: HecosEntity = {
+                ...ent,
+                questData: {
+                  ...qd,
+                  involvedNpcIds: involved.filter((id) => id !== entityId),
+                  questGiverEntityId: qd.questGiverEntityId === entityId ? undefined : qd.questGiverEntityId,
+                  questGiver: qd.questGiverEntityId === entityId ? undefined : qd.questGiver,
                 },
                 updatedAt: new Date().toISOString(),
               };
@@ -737,46 +739,93 @@ export class MutualLinkService {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // CASE B: LOCATION SAVED -> Update Inhabitant NPCs, Quests, Orgs
+    // CASE B: LOCATION SAVED -> Synchronize Inhabitant NPCs, Quests, Orgs Present
     // ─────────────────────────────────────────────────────────────
     if (savedEntity.category === 'location' || savedEntity.locationData) {
       const ld = savedEntity.locationData || {};
-      const inhabitantIds = ld.inhabitantNpcIds || [];
-      const questIds = ld.questIds || [];
-      const factionIds = ld.factionEntityIds || [];
+      const targetInhabitantIds = new Set<string>(ld.inhabitantNpcIds || []);
+      const targetQuestIds = new Set<string>(ld.questIds || []);
+      const targetFactionIds = new Set<string>(ld.factionEntityIds || []);
 
       // 1. Sync Inhabitant NPCs
-      inhabitantIds.forEach((npcId) => {
-        const npcEnt = allEntities.find((e) => e.id === npcId);
-        if (npcEnt && (npcEnt.category === 'npc' || npcEnt.npcData)) {
-          const nd = npcEnt.npcData || {};
-          if (nd.locationEntityId !== entityId) {
-            const updatedNpc: HecosEntity = {
-              ...npcEnt,
-              npcData: {
-                ...nd,
-                locationEntityId: entityId,
-                location: savedEntity.title,
-              },
-              updatedAt: new Date().toISOString(),
-            };
-            HecosStorage.saveEntity(updatedNpc);
+      allEntities.forEach((ent) => {
+        if (ent.category === 'npc' || ent.npcData) {
+          const nd = ent.npcData || {};
+          const isTargetNpc = targetInhabitantIds.has(ent.id);
+
+          if (isTargetNpc) {
+            const locIds = new Set<string>([...(nd.linkedLocationIds || []), ...(nd.locationIds || [])]);
+            if (nd.locationEntityId) locIds.add(nd.locationEntityId);
+            if (!locIds.has(entityId)) {
+              locIds.add(entityId);
+              const updatedNpc: HecosEntity = {
+                ...ent,
+                npcData: {
+                  ...nd,
+                  locationEntityId: nd.locationEntityId || entityId,
+                  location: nd.location || savedEntity.title,
+                  linkedLocationIds: Array.from(locIds),
+                  locationIds: Array.from(locIds),
+                },
+                updatedAt: new Date().toISOString(),
+              };
+              HecosStorage.saveEntity(updatedNpc);
+            }
+          } else {
+            // Check if NPC has this location and should be unlinked
+            const hasLocationLink =
+              nd.locationEntityId === entityId ||
+              nd.linkedLocationIds?.includes(entityId) ||
+              nd.locationIds?.includes(entityId);
+
+            if (hasLocationLink) {
+              const updatedLinked = (nd.linkedLocationIds || []).filter((id) => id !== entityId);
+              const updatedLocIds = (nd.locationIds || []).filter((id) => id !== entityId);
+              const updatedEntityId = nd.locationEntityId === entityId ? (updatedLinked[0] || undefined) : nd.locationEntityId;
+
+              const updatedNpc: HecosEntity = {
+                ...ent,
+                npcData: {
+                  ...nd,
+                  locationEntityId: updatedEntityId,
+                  location: updatedEntityId ? nd.location : undefined,
+                  linkedLocationIds: updatedLinked,
+                  locationIds: updatedLocIds,
+                },
+                updatedAt: new Date().toISOString(),
+              };
+              HecosStorage.saveEntity(updatedNpc);
+            }
           }
         }
       });
 
       // 2. Sync Quests
-      questIds.forEach((qId) => {
-        const qEnt = allEntities.find((e) => e.id === qId);
-        if (qEnt && (qEnt.category === 'quest' || qEnt.questData)) {
-          const qd = qEnt.questData || { status: 'not_started', objectives: [] };
-          if (qd.locationEntityId !== entityId) {
+      allEntities.forEach((ent) => {
+        if (ent.category === 'quest' || ent.questData) {
+          const qd = ent.questData || { status: 'not_started', objectives: [] };
+          const isTargetQuest = targetQuestIds.has(ent.id);
+
+          if (isTargetQuest) {
+            if (qd.locationEntityId !== entityId) {
+              const updatedQuest: HecosEntity = {
+                ...ent,
+                questData: {
+                  ...qd,
+                  locationEntityId: entityId,
+                  location: savedEntity.title,
+                },
+                updatedAt: new Date().toISOString(),
+              };
+              HecosStorage.saveEntity(updatedQuest);
+            }
+          } else if (qd.locationEntityId === entityId) {
             const updatedQuest: HecosEntity = {
-              ...qEnt,
+              ...ent,
               questData: {
                 ...qd,
-                locationEntityId: entityId,
-                location: savedEntity.title,
+                locationEntityId: undefined,
+                location: undefined,
               },
               updatedAt: new Date().toISOString(),
             };
@@ -786,17 +835,32 @@ export class MutualLinkService {
       });
 
       // 3. Sync Organizations Present
-      factionIds.forEach((orgId) => {
-        const orgEnt = allEntities.find((e) => e.id === orgId);
-        if (orgEnt && (orgEnt.category === 'organization' || orgEnt.organizationData)) {
-          const od = orgEnt.organizationData || {};
+      allEntities.forEach((ent) => {
+        if (ent.category === 'organization' || ent.organizationData) {
+          const od = ent.organizationData || {};
           const affLocs = od.affiliatedLocationIds || [];
-          if (!affLocs.includes(entityId)) {
+          const isTargetOrg = targetFactionIds.has(ent.id);
+
+          if (isTargetOrg) {
+            if (!affLocs.includes(entityId)) {
+              const updatedOrg: HecosEntity = {
+                ...ent,
+                organizationData: {
+                  ...od,
+                  affiliatedLocationIds: [...affLocs, entityId],
+                },
+                updatedAt: new Date().toISOString(),
+              };
+              HecosStorage.saveEntity(updatedOrg);
+            }
+          } else if (affLocs.includes(entityId) || od.headquartersLocationId === entityId) {
             const updatedOrg: HecosEntity = {
-              ...orgEnt,
+              ...ent,
               organizationData: {
                 ...od,
-                affiliatedLocationIds: [...affLocs, entityId],
+                headquartersLocationId: od.headquartersLocationId === entityId ? undefined : od.headquartersLocationId,
+                headquarters: od.headquartersLocationId === entityId ? undefined : od.headquarters,
+                affiliatedLocationIds: affLocs.filter((id) => id !== entityId),
               },
               updatedAt: new Date().toISOString(),
             };
@@ -807,70 +871,137 @@ export class MutualLinkService {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // CASE C: ORGANIZATION SAVED -> Update Member NPCs, HQ Location, Quests
+    // CASE C: ORGANIZATION SAVED -> Synchronize Members, HQ Location, Quests
     // ─────────────────────────────────────────────────────────────
     if (savedEntity.category === 'organization' || savedEntity.organizationData) {
       const od = savedEntity.organizationData || {};
-      const memberIds = od.memberNpcIds || [];
-      const leaderId = od.leaderEntityId;
-      const hqLocId = od.headquartersLocationId;
-      const questIds = od.questIds || [];
+      const targetMemberIds = new Set<string>(od.memberNpcIds || []);
+      if (od.leaderEntityId) targetMemberIds.add(od.leaderEntityId);
+
+      const targetHqLocId = od.headquartersLocationId;
+      const targetAffiliatedLocIds = new Set<string>(od.affiliatedLocationIds || []);
+      if (targetHqLocId) targetAffiliatedLocIds.add(targetHqLocId);
+
+      const targetQuestIds = new Set<string>(od.questIds || []);
 
       // 1. Sync Member & Leader NPCs
-      const allAssociatedNpcIds = Array.from(new Set([...memberIds, ...(leaderId ? [leaderId] : [])]));
-      allAssociatedNpcIds.forEach((npcId) => {
-        const npcEnt = allEntities.find((e) => e.id === npcId);
-        if (npcEnt && (npcEnt.category === 'npc' || npcEnt.npcData)) {
-          const nd = npcEnt.npcData || {};
-          if (nd.organizationEntityId !== entityId && nd.factionEntityId !== entityId) {
-            const updatedNpc: HecosEntity = {
-              ...npcEnt,
-              npcData: {
-                ...nd,
-                organizationEntityId: entityId,
-                factionEntityId: entityId,
-                organization: savedEntity.title,
-                faction: savedEntity.title,
-              },
-              updatedAt: new Date().toISOString(),
-            };
-            HecosStorage.saveEntity(updatedNpc);
+      allEntities.forEach((ent) => {
+        if (ent.category === 'npc' || ent.npcData) {
+          const nd = ent.npcData || {};
+          const isTargetMember = targetMemberIds.has(ent.id);
+
+          if (isTargetMember) {
+            const orgIds = new Set(nd.linkedOrganizationIds || nd.organizationIds || []);
+            if (nd.organizationEntityId) orgIds.add(nd.organizationEntityId);
+            if (nd.factionEntityId) orgIds.add(nd.factionEntityId);
+
+            if (!orgIds.has(entityId)) {
+              orgIds.add(entityId);
+              const updatedNpc: HecosEntity = {
+                ...ent,
+                npcData: {
+                  ...nd,
+                  organizationEntityId: nd.organizationEntityId || entityId,
+                  factionEntityId: nd.factionEntityId || entityId,
+                  organization: nd.organization || savedEntity.title,
+                  faction: nd.faction || savedEntity.title,
+                  linkedOrganizationIds: Array.from(orgIds),
+                  organizationIds: Array.from(orgIds),
+                },
+                updatedAt: new Date().toISOString(),
+              };
+              HecosStorage.saveEntity(updatedNpc);
+            }
+          } else {
+            const hasOrgLink =
+              nd.organizationEntityId === entityId ||
+              nd.factionEntityId === entityId ||
+              nd.linkedOrganizationIds?.includes(entityId) ||
+              nd.organizationIds?.includes(entityId);
+
+            if (hasOrgLink) {
+              const updatedLinked = (nd.linkedOrganizationIds || []).filter((id) => id !== entityId);
+              const updatedOrgIds = (nd.organizationIds || []).filter((id) => id !== entityId);
+              const updatedPrimary = nd.organizationEntityId === entityId ? (updatedLinked[0] || undefined) : nd.organizationEntityId;
+
+              const updatedNpc: HecosEntity = {
+                ...ent,
+                npcData: {
+                  ...nd,
+                  organizationEntityId: updatedPrimary,
+                  factionEntityId: updatedPrimary,
+                  organization: updatedPrimary ? nd.organization : undefined,
+                  faction: updatedPrimary ? nd.faction : undefined,
+                  linkedOrganizationIds: updatedLinked,
+                  organizationIds: updatedOrgIds,
+                },
+                updatedAt: new Date().toISOString(),
+              };
+              HecosStorage.saveEntity(updatedNpc);
+            }
           }
         }
       });
 
-      // 2. Sync Headquarters Location
-      if (hqLocId) {
-        const locEnt = allEntities.find((e) => e.id === hqLocId);
-        if (locEnt && (locEnt.category === 'location' || locEnt.locationData)) {
-          const ld = locEnt.locationData || {};
+      // 2. Sync Locations affiliated/HQ
+      allEntities.forEach((ent) => {
+        if (ent.category === 'location' || ent.locationData) {
+          const ld = ent.locationData || {};
           const factions = ld.factionEntityIds || [];
-          if (!factions.includes(entityId)) {
+          const isTargetLoc = targetAffiliatedLocIds.has(ent.id);
+
+          if (isTargetLoc) {
+            if (!factions.includes(entityId)) {
+              const updatedLoc: HecosEntity = {
+                ...ent,
+                locationData: {
+                  ...ld,
+                  factionEntityIds: [...factions, entityId],
+                },
+                updatedAt: new Date().toISOString(),
+              };
+              HecosStorage.saveEntity(updatedLoc);
+            }
+          } else if (factions.includes(entityId)) {
             const updatedLoc: HecosEntity = {
-              ...locEnt,
+              ...ent,
               locationData: {
                 ...ld,
-                factionEntityIds: [...factions, entityId],
+                factionEntityIds: factions.filter((id) => id !== entityId),
               },
               updatedAt: new Date().toISOString(),
             };
             HecosStorage.saveEntity(updatedLoc);
           }
         }
-      }
+      });
 
       // 3. Sync Quests
-      questIds.forEach((qId) => {
-        const qEnt = allEntities.find((e) => e.id === qId);
-        if (qEnt && (qEnt.category === 'quest' || qEnt.questData)) {
-          const qd = qEnt.questData || { status: 'not_started', objectives: [] };
-          if (qd.organizationEntityId !== entityId) {
+      allEntities.forEach((ent) => {
+        if (ent.category === 'quest' || ent.questData) {
+          const qd = ent.questData || { status: 'not_started', objectives: [] };
+          const isTargetQuest = targetQuestIds.has(ent.id);
+
+          if (isTargetQuest) {
+            if (qd.organizationEntityId !== entityId) {
+              const updatedQuest: HecosEntity = {
+                ...ent,
+                questData: {
+                  ...qd,
+                  organizationEntityId: entityId,
+                  organization: savedEntity.title,
+                },
+                updatedAt: new Date().toISOString(),
+              };
+              HecosStorage.saveEntity(updatedQuest);
+            }
+          } else if (qd.organizationEntityId === entityId) {
             const updatedQuest: HecosEntity = {
-              ...qEnt,
+              ...ent,
               questData: {
                 ...qd,
-                organizationEntityId: entityId,
-                organization: savedEntity.title,
+                organizationEntityId: undefined,
+                organization: undefined,
               },
               updatedAt: new Date().toISOString(),
             };
@@ -881,70 +1012,57 @@ export class MutualLinkService {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // CASE D: QUEST SAVED -> Update Quest Giver & Involved NPCs, Location, Org
+    // CASE D: QUEST SAVED -> Synchronize Giver & Involved NPCs, Location, Org
     // ─────────────────────────────────────────────────────────────
     if (savedEntity.category === 'quest' || savedEntity.questData) {
       const qd = savedEntity.questData || { status: 'not_started', objectives: [] };
       const giverId = qd.questGiverEntityId;
-      const involvedNpcIds = qd.involvedNpcIds || [];
-      const locId = qd.locationEntityId;
-      const orgId = qd.organizationEntityId;
+      const targetNpcIds = new Set<string>(qd.involvedNpcIds || []);
+      if (giverId) targetNpcIds.add(giverId);
 
-      // 1. Sync Giver NPC
-      if (giverId) {
-        const giverEnt = allEntities.find((e) => e.id === giverId);
-        if (giverEnt && (giverEnt.category === 'npc' || giverEnt.npcData)) {
-          const nd = giverEnt.npcData || {};
+      const targetLocId = qd.locationEntityId;
+      const targetOrgId = qd.organizationEntityId;
+
+      // 1. Sync NPCs
+      allEntities.forEach((ent) => {
+        if (ent.category === 'npc' || ent.npcData) {
+          const nd = ent.npcData || {};
           const currentQuests = nd.quests || [];
-          const hasQuest = currentQuests.some((q) => q.questEntityId === entityId);
-          if (!hasQuest) {
+          const currentQuestIds = nd.questIds || [];
+          const isTarget = targetNpcIds.has(ent.id);
+          const hasQuestLink = currentQuests.some((q) => q.questEntityId === entityId) || currentQuestIds.includes(entityId);
+
+          if (isTarget) {
+            if (!hasQuestLink) {
+              const isGiver = ent.id === giverId;
+              const updatedNpc: HecosEntity = {
+                ...ent,
+                npcData: {
+                  ...nd,
+                  questIds: Array.from(new Set([...currentQuestIds, entityId])),
+                  quests: [
+                    ...currentQuests,
+                    {
+                      id: 'q-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+                      questEntityId: entityId,
+                      title: savedEntity.title,
+                      roleInQuest: isGiver ? 'Doador da Missão' : 'NPC Envolvido',
+                      description: savedEntity.subtitle || '',
+                      isSecret: savedEntity.isSecret || savedEntity.visibility === 'gm',
+                    },
+                  ],
+                },
+                updatedAt: new Date().toISOString(),
+              };
+              HecosStorage.saveEntity(updatedNpc);
+            }
+          } else if (hasQuestLink) {
             const updatedNpc: HecosEntity = {
-              ...giverEnt,
+              ...ent,
               npcData: {
                 ...nd,
-                quests: [
-                  ...currentQuests,
-                  {
-                    id: 'q-' + Date.now(),
-                    questEntityId: entityId,
-                    title: savedEntity.title,
-                    roleInQuest: 'Doador da Missão',
-                    description: savedEntity.subtitle || '',
-                    isSecret: savedEntity.isSecret || savedEntity.visibility === 'gm',
-                  },
-                ],
-              },
-              updatedAt: new Date().toISOString(),
-            };
-            HecosStorage.saveEntity(updatedNpc);
-          }
-        }
-      }
-
-      // 2. Sync Involved NPCs
-      involvedNpcIds.forEach((npcId) => {
-        if (npcId === giverId) return;
-        const npcEnt = allEntities.find((e) => e.id === npcId);
-        if (npcEnt && (npcEnt.category === 'npc' || npcEnt.npcData)) {
-          const nd = npcEnt.npcData || {};
-          const currentQuests = nd.quests || [];
-          const hasQuest = currentQuests.some((q) => q.questEntityId === entityId);
-          if (!hasQuest) {
-            const updatedNpc: HecosEntity = {
-              ...npcEnt,
-              npcData: {
-                ...nd,
-                quests: [
-                  ...currentQuests,
-                  {
-                    id: 'q-' + Date.now(),
-                    questEntityId: entityId,
-                    title: savedEntity.title,
-                    roleInQuest: 'NPC Envolvido',
-                    description: savedEntity.subtitle || '',
-                    isSecret: savedEntity.isSecret || savedEntity.visibility === 'gm',
-                  },
-                ],
+                questIds: currentQuestIds.filter((id) => id !== entityId),
+                quests: currentQuests.filter((q) => q.questEntityId !== entityId),
               },
               updatedAt: new Date().toISOString(),
             };
@@ -953,45 +1071,214 @@ export class MutualLinkService {
         }
       });
 
-      // 3. Sync Location
-      if (locId) {
-        const locEnt = allEntities.find((e) => e.id === locId);
-        if (locEnt && (locEnt.category === 'location' || locEnt.locationData)) {
-          const ld = locEnt.locationData || {};
+      // 2. Sync Location
+      allEntities.forEach((ent) => {
+        if (ent.category === 'location' || ent.locationData) {
+          const ld = ent.locationData || {};
           const currentQuests = ld.questIds || [];
-          if (!currentQuests.includes(entityId)) {
+          const isTargetLoc = ent.id === targetLocId;
+
+          if (isTargetLoc) {
+            if (!currentQuests.includes(entityId)) {
+              const updatedLoc: HecosEntity = {
+                ...ent,
+                locationData: {
+                  ...ld,
+                  questIds: [...currentQuests, entityId],
+                },
+                updatedAt: new Date().toISOString(),
+              };
+              HecosStorage.saveEntity(updatedLoc);
+            }
+          } else if (currentQuests.includes(entityId)) {
             const updatedLoc: HecosEntity = {
-              ...locEnt,
+              ...ent,
               locationData: {
                 ...ld,
-                questIds: [...currentQuests, entityId],
+                questIds: currentQuests.filter((id) => id !== entityId),
               },
               updatedAt: new Date().toISOString(),
             };
             HecosStorage.saveEntity(updatedLoc);
           }
         }
-      }
+      });
 
-      // 4. Sync Organization
-      if (orgId) {
-        const orgEnt = allEntities.find((e) => e.id === orgId);
-        if (orgEnt && (orgEnt.category === 'organization' || orgEnt.organizationData)) {
-          const od = orgEnt.organizationData || {};
+      // 3. Sync Organization
+      allEntities.forEach((ent) => {
+        if (ent.category === 'organization' || ent.organizationData) {
+          const od = ent.organizationData || {};
           const currentQuests = od.questIds || [];
-          if (!currentQuests.includes(entityId)) {
+          const isTargetOrg = ent.id === targetOrgId;
+
+          if (isTargetOrg) {
+            if (!currentQuests.includes(entityId)) {
+              const updatedOrg: HecosEntity = {
+                ...ent,
+                organizationData: {
+                  ...od,
+                  questIds: [...currentQuests, entityId],
+                },
+                updatedAt: new Date().toISOString(),
+              };
+              HecosStorage.saveEntity(updatedOrg);
+            }
+          } else if (currentQuests.includes(entityId)) {
             const updatedOrg: HecosEntity = {
-              ...orgEnt,
+              ...ent,
               organizationData: {
                 ...od,
-                questIds: [...currentQuests, entityId],
+                questIds: currentQuests.filter((id) => id !== entityId),
               },
               updatedAt: new Date().toISOString(),
             };
             HecosStorage.saveEntity(updatedOrg);
           }
         }
-      }
+      });
     }
+  }
+
+  /**
+   * 6. REMOVE MUTUAL LINKS ON DELETE
+   * Cleans up all back-references across the system when an entity is deleted or trashed.
+   */
+  static cleanMutualLinksOnDelete(deletedEntityId: string): void {
+    const allEntities = HecosStorage.getEntities();
+
+    allEntities.forEach((ent) => {
+      let changed = false;
+      const updated: HecosEntity = { ...ent };
+
+      // 1. If NPC was deleted, clean from Location, Org, Quest
+      if (updated.locationData) {
+        const ld = { ...updated.locationData };
+        if (ld.inhabitantNpcIds?.includes(deletedEntityId)) {
+          ld.inhabitantNpcIds = ld.inhabitantNpcIds.filter((id) => id !== deletedEntityId);
+          changed = true;
+        }
+        if (ld.rulerEntityId === deletedEntityId) {
+          ld.rulerEntityId = undefined;
+          changed = true;
+        }
+        if (ld.questIds?.includes(deletedEntityId)) {
+          ld.questIds = ld.questIds.filter((id) => id !== deletedEntityId);
+          changed = true;
+        }
+        if (ld.factionEntityIds?.includes(deletedEntityId)) {
+          ld.factionEntityIds = ld.factionEntityIds.filter((id) => id !== deletedEntityId);
+          changed = true;
+        }
+        if (changed) updated.locationData = ld;
+      }
+
+      if (updated.organizationData) {
+        const od = { ...updated.organizationData };
+        if (od.memberNpcIds?.includes(deletedEntityId)) {
+          od.memberNpcIds = od.memberNpcIds.filter((id) => id !== deletedEntityId);
+          changed = true;
+        }
+        if (od.leaderEntityId === deletedEntityId) {
+          od.leaderEntityId = undefined;
+          changed = true;
+        }
+        if (od.headquartersLocationId === deletedEntityId) {
+          od.headquartersLocationId = undefined;
+          changed = true;
+        }
+        if (od.affiliatedLocationIds?.includes(deletedEntityId)) {
+          od.affiliatedLocationIds = od.affiliatedLocationIds.filter((id) => id !== deletedEntityId);
+          changed = true;
+        }
+        if (od.questIds?.includes(deletedEntityId)) {
+          od.questIds = od.questIds.filter((id) => id !== deletedEntityId);
+          changed = true;
+        }
+        if (od.alliedOrgIds?.includes(deletedEntityId)) {
+          od.alliedOrgIds = od.alliedOrgIds.filter((id) => id !== deletedEntityId);
+          changed = true;
+        }
+        if (od.rivalOrgIds?.includes(deletedEntityId)) {
+          od.rivalOrgIds = od.rivalOrgIds.filter((id) => id !== deletedEntityId);
+          changed = true;
+        }
+        if (changed) updated.organizationData = od;
+      }
+
+      if (updated.npcData) {
+        const nd = { ...updated.npcData };
+        if (nd.locationEntityId === deletedEntityId) {
+          nd.locationEntityId = undefined;
+          changed = true;
+        }
+        if (nd.linkedLocationIds?.includes(deletedEntityId)) {
+          nd.linkedLocationIds = nd.linkedLocationIds.filter((id) => id !== deletedEntityId);
+          changed = true;
+        }
+        if (nd.locationIds?.includes(deletedEntityId)) {
+          nd.locationIds = nd.locationIds.filter((id) => id !== deletedEntityId);
+          changed = true;
+        }
+        if (nd.organizationEntityId === deletedEntityId) {
+          nd.organizationEntityId = undefined;
+          changed = true;
+        }
+        if (nd.factionEntityId === deletedEntityId) {
+          nd.factionEntityId = undefined;
+          changed = true;
+        }
+        if (nd.linkedOrganizationIds?.includes(deletedEntityId)) {
+          nd.linkedOrganizationIds = nd.linkedOrganizationIds.filter((id) => id !== deletedEntityId);
+          changed = true;
+        }
+        if (nd.organizationIds?.includes(deletedEntityId)) {
+          nd.organizationIds = nd.organizationIds.filter((id) => id !== deletedEntityId);
+          changed = true;
+        }
+        if (nd.questIds?.includes(deletedEntityId)) {
+          nd.questIds = nd.questIds.filter((id) => id !== deletedEntityId);
+          changed = true;
+        }
+        if (nd.quests?.some((q) => q.questEntityId === deletedEntityId)) {
+          nd.quests = nd.quests.filter((q) => q.questEntityId !== deletedEntityId);
+          changed = true;
+        }
+        if (changed) updated.npcData = nd;
+      }
+
+      if (updated.questData) {
+        const qd = { ...updated.questData };
+        if (qd.questGiverEntityId === deletedEntityId) {
+          qd.questGiverEntityId = undefined;
+          changed = true;
+        }
+        if (qd.involvedNpcIds?.includes(deletedEntityId)) {
+          qd.involvedNpcIds = qd.involvedNpcIds.filter((id) => id !== deletedEntityId);
+          changed = true;
+        }
+        if (qd.locationEntityId === deletedEntityId) {
+          qd.locationEntityId = undefined;
+          changed = true;
+        }
+        if (qd.involvedLocationIds?.includes(deletedEntityId)) {
+          qd.involvedLocationIds = qd.involvedLocationIds.filter((id) => id !== deletedEntityId);
+          changed = true;
+        }
+        if (qd.organizationEntityId === deletedEntityId) {
+          qd.organizationEntityId = undefined;
+          changed = true;
+        }
+        if (qd.involvedOrgIds?.includes(deletedEntityId)) {
+          qd.involvedOrgIds = qd.involvedOrgIds.filter((id) => id !== deletedEntityId);
+          changed = true;
+        }
+        if (changed) updated.questData = qd;
+      }
+
+      if (changed) {
+        updated.updatedAt = new Date().toISOString();
+        HecosStorage.saveEntity(updated);
+      }
+    });
   }
 }
