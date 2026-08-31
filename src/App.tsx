@@ -1,5 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { HecosEntity, EntityCategory, HecosUser, FolderPermission } from './types';
+import {
+  HecosEntity,
+  EntityCategory,
+  HecosUser,
+  FolderPermission,
+  FeatCategoryType,
+  SpellCategoryType,
+  ItemCategoryType,
+  DrawerStackItem,
+  DrawerBreadcrumb,
+  DrawerType,
+} from './types';
 import { HecosStorage } from './services/storage';
 import { CATEGORY_DEFINITIONS, CategoryDefinition, getCategoryMeta } from './utils/categories';
 import { EntityView } from './components/EntityView';
@@ -45,7 +56,6 @@ import { TagDrawer } from './components/TagDrawer';
 import { EntityDrawer } from './components/EntityDrawer';
 import { FeatDrawer } from './components/FeatDrawer';
 import { ItemDrawer } from './components/ItemDrawer';
-import { FeatCategoryType, SpellCategoryType, ItemCategoryType } from './types';
 import { HomePage } from './components/HomePage';
 import { setupGlobalTextFormattingShortcuts } from './utils/keyboardShortcuts';
 import { getEmptyAncestryData, serializeAncestryToHTML } from './utils/ancestrySerializer';
@@ -229,25 +239,83 @@ export function App() {
   const [isPcCreateModalOpen, setIsPcCreateModalOpen] = useState(false);
   const [editingPcEntity, setEditingPcEntity] = useState<HecosEntity | null>(null);
 
-  // Trait Drawer state
-  const [selectedDrawerTrait, setSelectedDrawerTrait] = useState<string | null>(null);
-  const [isTraitDrawerOpen, setIsTraitDrawerOpen] = useState(false);
+  // Stack-based drawer state for multi-layered sliding drawers with history & breadcrumbs
+  const [drawerStack, setDrawerStack] = useState<DrawerStackItem[]>([]);
 
-  // Tag Drawer state
-  const [selectedDrawerTag, setSelectedDrawerTag] = useState<string | null>(null);
-  const [isTagDrawerOpen, setIsTagDrawerOpen] = useState(false);
+  // Push a drawer to the stack
+  const pushDrawer = (type: DrawerType, data: any, title?: string) => {
+    let resolvedTitle = title;
+    if (!resolvedTitle) {
+      if (type === 'entity') {
+        const ent = HecosStorage.getEntityById(data.entityId);
+        resolvedTitle = ent?.title || data.entityId;
+      } else if (type === 'trait') {
+        resolvedTitle = data.trait;
+      } else if (type === 'tag') {
+        resolvedTitle = '#' + data.tag;
+      } else if (type === 'feat') {
+        const ent = HecosStorage.getEntityById(data.featId);
+        resolvedTitle = ent?.title || data.featId;
+      } else if (type === 'item') {
+        const ent = HecosStorage.getEntityById(data.itemId);
+        resolvedTitle = ent?.title || data.itemId;
+      }
+    }
 
-  // Feat Drawer state (for direct feat drawer viewing)
-  const [selectedDrawerFeatId, setSelectedDrawerFeatId] = useState<string | null>(null);
-  const [isFeatDrawerOpen, setIsFeatDrawerOpen] = useState(false);
+    const newItem: DrawerStackItem = {
+      id: `drawer-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      type,
+      data,
+      title: resolvedTitle,
+    };
 
-  // Item Drawer state (for direct item drawer viewing)
-  const [selectedDrawerItemId, setSelectedDrawerItemId] = useState<string | null>(null);
-  const [isItemDrawerOpen, setIsItemDrawerOpen] = useState(false);
+    setDrawerStack((prev) => {
+      // Don't push duplicate if the top of the stack is already the exact same item
+      if (prev.length > 0) {
+        const top = prev[prev.length - 1];
+        if (top.type === type && JSON.stringify(top.data) === JSON.stringify(data)) {
+          return prev;
+        }
+      }
+      return [...prev, newItem];
+    });
+  };
 
-  // Entity Drawer state (for all @mentions and entity shortcut links)
-  const [selectedDrawerEntityId, setSelectedDrawerEntityId] = useState<string | null>(null);
-  const [isEntityDrawerOpen, setIsEntityDrawerOpen] = useState(false);
+  // Close specific drawer at index (pops it and any above it)
+  const closeDrawerAt = (index: number) => {
+    setDrawerStack((prev) => prev.filter((_, i) => i < index));
+  };
+
+  // Jump to specific drawer in stack
+  const jumpToDrawerIndex = (index: number) => {
+    setDrawerStack((prev) => prev.slice(0, index + 1));
+  };
+
+  // Close all open drawers
+  const closeAllDrawers = () => {
+    setDrawerStack([]);
+  };
+
+  // Breadcrumbs array
+  const drawerBreadcrumbs = useMemo<DrawerBreadcrumb[]>(() => {
+    return drawerStack.map((item, idx) => ({
+      id: item.id,
+      index: idx,
+      targetId: item.data?.entityId || item.data?.trait || item.data?.tag || item.data?.featId || item.data?.itemId || item.targetId || '',
+      title:
+        item.title ||
+        (item.type === 'entity'
+          ? 'Artigo'
+          : item.type === 'trait'
+          ? 'Traço'
+          : item.type === 'tag'
+          ? 'Tag'
+          : item.type === 'feat'
+          ? 'Talento'
+          : 'Item'),
+      type: item.type,
+    }));
+  }, [drawerStack]);
 
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
@@ -280,8 +348,7 @@ export function App() {
     const handleOpenTraitDrawer = (e: Event) => {
       const customEvent = e as CustomEvent<{ trait: string }>;
       if (customEvent.detail?.trait) {
-        setSelectedDrawerTrait(customEvent.detail.trait);
-        setIsTraitDrawerOpen(true);
+        pushDrawer('trait', { trait: customEvent.detail.trait });
       }
     };
     window.addEventListener('hecos:open-trait-drawer', handleOpenTraitDrawer);
@@ -293,8 +360,7 @@ export function App() {
     const handleOpenTagDrawer = (e: Event) => {
       const customEvent = e as CustomEvent<{ tag: string }>;
       if (customEvent.detail?.tag) {
-        setSelectedDrawerTag(customEvent.detail.tag);
-        setIsTagDrawerOpen(true);
+        pushDrawer('tag', { tag: customEvent.detail.tag });
       }
     };
     window.addEventListener('hecos:open-tag-drawer', handleOpenTagDrawer);
@@ -307,8 +373,7 @@ export function App() {
       const customEvent = e as CustomEvent<{ featId?: string; id?: string }>;
       const targetId = customEvent.detail?.featId || customEvent.detail?.id;
       if (targetId) {
-        setSelectedDrawerFeatId(targetId);
-        setIsFeatDrawerOpen(true);
+        pushDrawer('feat', { featId: targetId });
       }
     };
     window.addEventListener('hecos:open-feat-drawer', handleOpenFeatDrawer);
@@ -321,8 +386,7 @@ export function App() {
       const customEvent = e as CustomEvent<{ itemId?: string; id?: string }>;
       const targetId = customEvent.detail?.itemId || customEvent.detail?.id;
       if (targetId) {
-        setSelectedDrawerItemId(targetId);
-        setIsItemDrawerOpen(true);
+        pushDrawer('item', { itemId: targetId });
       }
     };
     window.addEventListener('hecos:open-item-drawer', handleOpenItemDrawer);
@@ -335,8 +399,7 @@ export function App() {
       const customEvent = e as CustomEvent<{ entityId?: string; slug?: string; id?: string }>;
       const targetId = customEvent.detail?.entityId || customEvent.detail?.slug || customEvent.detail?.id;
       if (targetId) {
-        setSelectedDrawerEntityId(targetId);
-        setIsEntityDrawerOpen(true);
+        pushDrawer('entity', { entityId: targetId });
       }
     };
     window.addEventListener('hecos:open-entity-drawer', handleOpenEntityDrawer);
@@ -1528,6 +1591,9 @@ export function App() {
             <TimelineView
               onNavigateEntity={handleNavigateEntity}
               onNewEntity={handleCreateNewEntity}
+              onEditEntity={(id) => handleEditEntity(id)}
+              onDeleteEntity={handleDeleteEntity}
+              isGmMode={isActualGm}
             />
           )}
 
@@ -1546,7 +1612,7 @@ export function App() {
               onEditEntity={(ent) => handleEditEntity(ent.id)}
               onCreateQuest={() => handleCreateNewEntity('quest')}
               onDeleteEntity={handleDeleteEntity}
-              isGmMode={isGmMode}
+              isGmMode={isActualGm}
             />
           )}
 
@@ -1591,7 +1657,7 @@ export function App() {
                   setSelectedTagFilter(tag);
                   setActiveView('tags');
                 }}
-                isGmMode={isGmMode}
+                isGmMode={isActualGm}
               />
             ) : effectiveCategoryKey === 'spell' ? (
               <SpellExplorer
@@ -1604,7 +1670,7 @@ export function App() {
                   setSelectedTagFilter(tag);
                   setActiveView('tags');
                 }}
-                isGmMode={isGmMode}
+                isGmMode={isActualGm}
               />
             ) : effectiveCategoryKey === 'item' ? (
               <ItemExplorer
@@ -1617,7 +1683,7 @@ export function App() {
                   setSelectedTagFilter(tag);
                   setActiveView('tags');
                 }}
-                isGmMode={isGmMode}
+                isGmMode={isActualGm}
               />
             ) : effectiveCategoryKey === 'quest' ? (
               <QuestBoard
@@ -1625,7 +1691,7 @@ export function App() {
                 onEditEntity={(ent) => handleEditEntity(ent.id)}
                 onCreateQuest={() => handleCreateNewEntity('quest')}
                 onDeleteEntity={handleDeleteEntity}
-                isGmMode={isGmMode}
+                isGmMode={isActualGm}
               />
             ) : effectiveCategoryKey === 'codex' && !activeSubcategory && !searchFilter.trim() && !selectedTagFilter ? (
               <HomePage
@@ -1655,9 +1721,27 @@ export function App() {
                 activeSubcategory={activeSubcategory}
                 onSelectEntity={(id) => {
                   const ent = entities.find((e) => e.id === id || e.slug === id);
-                  if (ent && (ent.category === 'peril' || ent.category === 'creature' || ent.perilData || ent.category === 'npc' || ent.npcData)) {
-                    setSelectedDrawerEntityId(ent.id);
-                    setIsEntityDrawerOpen(true);
+                  if (
+                    ent &&
+                    (ent.category === 'peril' ||
+                      ent.category === 'creature' ||
+                      ent.perilData ||
+                      ent.category === 'npc' ||
+                      ent.npcData ||
+                      ent.category === 'ancestry' ||
+                      ent.ancestryData ||
+                      ent.category === 'fauna' ||
+                      ent.faunaData ||
+                      ent.category === 'flora' ||
+                      ent.floraData ||
+                      ent.category === 'location' ||
+                      ent.locationData ||
+                      ent.category === 'organization' ||
+                      ent.organizationData ||
+                      ent.category === 'pc' ||
+                      ent.pcData)
+                  ) {
+                    pushDrawer('entity', { entityId: ent.id }, ent.title);
                   } else {
                     handleNavigateEntity(id);
                   }
@@ -2190,98 +2274,146 @@ export function App() {
         }}
       />
 
-      {/* PF2e & Hecos Trait Drawer */}
-      <TraitDrawer
-        trait={selectedDrawerTrait}
-        isOpen={isTraitDrawerOpen}
-        onClose={() => setIsTraitDrawerOpen(false)}
-        onNavigate={handleNavigateEntity}
-        isGmMode={isGmMode}
-      />
+      {/* Multi-layered Stackable Drawers */}
+      {drawerStack.map((item, index) => {
+        const isTopmost = index === drawerStack.length - 1;
 
-      {/* Hecos Codex Tag Drawer */}
-      <TagDrawer
-        tag={selectedDrawerTag}
-        isOpen={isTagDrawerOpen}
-        onClose={() => setIsTagDrawerOpen(false)}
-        onNavigate={handleNavigateEntity}
-        isGmMode={isGmMode}
-        onTagUpdated={refreshEntities}
-      />
+        if (item.type === 'entity') {
+          return (
+            <EntityDrawer
+              key={item.id}
+              entityId={item.data.entityId}
+              isOpen={true}
+              onClose={() => closeDrawerAt(index)}
+              onNavigateToPage={(id) => {
+                closeAllDrawers();
+                handleNavigateEntity(id);
+              }}
+              onEditEntity={(id) => {
+                closeAllDrawers();
+                handleEditEntity(id);
+              }}
+              isGmMode={isGmMode}
+              stackIndex={index}
+              stackTotal={drawerStack.length}
+              stackBreadcrumbs={drawerBreadcrumbs}
+              onJumpToStackIndex={jumpToDrawerIndex}
+              onCloseAll={closeAllDrawers}
+            />
+          );
+        }
 
-      {/* Hecos Codex Full Entity Article Drawer */}
-      <EntityDrawer
-        entityId={selectedDrawerEntityId}
-        isOpen={isEntityDrawerOpen}
-        onClose={() => setIsEntityDrawerOpen(false)}
-        onNavigateToPage={(id) => {
-          setIsEntityDrawerOpen(false);
-          handleNavigateEntity(id);
-        }}
-        onEditEntity={(id) => {
-          setIsEntityDrawerOpen(false);
-          handleEditEntity(id);
-        }}
-        isGmMode={isGmMode}
-      />
+        if (item.type === 'trait') {
+          return (
+            <TraitDrawer
+              key={item.id}
+              trait={item.data.trait}
+              isOpen={true}
+              onClose={() => closeDrawerAt(index)}
+              onNavigate={(id) => {
+                closeAllDrawers();
+                handleNavigateEntity(id);
+              }}
+              isGmMode={isGmMode}
+              stackIndex={index}
+              stackTotal={drawerStack.length}
+              stackBreadcrumbs={drawerBreadcrumbs}
+              onJumpToStackIndex={jumpToDrawerIndex}
+              onCloseAll={closeAllDrawers}
+            />
+          );
+        }
 
-      {/* Hecos PF2e Feat Drawer */}
-      <FeatDrawer
-        featId={selectedDrawerFeatId}
-        entities={entities}
-        isOpen={isFeatDrawerOpen}
-        onClose={() => {
-          setIsFeatDrawerOpen(false);
-          setSelectedDrawerFeatId(null);
-        }}
-        onNavigateFullPage={(id) => {
-          setIsFeatDrawerOpen(false);
-          setSelectedDrawerFeatId(null);
-          handleNavigateEntity(id);
-        }}
-        onEditFeat={(feat) => {
-          setIsFeatDrawerOpen(false);
-          handleEditEntity(feat.id);
-        }}
-        onDeleteFeat={(id) => {
-          setIsFeatDrawerOpen(false);
-          handleDeleteEntity(id);
-        }}
-        onTagClick={(tag) => {
-          setSelectedDrawerTag(tag);
-          setIsTagDrawerOpen(true);
-        }}
-        isGmMode={isGmMode}
-      />
+        if (item.type === 'tag') {
+          return (
+            <TagDrawer
+              key={item.id}
+              tag={item.data.tag}
+              isOpen={true}
+              onClose={() => closeDrawerAt(index)}
+              onNavigate={(id) => {
+                closeAllDrawers();
+                handleNavigateEntity(id);
+              }}
+              isGmMode={isGmMode}
+              onTagUpdated={refreshEntities}
+              stackIndex={index}
+              stackTotal={drawerStack.length}
+              stackBreadcrumbs={drawerBreadcrumbs}
+              onJumpToStackIndex={jumpToDrawerIndex}
+              onCloseAll={closeAllDrawers}
+            />
+          );
+        }
 
-      {/* Hecos PF2e Item Drawer */}
-      <ItemDrawer
-        itemId={selectedDrawerItemId}
-        entities={entities}
-        isOpen={isItemDrawerOpen}
-        onClose={() => {
-          setIsItemDrawerOpen(false);
-          setSelectedDrawerItemId(null);
-        }}
-        onNavigateFullPage={(id) => {
-          setIsItemDrawerOpen(false);
-          setSelectedDrawerItemId(null);
-          handleNavigateEntity(id);
-        }}
-        onEditItem={(item) => {
-          setIsItemDrawerOpen(false);
-          handleEditEntity(item.id);
-        }}
-        onDeleteItem={(id) => {
-          setIsItemDrawerOpen(false);
-          handleDeleteEntity(id);
-        }}
-        onTagClick={(tag) => {
-          setSelectedDrawerTag(tag);
-          setIsTagDrawerOpen(true);
-        }}
-        isGmMode={isGmMode}
-      />
+        if (item.type === 'feat') {
+          return (
+            <FeatDrawer
+              key={item.id}
+              featId={item.data.featId}
+              entities={entities}
+              isOpen={true}
+              onClose={() => closeDrawerAt(index)}
+              onNavigateFullPage={(id) => {
+                closeAllDrawers();
+                handleNavigateEntity(id);
+              }}
+              onEditFeat={(feat) => {
+                closeAllDrawers();
+                handleEditEntity(feat.id);
+              }}
+              onDeleteFeat={(id) => {
+                closeAllDrawers();
+                handleDeleteEntity(id);
+              }}
+              onTagClick={(tag) => {
+                pushDrawer('tag', { tag });
+              }}
+              isGmMode={isGmMode}
+              stackIndex={index}
+              stackTotal={drawerStack.length}
+              stackBreadcrumbs={drawerBreadcrumbs}
+              onJumpToStackIndex={jumpToDrawerIndex}
+              onCloseAll={closeAllDrawers}
+            />
+          );
+        }
+
+        if (item.type === 'item') {
+          return (
+            <ItemDrawer
+              key={item.id}
+              itemId={item.data.itemId}
+              entities={entities}
+              isOpen={true}
+              onClose={() => closeDrawerAt(index)}
+              onNavigateFullPage={(id) => {
+                closeAllDrawers();
+                handleNavigateEntity(id);
+              }}
+              onEditItem={(itm) => {
+                closeAllDrawers();
+                handleEditEntity(itm.id);
+              }}
+              onDeleteItem={(id) => {
+                closeAllDrawers();
+                handleDeleteEntity(id);
+              }}
+              onTagClick={(tag) => {
+                pushDrawer('tag', { tag });
+              }}
+              isGmMode={isGmMode}
+              stackIndex={index}
+              stackTotal={drawerStack.length}
+              stackBreadcrumbs={drawerBreadcrumbs}
+              onJumpToStackIndex={jumpToDrawerIndex}
+              onCloseAll={closeAllDrawers}
+            />
+          );
+        }
+
+        return null;
+      })}
 
       {/* Global Tooltip that overlays all windows with highest z-index */}
       <GlobalTooltip />

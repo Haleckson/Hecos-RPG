@@ -6,6 +6,7 @@ import { RichContentRenderer } from './RichContentRenderer';
 import { renderContentWithMentions } from './MentionBadge';
 import { TraitBadge } from './TraitBadge';
 import { sortTraitsHierarchically } from '../utils/traitUtils';
+import { HecosStorage } from '../services/storage';
 import {
   Copy,
   Check,
@@ -108,6 +109,9 @@ export const FeatView: React.FC<FeatViewProps> = ({
     )
   );
 
+  const currentUser = HecosStorage.getCurrentUser();
+  const isActualGm = currentUser?.role === 'gm' || HecosStorage.getGmMode();
+
   return (
     <div className="space-y-6">
       {/* CARD PRINCIPAL DO TALENTO PF2E */}
@@ -117,14 +121,14 @@ export const FeatView: React.FC<FeatViewProps> = ({
           {/* Top Bar: Pastas/Subcategorias, Category & Copy Action */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              {/* Indicador de Pastas logo antes da Categoria */}
-              {subcats.map((subcat) => (
+              {/* Indicador de Pastas (Exclusivo GM) */}
+              {isActualGm && subcats.map((subcat) => (
                 <button
                   key={subcat}
                   type="button"
                   onClick={() => onTagClick(subcat)}
                   className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-amber-950/60 hover:bg-amber-900/70 text-amber-300 border border-amber-600/40 transition-colors shadow-sm cursor-pointer"
-                  title={`Filtrar pela pasta ${subcat}`}
+                  title={`Filtrar pela pasta ${subcat} (Exclusivo GM)`}
                 >
                   <Folder className="w-3 h-3 text-amber-400" />
                   <span>{subcat}</span>

@@ -401,8 +401,8 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
         }
       }
 
-      // 2. Folder match
-      if (selectedFolder !== null) {
+      // 2. Folder match (GM only)
+      if (isActualGm && selectedFolder !== null) {
         const entFolders = getEntityFolders(ent);
         if (selectedFolder === '__none__') {
           if (entFolders.length > 0) return false;
@@ -546,6 +546,17 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
   const themeClasses = useMemo(() => {
     return getCategoryTheme(categoryKey);
   }, [categoryKey]);
+
+  // Helper to determine grid columns based on category
+  const getGridColsClass = () => {
+    if (categoryKey === 'npc') {
+      return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-3 gap-4 sm:gap-5';
+    }
+    if (categoryKey === 'peril') {
+      return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 min-[1800px]:grid-cols-4 gap-3 sm:gap-4';
+    }
+    return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 min-[1800px]:grid-cols-5 2xl:grid-cols-5 gap-3 sm:gap-3.5';
+  };
 
   // Grouped by folders for folder/tree view
   const groupedByFolder = useMemo(() => {
@@ -915,8 +926,8 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
               )}
             </div>
 
-            {/* Folder Dropdown Selector (for categories supporting folders) */}
-            {categoryKey !== 'ancestry' && (
+            {/* Folder Dropdown Selector (GM ONLY) */}
+            {isActualGm && categoryKey !== 'ancestry' && (
               <div className="relative min-w-[200px] sm:w-60">
                 <button
                   type="button"
@@ -1134,7 +1145,7 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
               >
                 <List className="w-4 h-4" />
               </button>
-              {categoryKey !== 'ancestry' && (
+              {isActualGm && categoryKey !== 'ancestry' && (
                 <button
                   type="button"
                   onClick={() => setViewMode('folders')}
@@ -1143,7 +1154,7 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
                       ? 'bg-zinc-800 text-cyan-300 shadow-sm'
                       : 'text-zinc-500 hover:text-zinc-300'
                   }`}
-                  title="Visualização em Árvore de Pastas"
+                  title="Visualização em Árvore de Pastas (Exclusivo GM)"
                 >
                   <FolderTree className="w-4 h-4" />
                 </button>
@@ -1161,7 +1172,7 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
             Nenhum registro encontrado em {meta.name} com os filtros atuais.
           </p>
           <p className="text-xs text-zinc-500 max-w-md mx-auto">
-            Tente remover os termos de busca ou selecione outra pasta.
+            Tente remover os termos de busca ou selecione outra categoria.
           </p>
           {isActualGm && (
             <button
@@ -1181,7 +1192,7 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
               <thead className="bg-[#120f1c] border-b border-zinc-800 text-zinc-400 uppercase font-mono text-[10px]">
                 <tr>
                   <th className="py-3 px-4">Nome / Título</th>
-                  <th className="py-3 px-3">Pastas / Subcategorias</th>
+                  {isActualGm && <th className="py-3 px-3">Pastas / Subcategorias</th>}
                   <th className="py-3 px-3">Tags</th>
                   <th className="py-3 px-3">Atualizado</th>
                   <th className="py-3 px-3 text-right">Ações</th>
@@ -1247,22 +1258,24 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
                           </div>
                         )}
                       </td>
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {itemFolders.length > 0 ? (
-                            itemFolders.map((f, fIdx) => (
-                              <span
-                                key={`${item.id}-fld-${f}-${fIdx}`}
-                                className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-purple-950/70 text-purple-300 border border-purple-800/60"
-                              >
-                                {f}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-[10px] text-zinc-600 italic">Sem pasta</span>
-                          )}
-                        </div>
-                      </td>
+                      {isActualGm && (
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {itemFolders.length > 0 ? (
+                              itemFolders.map((f, fIdx) => (
+                                <span
+                                  key={`${item.id}-fld-${f}-${fIdx}`}
+                                  className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-purple-950/70 text-purple-300 border border-purple-800/60"
+                                >
+                                  {f}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-[10px] text-zinc-600 italic">Sem pasta</span>
+                            )}
+                          </div>
+                        </td>
+                      )}
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-1 flex-wrap">
                           {(item.tags || []).slice(0, 3).map((t, tIdx) => (
@@ -1356,7 +1369,7 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
                     {list.length === 0 ? (
                       <p className="text-xs text-zinc-500 italic py-2">Nenhum item nesta pasta.</p>
                     ) : (
-                      <div className={categoryKey === 'peril' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 min-[1800px]:grid-cols-4 gap-3 sm:gap-4' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3'}>
+                      <div className={`grid ${getGridColsClass()}`}>
                         {list.map(renderItemCard)}
                       </div>
                     )}
@@ -1385,7 +1398,7 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
 
               {expandedFolders.__none__ !== false && (
                 <div className="p-4">
-                  <div className={categoryKey === 'peril' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 min-[1800px]:grid-cols-4 gap-3 sm:gap-4' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3'}>
+                  <div className={`grid ${getGridColsClass()}`}>
                     {groupedByFolder.noFolderList.map(renderItemCard)}
                   </div>
                 </div>
@@ -1395,7 +1408,7 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
         </div>
       ) : (
         /* STANDARD CARDS GRID VIEW */
-        <div className={`grid ${categoryKey === 'peril' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 min-[1800px]:grid-cols-4 gap-3 sm:gap-4' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 min-[1800px]:grid-cols-5 2xl:grid-cols-5 gap-3 sm:gap-3.5'} items-stretch`}>
+        <div className={`grid ${getGridColsClass()} items-stretch`}>
           {sortedEntities.map(renderItemCard)}
         </div>
       )}

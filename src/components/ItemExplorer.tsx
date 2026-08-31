@@ -21,6 +21,7 @@ import {
   Plus,
   Filter,
   SlidersHorizontal,
+  ArrowUpDown,
   Folder,
   FolderPlus,
   FolderOpen,
@@ -157,7 +158,22 @@ export const MAIN_ITEM_CATEGORIES: {
 
 const ALPHABET = ['TODOS', '0-9', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')];
 
+const parsePriceToGp = (priceStr?: string): number => {
+  if (!priceStr) return 0;
+  const clean = priceStr.toLowerCase().trim();
+  const numMatch = clean.match(/([\d.,]+)/);
+  if (!numMatch) return 0;
+  const num = parseFloat(numMatch[1].replace(',', '.'));
+  if (isNaN(num)) return 0;
+  if (clean.includes('pl') || clean.includes('platina')) return num * 10;
+  if (clean.includes('po') || clean.includes('gp') || clean.includes('ouro')) return num;
+  if (clean.includes('pp') || clean.includes('sp') || clean.includes('prata')) return num * 0.1;
+  if (clean.includes('pc') || clean.includes('cp') || clean.includes('cobre')) return num * 0.01;
+  return num;
+};
+
 export const ItemExplorer: React.FC<ItemExplorerProps> = ({
+
   entities,
   onSelectEntity,
   onEditEntity,
@@ -167,7 +183,7 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
   isGmMode = false,
 }) => {
   const currentUser = HecosStorage.getCurrentUser();
-  const isActualGm = isGmMode || currentUser?.role === 'gm';
+  const isActualGm = HecosStorage.isUserGm(currentUser) && (isGmMode !== false);
 
   // 1. Navigation & View State
   const [activeCategory, setActiveCategory] = useState<ItemCategoryType>('all');
@@ -184,7 +200,9 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
   const [selectedTrait, setSelectedTrait] = useState<string>('all');
   const [selectedLevel, setSelectedLevel] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
-  const [sortBy, setSortBy] = useState<'name' | 'level-asc' | 'level-desc' | 'rarity' | 'price'>('name');
+  const [sortBy, setSortBy] = useState<
+    'name-asc' | 'name-desc' | 'level-asc' | 'level-desc' | 'rarity' | 'price-asc' | 'price-desc' | 'recent'
+  >('name-asc');
 
   // 3. Lateral Item Drawer State
   const [drawerItemId, setDrawerItemId] = useState<string | null>(null);
@@ -408,8 +426,8 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
             return false;
         }
 
-        // 2. Subcategory / Folder filter
-        if (activeSubcategory) {
+        // 2. Subcategory / Folder filter (GM only)
+        if (isActualGm && activeSubcategory) {
           if (activeSubcategory === '__none__') {
             const subs = data.subcategories || it.subcategories || [];
             if (subs.length > 0 || it.subcategory) return false;
@@ -473,8 +491,11 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
         return true;
       })
       .sort((a, b) => {
-        if (sortBy === 'name') {
+        if (sortBy === 'name-asc') {
           return a.title.localeCompare(b.title, 'pt-BR');
+        }
+        if (sortBy === 'name-desc') {
+          return b.title.localeCompare(a.title, 'pt-BR');
         }
         if (sortBy === 'level-asc') {
           return (a.itemData?.level ?? 0) - (b.itemData?.level ?? 0);
@@ -487,6 +508,17 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
           const rA = order[(a.itemData?.rarity || 'comum').toLowerCase()] ?? 0;
           const rB = order[(b.itemData?.rarity || 'comum').toLowerCase()] ?? 0;
           return rB - rA;
+        }
+        if (sortBy === 'price-asc') {
+          return parsePriceToGp(a.itemData?.price) - parsePriceToGp(b.itemData?.price);
+        }
+        if (sortBy === 'price-desc') {
+          return parsePriceToGp(b.itemData?.price) - parsePriceToGp(a.itemData?.price);
+        }
+        if (sortBy === 'recent') {
+          const dateA = new Date(a.updatedAt || a.createdAt || 0).getTime() || 0;
+          const dateB = new Date(b.updatedAt || b.createdAt || 0).getTime() || 0;
+          return dateB - dateA;
         }
         return 0;
       });
@@ -721,11 +753,56 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
         })}
       </div>
 
-      {/* Search & Toolbar with Integrated Folder Selector */}
+      {/* Search & Toolbar with Standardized Order */}
       <div className="p-4 rounded-2xl bg-[#0b0816] border border-zinc-800/80 space-y-3">
         <div className="flex flex-col lg:flex-row items-center gap-3">
-          {/* Search Input */}
-          <div className="relative flex-1 w-full">
+          {/* 1. Sort Selector (Icon-Only, Leftmost) */}
+          <div className="relative shrink-0 flex items-center">
+            <div
+              className={`w-9 h-9 flex items-center justify-center rounded-xl border transition-all cursor-pointer shadow-sm relative overflow-hidden ${
+                sortBy !== 'name-asc'
+                  ? 'bg-amber-950/60 border-amber-500/70 text-amber-300 shadow-sm'
+                  : 'bg-zinc-900/90 border-zinc-700/80 text-zinc-300 hover:border-zinc-600 hover:text-zinc-100 hover:bg-zinc-800'
+              }`}
+              title={`Ordenar Itens (Ativo: ${
+                sortBy === 'name-asc'
+                  ? 'Ordem Alfabética (A-Z)'
+                  : sortBy === 'name-desc'
+                  ? 'Ordem Alfabética (Z-A)'
+                  : sortBy === 'level-asc'
+                  ? 'Nível (Menor ao Maior)'
+                  : sortBy === 'level-desc'
+                  ? 'Nível (Maior ao Menor)'
+                  : sortBy === 'rarity'
+                  ? 'Raridade (Mais Raro Primeiro)'
+                  : sortBy === 'price-asc'
+                  ? 'Preço (Menor ao Maior)'
+                  : sortBy === 'price-desc'
+                  ? 'Preço (Maior ao Menor)'
+                  : 'Mais Recentes Primeiro'
+              })`}
+            >
+              <ArrowUpDown className="w-4 h-4 shrink-0" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-xs"
+                title="Alterar ordenação de itens"
+              >
+                <option value="name-asc" className="bg-[#0f0d1a] text-zinc-200">Ordem Alfabética (A-Z)</option>
+                <option value="name-desc" className="bg-[#0f0d1a] text-zinc-200">Ordem Alfabética (Z-A)</option>
+                <option value="level-asc" className="bg-[#0f0d1a] text-zinc-200">Nível (Menor ao Maior)</option>
+                <option value="level-desc" className="bg-[#0f0d1a] text-zinc-200">Nível (Maior ao Menor)</option>
+                <option value="rarity" className="bg-[#0f0d1a] text-zinc-200">Raridade (Mais Raro Primeiro)</option>
+                <option value="price-asc" className="bg-[#0f0d1a] text-zinc-200">Preço (Menor ao Maior)</option>
+                <option value="price-desc" className="bg-[#0f0d1a] text-zinc-200">Preço (Maior ao Menor)</option>
+                <option value="recent" className="bg-[#0f0d1a] text-zinc-200">Mais Recentes Primeiro</option>
+              </select>
+            </div>
+          </div>
+
+          {/* 2. Search Input */}
+          <div className="relative flex-1 w-full min-w-[200px]">
             <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -745,175 +822,194 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
             )}
           </div>
 
-          {/* Folder / Subcategory Dropdown Filter with Built-in Search */}
-          <div className="relative w-full sm:w-64 shrink-0">
-            <button
-              type="button"
-              onClick={() => setIsFolderDropdownOpen(!isFolderDropdownOpen)}
-              className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                activeSubcategory !== null
-                  ? 'bg-amber-950/70 border-amber-500/80 text-amber-200 shadow-xs'
-                  : 'bg-[#120d22] border-zinc-700/70 text-zinc-300 hover:border-zinc-600 hover:text-zinc-100'
-              }`}
-            >
-              <div className="flex items-center gap-2 truncate">
-                <Folder className={`w-3.5 h-3.5 shrink-0 ${activeSubcategory ? 'text-amber-400' : 'text-zinc-400'}`} />
-                <span className="truncate">
-                  {activeSubcategory === null
-                    ? 'Todas as Pastas'
-                    : activeSubcategory === '__none__'
-                    ? 'Sem Pasta Definida'
-                    : activeSubcategory}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-amber-300 border border-zinc-800">
-                  {activeSubcategory === null
-                    ? filteredItems.length
-                    : activeSubcategory === '__none__'
-                    ? subcategoryCounts.__none__ || 0
-                    : subcategoryCounts[activeSubcategory] || 0}
-                </span>
-                <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${isFolderDropdownOpen ? 'rotate-180' : ''}`} />
-              </div>
-            </button>
+          {/* 3. Folder / Subcategory Dropdown Filter (GM only) */}
+          {isActualGm && (
+            <div className="relative w-full sm:w-60 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsFolderDropdownOpen(!isFolderDropdownOpen)}
+                className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                  activeSubcategory !== null
+                    ? 'bg-amber-950/70 border-amber-500/80 text-amber-200 shadow-xs'
+                    : 'bg-[#120d22] border-zinc-700/70 text-zinc-300 hover:border-zinc-600 hover:text-zinc-100'
+                }`}
+              >
+                <div className="flex items-center gap-2 truncate">
+                  <Folder className={`w-3.5 h-3.5 shrink-0 ${activeSubcategory ? 'text-amber-400' : 'text-zinc-400'}`} />
+                  <span className="truncate">
+                    {activeSubcategory === null
+                      ? 'Todas as Pastas'
+                      : activeSubcategory === '__none__'
+                      ? 'Sem Pasta Definida'
+                      : activeSubcategory}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-amber-300 border border-zinc-800">
+                    {activeSubcategory === null
+                      ? filteredItems.length
+                      : activeSubcategory === '__none__'
+                      ? subcategoryCounts.__none__ || 0
+                      : subcategoryCounts[activeSubcategory] || 0}
+                  </span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${isFolderDropdownOpen ? 'rotate-180' : ''}`} />
+                </div>
+              </button>
 
-            {/* Folder Selector Dropdown Menu */}
-            {isFolderDropdownOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-30"
-                  onClick={() => setIsFolderDropdownOpen(false)}
-                />
-                <div className="absolute left-0 right-0 sm:right-auto sm:w-80 mt-1.5 z-40 bg-[#0d0a17] border border-zinc-700/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-80 animate-fade-in">
-                  {/* Search inside folder dropdown */}
-                  <div className="p-2.5 border-b border-zinc-800/80 bg-zinc-950/70 flex items-center gap-1.5">
-                    <Search className="w-3.5 h-3.5 text-zinc-500 ml-1 shrink-0" />
-                    <input
-                      type="text"
-                      value={folderDropdownSearch}
-                      onChange={(e) => setFolderDropdownSearch(e.target.value)}
-                      placeholder="Procurar pasta..."
-                      className="flex-1 bg-transparent text-xs text-zinc-200 placeholder-zinc-500 outline-none"
-                      autoFocus
-                    />
-                    {folderDropdownSearch && (
+              {/* Folder Selector Dropdown Menu */}
+              {isFolderDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-30"
+                    onClick={() => setIsFolderDropdownOpen(false)}
+                  />
+                  <div className="absolute left-0 right-0 sm:right-auto sm:w-80 mt-1.5 z-40 bg-[#0d0a17] border border-zinc-700/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-80 animate-fade-in">
+                    {/* Search inside folder dropdown */}
+                    <div className="p-2.5 border-b border-zinc-800/80 bg-zinc-950/70 flex items-center gap-1.5">
+                      <Search className="w-3.5 h-3.5 text-zinc-500 ml-1 shrink-0" />
+                      <input
+                        type="text"
+                        value={folderDropdownSearch}
+                        onChange={(e) => setFolderDropdownSearch(e.target.value)}
+                        placeholder="Procurar pasta..."
+                        className="flex-1 bg-transparent text-xs text-zinc-200 placeholder-zinc-500 outline-none"
+                        autoFocus
+                      />
+                      {folderDropdownSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setFolderDropdownSearch('')}
+                          className="p-1 text-zinc-500 hover:text-zinc-300"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Folders List */}
+                    <div className="p-1.5 overflow-y-auto space-y-1 flex-1 scrollbar-thin scrollbar-thumb-zinc-800">
+                      {/* Option: All Folders */}
                       <button
                         type="button"
-                        onClick={() => setFolderDropdownSearch('')}
-                        className="p-1 text-zinc-500 hover:text-zinc-300"
+                        onClick={() => {
+                          setActiveSubcategory(null);
+                          setIsFolderDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left cursor-pointer ${
+                          activeSubcategory === null
+                            ? 'bg-amber-950/80 text-amber-200 border border-amber-500/50'
+                            : 'text-zinc-300 hover:bg-zinc-900/90'
+                        }`}
                       >
-                        <X className="w-3 h-3" />
+                        <div className="flex items-center gap-2">
+                          <Folder className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Todas as Pastas</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-zinc-400">
+                          {activeCategory === 'all'
+                            ? itemEntities.length
+                            : itemEntities.filter(it => it.itemData?.itemType === activeCategory || (it.tags || []).includes(activeCategory)).length}
+                        </span>
                       </button>
-                    )}
+
+                      {/* Option: Without Folder */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveSubcategory('__none__');
+                          setIsFolderDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left cursor-pointer ${
+                          activeSubcategory === '__none__'
+                            ? 'bg-amber-950/80 text-amber-200 border border-amber-500/50'
+                            : 'text-zinc-400 hover:bg-zinc-900/90'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Folder className="w-3.5 h-3.5 text-zinc-600" />
+                          <span className="italic">Sem Pasta Definida</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-zinc-500">
+                          {subcategoryCounts.__none__ || 0}
+                        </span>
+                      </button>
+
+                      <div className="my-1 border-t border-zinc-800/80" />
+
+                      {/* Custom subcategories filtered by search */}
+                      {currentSubcategories
+                        .filter((s) =>
+                          s.toLowerCase().includes(folderDropdownSearch.toLowerCase().trim())
+                        )
+                        .map((subcat) => {
+                          const isSelected = activeSubcategory === subcat;
+                          const count = subcategoryCounts[subcat] || 0;
+
+                          return (
+                            <button
+                              key={subcat}
+                              type="button"
+                              onClick={() => {
+                                setActiveSubcategory(isSelected ? null : subcat);
+                                setIsFolderDropdownOpen(false);
+                              }}
+                              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left cursor-pointer ${
+                                isSelected
+                                  ? 'bg-amber-950/80 text-amber-200 border border-amber-500/50'
+                                  : 'text-zinc-300 hover:bg-zinc-900/90'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 truncate">
+                                <Folder className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                <span className="truncate">{subcat}</span>
+                              </div>
+                              <span className="text-[10px] font-mono text-zinc-400 shrink-0 ml-2">
+                                {count}
+                              </span>
+                            </button>
+                          );
+                        })}
+
+                      {currentSubcategories.length === 0 && (
+                        <div className="py-4 text-center text-xs text-zinc-500">
+                          Nenhuma pasta cadastrada nesta categoria.
+                        </div>
+                      )}
+                    </div>
                   </div>
+                </>
+              )}
+            </div>
+          )}
 
-                  {/* Folders List */}
-                  <div className="p-1.5 overflow-y-auto space-y-1 flex-1 scrollbar-thin scrollbar-thumb-zinc-800">
-                    {/* Option: All Folders */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveSubcategory(null);
-                        setIsFolderDropdownOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left cursor-pointer ${
-                        activeSubcategory === null
-                          ? 'bg-amber-950/80 text-amber-200 border border-amber-500/50'
-                          : 'text-zinc-300 hover:bg-zinc-900/90'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Folder className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Todas as Pastas</span>
-                      </div>
-                      <span className="text-[10px] font-mono text-zinc-400">
-                        {activeCategory === 'all'
-                          ? itemEntities.length
-                          : itemEntities.filter(it => it.itemData?.itemType === activeCategory || (it.tags || []).includes(activeCategory)).length}
-                      </span>
-                    </button>
-
-                    {/* Option: Without Folder */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveSubcategory('__none__');
-                        setIsFolderDropdownOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left cursor-pointer ${
-                        activeSubcategory === '__none__'
-                          ? 'bg-amber-950/80 text-amber-200 border border-amber-500/50'
-                          : 'text-zinc-400 hover:bg-zinc-900/90'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Folder className="w-3.5 h-3.5 text-zinc-600" />
-                        <span className="italic">Sem Pasta Definida</span>
-                      </div>
-                      <span className="text-[10px] font-mono text-zinc-500">
-                        {subcategoryCounts.__none__ || 0}
-                      </span>
-                    </button>
-
-                    <div className="my-1 border-t border-zinc-800/80" />
-
-                    {/* Custom subcategories filtered by search */}
-                    {currentSubcategories
-                      .filter((s) =>
-                        s.toLowerCase().includes(folderDropdownSearch.toLowerCase().trim())
-                      )
-                      .map((subcat) => {
-                        const isSelected = activeSubcategory === subcat;
-                        const count = subcategoryCounts[subcat] || 0;
-
-                        return (
-                          <button
-                            key={subcat}
-                            type="button"
-                            onClick={() => {
-                              setActiveSubcategory(isSelected ? null : subcat);
-                              setIsFolderDropdownOpen(false);
-                            }}
-                            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left cursor-pointer ${
-                              isSelected
-                                ? 'bg-amber-950/80 text-amber-200 border border-amber-500/50'
-                                : 'text-zinc-300 hover:bg-zinc-900/90'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 truncate">
-                              <Folder className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                              <span className="truncate">{subcat}</span>
-                            </div>
-                            <span className="text-[10px] font-mono text-zinc-400 shrink-0 ml-2">
-                              {count}
-                            </span>
-                          </button>
-                        );
-                      })}
-
-                    {currentSubcategories.length === 0 && (
-                      <div className="py-4 text-center text-xs text-zinc-500">
-                        Nenhuma pasta cadastrada nesta categoria.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Sort Selector */}
-          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
+          {/* 4. Category-Specific Filters (Level Range, Rarity, Advanced Filters) */}
+          <div className="flex items-center gap-2 flex-wrap shrink-0 w-full sm:w-auto">
+            {/* Quick Level Range Select */}
             <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="bg-[#120d22] border border-zinc-700/70 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-amber-500 cursor-pointer"
+              value={levelRangeFilter}
+              onChange={(e) => setLevelRangeFilter(e.target.value)}
+              className="bg-[#120d22] border border-zinc-700/70 rounded-xl px-2.5 py-2 text-xs text-zinc-200 focus:outline-none focus:border-amber-500 cursor-pointer"
             >
-              <option value="name">Ordem Alfabética (A-Z)</option>
-              <option value="level-asc">Nível (Menor ao Maior)</option>
-              <option value="level-desc">Nível (Maior ao Menor)</option>
-              <option value="rarity">Raridade (Mais Raro)</option>
+              <option value="all">Todos Níveis</option>
+              <option value="0">Nível 0</option>
+              <option value="1-4">Nível 1-4</option>
+              <option value="5-8">Nível 5-8</option>
+              <option value="9-12">Nível 9-12</option>
+              <option value="13-16">Nível 13-16</option>
+              <option value="17-20">Nível 17-20</option>
+            </select>
+
+            {/* Quick Rarity Select */}
+            <select
+              value={selectedRarity}
+              onChange={(e) => setSelectedRarity(e.target.value)}
+              className="bg-[#120d22] border border-zinc-700/70 rounded-xl px-2.5 py-2 text-xs text-zinc-200 focus:outline-none focus:border-amber-500 cursor-pointer"
+            >
+              <option value="all">Todas Raridades</option>
+              <option value="Comum">Comum</option>
+              <option value="Incomum">Incomum</option>
+              <option value="Raro">Raro</option>
+              <option value="Único">Único</option>
             </select>
 
             {/* Toggle Advanced Filters Button */}
@@ -921,7 +1017,7 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
               type="button"
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
-                showFilters || selectedRarity !== 'all' || selectedTrait !== 'all' || selectedLevel !== 'all'
+                showFilters || selectedTrait !== 'all' || selectedLevel !== 'all'
                   ? 'bg-amber-950/60 text-amber-300 border-amber-600/60'
                   : 'bg-[#120d22] text-zinc-400 border-zinc-700/70 hover:text-zinc-200'
               }`}
@@ -929,42 +1025,126 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
               <SlidersHorizontal className="w-3.5 h-3.5" />
               <span>Filtros</span>
             </button>
+          </div>
 
-            {/* View Mode Switcher */}
-            <div className="flex items-center bg-[#120d22] border border-zinc-700/70 rounded-xl p-0.5">
-              <button
-                type="button"
-                onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                  viewMode === 'grid' ? 'bg-amber-500 text-zinc-950 font-bold' : 'text-zinc-400 hover:text-zinc-100'
-                }`}
-                title="Visualização em Cards"
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('table')}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                  viewMode === 'table' ? 'bg-amber-500 text-zinc-950 font-bold' : 'text-zinc-400 hover:text-zinc-100'
-                }`}
-                title="Visualização em Tabela"
-              >
-                <List className="w-4 h-4" />
-              </button>
+          {/* 5. View Mode Switcher (Rightmost) */}
+          <div className="flex items-center bg-[#120d22] border border-zinc-700/70 rounded-xl p-0.5 shrink-0 ml-auto lg:ml-0">
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                viewMode === 'grid' ? 'bg-amber-500 text-zinc-950 font-bold' : 'text-zinc-400 hover:text-zinc-100'
+              }`}
+              title="Visualização em Cards"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                viewMode === 'table' ? 'bg-amber-500 text-zinc-950 font-bold' : 'text-zinc-400 hover:text-zinc-100'
+              }`}
+              title="Visualização em Tabela"
+            >
+              <List className="w-4 h-4" />
+            </button>
+            {isActualGm && (
               <button
                 type="button"
                 onClick={() => setViewMode('tree')}
                 className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                   viewMode === 'tree' ? 'bg-amber-500 text-zinc-950 font-bold' : 'text-zinc-400 hover:text-zinc-100'
                 }`}
-                title="Visualização em Pastas"
+                title="Visualização em Pastas (Exclusivo GM)"
               >
                 <FolderTree className="w-4 h-4" />
               </button>
-            </div>
+            )}
           </div>
         </div>
+
+        {/* Active Filter Badges & Clear Button */}
+        {(activeSubcategory !== null ||
+          levelRangeFilter !== 'all' ||
+          selectedRarity !== 'all' ||
+          selectedTrait !== 'all' ||
+          selectedLevel !== 'all' ||
+          letterFilter !== 'TODOS' ||
+          searchQuery) && (
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-800/80 text-xs">
+            <div className="flex flex-wrap items-center gap-1.5 text-zinc-400">
+              <span className="text-[11px] text-zinc-500">Filtros ativos:</span>
+              {activeSubcategory !== null && (
+                <span className="px-2 py-0.5 rounded-md bg-amber-950/80 text-amber-300 border border-amber-800 text-[11px] flex items-center gap-1">
+                  <span>Pasta: {activeSubcategory === '__none__' ? 'Sem Pasta' : activeSubcategory}</span>
+                  <button type="button" onClick={() => setActiveSubcategory(null)} className="hover:text-white cursor-pointer">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+              {levelRangeFilter !== 'all' && (
+                <span className="px-2 py-0.5 rounded-md bg-cyan-950/80 text-cyan-300 border border-cyan-800 text-[11px] flex items-center gap-1">
+                  <span>Faixa Nível: {levelRangeFilter}</span>
+                  <button type="button" onClick={() => setLevelRangeFilter('all')} className="hover:text-white cursor-pointer">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+              {selectedRarity !== 'all' && (
+                <span className="px-2 py-0.5 rounded-md bg-purple-950/80 text-purple-300 border border-purple-800 text-[11px] flex items-center gap-1">
+                  <span>Raridade: {selectedRarity}</span>
+                  <button type="button" onClick={() => setSelectedRarity('all')} className="hover:text-white cursor-pointer">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+              {selectedTrait !== 'all' && (
+                <span className="px-2 py-0.5 rounded-md bg-emerald-950/80 text-emerald-300 border border-emerald-800 text-[11px] flex items-center gap-1">
+                  <span>Traço: {selectedTrait}</span>
+                  <button type="button" onClick={() => setSelectedTrait('all')} className="hover:text-white cursor-pointer">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+              {selectedLevel !== 'all' && (
+                <span className="px-2 py-0.5 rounded-md bg-blue-950/80 text-blue-300 border border-blue-800 text-[11px] flex items-center gap-1">
+                  <span>Nível: {selectedLevel}</span>
+                  <button type="button" onClick={() => setSelectedLevel('all')} className="hover:text-white cursor-pointer">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+              {letterFilter !== 'TODOS' && (
+                <span className="px-2 py-0.5 rounded-md bg-amber-950/80 text-amber-300 border border-amber-800 text-[11px] flex items-center gap-1">
+                  <span>Letra: {letterFilter}</span>
+                  <button type="button" onClick={() => setLetterFilter('TODOS')} className="hover:text-white cursor-pointer">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+              <span className="text-[11px] text-zinc-500 ml-1">
+                ({filteredItems.length} de {itemEntities.length})
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveSubcategory(null);
+                setLevelRangeFilter('all');
+                setSelectedRarity('all');
+                setSelectedTrait('all');
+                setSelectedLevel('all');
+                setLetterFilter('TODOS');
+                setSearchQuery('');
+              }}
+              className="text-xs text-rose-400 hover:text-rose-300 hover:underline font-bold cursor-pointer"
+            >
+              Limpar Todos os Filtros
+            </button>
+          </div>
+        )}
 
         {/* Advanced Filters Expandable Drawer */}
         {showFilters && (
@@ -1107,7 +1287,7 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
                   <th className="py-3 px-3">Traços</th>
                   <th className="py-3 px-3">Preço</th>
                   <th className="py-3 px-3">Volume</th>
-                  <th className="py-3 px-3">Pastas</th>
+                  {isActualGm && <th className="py-3 px-3">Pastas</th>}
                   {isActualGm && <th className="py-3 px-4 text-right">Ações</th>}
                 </tr>
               </thead>
@@ -1167,22 +1347,24 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
                       <td className="py-3 px-3 font-mono text-zinc-400">
                         {data.bulk || '—'}
                       </td>
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-1 flex-wrap">
-                          {data.subcategories && data.subcategories.length > 0 ? (
-                            data.subcategories.map((s) => (
-                              <span
-                                key={s}
-                                className="text-[10px] px-1.5 py-0.5 rounded bg-amber-950/40 text-amber-300 border border-amber-800/40"
-                              >
-                                {s}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-[10px] text-zinc-600">—</span>
-                          )}
-                        </div>
-                      </td>
+                      {isActualGm && (
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {data.subcategories && data.subcategories.length > 0 ? (
+                              data.subcategories.map((s) => (
+                                <span
+                                  key={s}
+                                  className="text-[10px] px-1.5 py-0.5 rounded bg-amber-950/40 text-amber-300 border border-amber-800/40"
+                                >
+                                  {s}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-[10px] text-zinc-600">—</span>
+                            )}
+                          </div>
+                        </td>
+                      )}
                       {isActualGm && (
                         <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1.5">

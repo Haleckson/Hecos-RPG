@@ -17,6 +17,7 @@ import { TraitBadge } from './TraitBadge';
 import { EntityIcon } from './EntityIcon';
 import { Tooltip } from './Tooltip';
 import { ItemDrawer } from './ItemDrawer';
+import { QuestCard } from './QuestCard';
 import { sortTraitsHierarchically } from '../utils/traitUtils';
 import { DISPOSITION_CONFIG } from '../utils/npcSerializer';
 import {
@@ -34,6 +35,7 @@ import {
   Trash2,
   Share2,
   Folder,
+  Tag,
   Compass,
   MapPin,
   Briefcase,
@@ -159,20 +161,66 @@ export const NPCView: React.FC<NPCViewProps> = ({
     const currentIsRevealed = isFieldRevealed(fieldKey, defaultVis);
     const nextVis: ItemVisibility = currentIsRevealed ? 'gm' : 'all';
 
+    const updatedFieldVis: Record<string, ItemVisibility> = {
+      ...fieldVis,
+      [fieldKey]: nextVis,
+    };
+
+    // Synchronize parent and child keys for nested sections
+    if (fieldKey === 'questsAndRumors') {
+      updatedFieldVis['quests'] = nextVis;
+      updatedFieldVis['rumors'] = nextVis;
+    } else if (fieldKey === 'quests' || fieldKey === 'rumors') {
+      if (nextVis === 'all') {
+        updatedFieldVis['questsAndRumors'] = 'all';
+      }
+    } else if (fieldKey === 'inventory') {
+      updatedFieldVis['loot'] = nextVis;
+      updatedFieldVis['currency'] = nextVis;
+    } else if (fieldKey === 'loot' || fieldKey === 'currency') {
+      if (nextVis === 'all') {
+        updatedFieldVis['inventory'] = 'all';
+      }
+    }
+
     const updatedNpcData: NPCAttributes = {
       ...(currentEntity.npcData || {}),
-      fieldVisibility: {
-        ...fieldVis,
-        [fieldKey]: nextVis
-      }
+      fieldVisibility: updatedFieldVis,
     };
 
     const updatedEntity: HecosEntity = {
       ...currentEntity,
-      npcData: updatedNpcData
+      npcData: updatedNpcData,
     };
 
     HecosStorage.saveEntity(updatedEntity);
+    setCurrentEntity(updatedEntity);
+  };
+
+  // Unlink a quest directly from NPCView (GM only)
+  const handleUnlinkQuest = (questIdentifier: string) => {
+    if (!isActualGm) return;
+
+    const remainingQuests = (currentEntity.npcData?.quests || []).filter(
+      (q) => q.id !== questIdentifier && q.questEntityId !== questIdentifier
+    );
+    const remainingQuestIds = (currentEntity.npcData?.questIds || []).filter(
+      (id) => id !== questIdentifier
+    );
+
+    const updatedNpcData: NPCAttributes = {
+      ...(currentEntity.npcData || {}),
+      quests: remainingQuests,
+      questIds: remainingQuestIds,
+    };
+
+    const updatedEntity: HecosEntity = {
+      ...currentEntity,
+      npcData: updatedNpcData,
+    };
+
+    HecosStorage.saveEntity(updatedEntity);
+    MutualLinkService.syncMutualLinksOnSave(updatedEntity);
     setCurrentEntity(updatedEntity);
   };
 
@@ -205,7 +253,7 @@ export const NPCView: React.FC<NPCViewProps> = ({
       ? npc.traits
       : (currentEntity.traits && currentEntity.traits.length > 0)
       ? currentEntity.traits
-      : (currentEntity.tags || []);
+      : [];
     rawT.forEach(t => dynamicKeys.push(`tag_${t}`));
 
     const subc = currentEntity.subcategories || (currentEntity.subcategory ? [currentEntity.subcategory] : []);
@@ -358,7 +406,55 @@ export const NPCView: React.FC<NPCViewProps> = ({
   // Lists
   const relationships: NPCRelationship[] = npc.relationships || [];
   const rumors: NPCRumor[] = npc.rumors || [];
-  const quests: NPCQuestLink[] = npc.quests || [];
+  
+  // Quests (with robust aggregation from direct array, IDs, and MutualLinkService reverse-lookups)
+  const quests: NPCQuestLink[] = useMemo(() => {
+    const map = new Map<string, NPCQuestLink>();
+
+    // 1. Direct explicit quests array on NPC
+    (npc.quests || []).forEach((q, idx) => {
+      const key = q.questEntityId || q.id || `q-${idx}-${q.title}`;
+      map.set(key, {
+        ...q,
+        id: q.id || q.questEntityId || `q-${idx}`,
+      });
+    });
+
+    // 2. Direct quest IDs
+    (npc.questIds || []).forEach((qId) => {
+      if (qId && !map.has(qId)) {
+        const ent = allEntities.find((e) => e.id === qId);
+        if (ent) {
+          map.set(qId, {
+            id: ent.id,
+            questEntityId: ent.id,
+            title: ent.title,
+            roleInQuest: 'Missão Vinculada',
+            description: ent.subtitle || ent.summary || '',
+            isSecret: Boolean(ent.isSecret || ent.visibility === 'gm'),
+          });
+        }
+      }
+    });
+
+    // 3. Mutual links (reverse lookup: quest giver, involved NPC, etc.)
+    (linkedData.quests || []).forEach((lq) => {
+      const key = lq.entity?.id || lq.linkId || lq.title;
+      if (key && !map.has(key)) {
+        map.set(key, {
+          id: lq.linkId || lq.entity?.id || key,
+          questEntityId: lq.entity?.id,
+          title: lq.title,
+          roleInQuest: lq.roleInQuest || 'Missão Vinculada',
+          description: lq.description || lq.entity?.subtitle || '',
+          isSecret: Boolean(lq.isSecret || lq.entity?.isSecret || lq.entity?.visibility === 'gm'),
+        });
+      }
+    });
+
+    return Array.from(map.values());
+  }, [npc.quests, npc.questIds, linkedData.quests, allEntities]);
+
   const lootItems: NPCLootItem[] = npc.loot || npc.inventory || [];
   const currency = npc.currency;
 
@@ -366,12 +462,12 @@ export const NPCView: React.FC<NPCViewProps> = ({
   const portraitImage = currentEntity.coverImage || npc.portraitImage;
   const tokenImage = npc.tokenImage || currentEntity.icon;
 
-  // Traits (with permission filtering for non-GMs)
+  // Traits (with permission filtering for non-GMs) - strictly PF2e traits, separate from search tags
   const rawTraits = (npc.traits && npc.traits.length > 0)
     ? npc.traits
     : (currentEntity.traits && currentEntity.traits.length > 0)
     ? currentEntity.traits
-    : (currentEntity.tags || []);
+    : [];
   const orderedTraits = sortTraitsHierarchically(rawTraits, { rarity: npc.rarity || 'Comum', size });
 
   const visibleTraits = useMemo(() => {
@@ -380,13 +476,14 @@ export const NPCView: React.FC<NPCViewProps> = ({
     return orderedTraits.filter(trait => isFieldVisible(`tag_${trait}`));
   }, [orderedTraits, isActualGm, fieldVis]);
 
-  // Subcategories / Folders (with permission filtering for non-GMs)
+  // Discrete search & filter tags (filtered from traits to avoid duplicate display)
+  const discreteTags = useMemo(() => {
+    const allTags = currentEntity.tags || [];
+    return allTags.filter((t) => !rawTraits.some((tr) => tr.toLowerCase() === t.toLowerCase()));
+  }, [currentEntity.tags, rawTraits]);
+
+  // Subcategories / Folders (strictly GM only)
   const subcategories = currentEntity.subcategories || (currentEntity.subcategory ? [currentEntity.subcategory] : []);
-  const visibleSubcategories = useMemo(() => {
-    if (isActualGm) return subcategories;
-    if (!isFieldVisible('subcategories')) return [];
-    return subcategories.filter(folder => isFieldVisible(`folder_${folder}`));
-  }, [subcategories, isActualGm, fieldVis]);
 
   // Backlinks
   const backlinks = useMemo(() => {
@@ -476,24 +573,76 @@ export const NPCView: React.FC<NPCViewProps> = ({
   const visibleRelationships = useMemo(() => {
     if (isActualGm) return relationships;
     if (!isFieldVisible('relationships')) return [];
-    return relationships.filter(r => !r.isSecret && isFieldVisible(`rel_${r.id}`));
+    return relationships.filter((r) => {
+      const itemVis = fieldVis[`rel_${r.id}`];
+      if (itemVis === 'all') return true;
+      if (itemVis === 'gm') return false;
+      if (r.isSecret) return false;
+      return isFieldVisible(`rel_${r.id}`);
+    });
   }, [relationships, isActualGm, fieldVis]);
 
   const visibleQuests = useMemo(() => {
     if (isActualGm) return quests;
-    if (!isFieldVisible('questsAndRumors') || !isFieldVisible('quests')) return [];
-    return quests.filter(q => !q.isSecret && isFieldVisible(`quest_${q.id}`));
-  }, [quests, isActualGm, fieldVis]);
+    
+    // Check section-level visibility:
+    // If either 'questsAndRumors' or 'quests' is set to 'all' (or default 'all' if unset), allow it.
+    // Block only if both or the active configured key is explicitly 'gm'.
+    const isQuestsAllowed =
+      fieldVis['questsAndRumors'] === 'all' ||
+      fieldVis['quests'] === 'all' ||
+      (fieldVis['questsAndRumors'] !== 'gm' && fieldVis['quests'] !== 'gm');
+
+    if (!isQuestsAllowed) return [];
+
+    return quests.filter((q) => {
+      // 1. Check explicit item-level eye toggle from the NPC view
+      const itemVis = fieldVis[`quest_${q.id}`] ?? (q.questEntityId ? fieldVis[`quest_${q.questEntityId}`] : undefined);
+      if (itemVis === 'all') return true;
+      if (itemVis === 'gm') return false;
+      if (itemVis === 'custom') {
+        if (!currentUser) return false;
+        const allowed = fieldVis.allowedUsers?.[`quest_${q.id}`] || (q.questEntityId ? fieldVis.allowedUsers?.[`quest_${q.questEntityId}`] : []);
+        if (!allowed.includes(currentUser.id)) return false;
+      }
+
+      // 2. If there is a matched Quest Entity in database, check its access permission (respects quest category folder permissions and entity visibility)
+      const matched = allEntities.find(
+        (e) =>
+          (e.category === 'quest' || Boolean(e.questData)) &&
+          (e.id === q.questEntityId || e.id === q.id || (q.title && MutualLinkService.matchTitle(e.title, q.title)))
+      );
+      if (matched) {
+        if (!HecosStorage.canUserAccessItem(matched, currentUser)) {
+          return false;
+        }
+        return true;
+      }
+
+      // 3. Fallback for unlinked/custom quest items: check q.isSecret
+      if (q.isSecret) return false;
+
+      return true;
+    });
+  }, [quests, isActualGm, fieldVis, allEntities, currentUser]);
 
   const visibleRumors = useMemo(() => {
     if (isActualGm) return rumors;
-    if (!isFieldVisible('questsAndRumors') || !isFieldVisible('rumors')) return [];
+    const isRumorsAllowed =
+      fieldVis['questsAndRumors'] === 'all' ||
+      fieldVis['rumors'] === 'all' ||
+      (fieldVis['questsAndRumors'] !== 'gm' && fieldVis['rumors'] !== 'gm');
+    if (!isRumorsAllowed) return [];
     return rumors.filter(r => isFieldVisible(`rumor_${r.id}`));
   }, [rumors, isActualGm, fieldVis]);
 
   const visibleLootItems = useMemo(() => {
     if (isActualGm) return lootItems;
-    if (!isFieldVisible('inventory') || !isFieldVisible('loot')) return [];
+    const isLootAllowed =
+      fieldVis['inventory'] === 'all' ||
+      fieldVis['loot'] === 'all' ||
+      (fieldVis['inventory'] !== 'gm' && fieldVis['loot'] !== 'gm');
+    if (!isLootAllowed) return [];
     return lootItems.filter(item => !item.isSecret && isFieldVisible(`loot_${item.id || item.name}`));
   }, [lootItems, isActualGm, fieldVis]);
 
@@ -689,34 +838,28 @@ export const NPCView: React.FC<NPCViewProps> = ({
             </div>
           </div>
 
-          {/* 3. METADADOS E PASTAS VINCULADAS COM OLHINHO INDIVIDUAL */}
-          {(isActualGm ? subcategories.length > 0 : visibleSubcategories.length > 0) && (
+          {/* 3. METADADOS E PASTAS VINCULADAS (EXCLUSIVO PARA O GM) */}
+          {isActualGm && subcategories.length > 0 && (
             <div className="rounded-2xl bg-[#0e0a19] border border-zinc-800/80 p-3.5 space-y-2 shadow-lg">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-mono">
                   <Folder className="w-3.5 h-3.5 text-purple-400" />
                   Pastas Vinculadas
                 </span>
-                {renderEyeToggle('subcategories', 'Todas as Pastas', 'all', { compact: true })}
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-950/60 text-purple-300 border border-purple-800/60 font-mono font-bold">
+                  GM
+                </span>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {(isActualGm ? subcategories : visibleSubcategories).map((folder) => {
-                  const isFolderRev = isFieldRevealed(`folder_${folder}`, 'all');
-                  return (
-                    <span
-                      key={folder}
-                      className={`text-xs px-2.5 py-1 rounded-lg border flex items-center gap-1.5 shadow-sm transition-all ${
-                        isActualGm && !isFolderRev
-                          ? 'bg-rose-950/40 text-rose-300 border-rose-800/60 opacity-80'
-                          : 'bg-[#180f26] text-purple-200 border-purple-900/50'
-                      }`}
-                    >
-                      <Folder className="w-3 h-3 text-purple-400" />
-                      <span>{folder}</span>
-                      {renderEyeToggle(`folder_${folder}`, `Pasta ${folder}`, 'all', { compact: true })}
-                    </span>
-                  );
-                })}
+                {subcategories.map((folder) => (
+                  <span
+                    key={folder}
+                    className="text-xs px-2.5 py-1 rounded-lg border flex items-center gap-1.5 shadow-sm bg-[#180f26] text-purple-200 border-purple-900/50"
+                  >
+                    <Folder className="w-3 h-3 text-purple-400" />
+                    <span>{folder}</span>
+                  </span>
+                ))}
               </div>
             </div>
           )}
@@ -821,7 +964,11 @@ export const NPCView: React.FC<NPCViewProps> = ({
               <div className="flex items-center gap-2 flex-wrap">
                 {/* Ocupação / Papel */}
                 <div className="inline-flex items-center gap-1">
-                  <Tooltip content={`Papel / Ocupação: ${role}`}>
+                  <Tooltip
+                    title="Papel & Ocupação"
+                    description={`Função social ou ofício principal: ${role}`}
+                    badge="Papel"
+                  >
                     <span className="px-3 py-1 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-sm border bg-purple-950 text-purple-300 border-purple-800 cursor-help">
                       <User className="w-3.5 h-3.5 text-purple-400" />
                       <span>{isFieldVisible('role') ? role : '???'}</span>
@@ -833,7 +980,11 @@ export const NPCView: React.FC<NPCViewProps> = ({
                 {/* Nível */}
                 {level !== undefined && level !== null && (
                   <div className="inline-flex items-center gap-1">
-                    <Tooltip content={`Nível do NPC: ${level}`}>
+                    <Tooltip
+                      title="Nível do NPC"
+                      description={`Nível ${level} — Define o patamar de poder, atributos e perícias deste NPC.`}
+                      badge={`Nv ${level}`}
+                    >
                       <span className="px-3 py-1 rounded-xl bg-violet-950 text-violet-300 border border-violet-800 font-mono font-bold text-xs cursor-help">
                         Nível {isFieldVisible('level') ? level : '???'}
                       </span>
@@ -845,7 +996,11 @@ export const NPCView: React.FC<NPCViewProps> = ({
                 {/* Disposição */}
                 {disposition && (isFieldVisible('disposition') || isActualGm) && (
                   <div className="inline-flex items-center gap-1">
-                    <Tooltip content={`Disposição / Atitude inicial: ${disposition.label} - ${disposition.desc}`}>
+                    <Tooltip
+                      title={`Atitude: ${disposition.label}`}
+                      description={disposition.desc}
+                      badge="Comportamento"
+                    >
                       <span className={`px-3 py-1 rounded-xl border font-mono font-bold text-xs flex items-center gap-1 cursor-help ${disposition.bg} ${disposition.border} ${disposition.text}`}>
                         <Smile className="w-3.5 h-3.5" />
                         <span>{isFieldVisible('disposition') ? disposition.label : '🔒 Disposição Oculta'}</span>
@@ -857,7 +1012,11 @@ export const NPCView: React.FC<NPCViewProps> = ({
               </div>
 
               {onEdit && isActualGm && (
-                <Tooltip content="Abrir o modal de edição deste NPC">
+                <Tooltip
+                  title="Editar Ficha"
+                  description="Abrir o modal de edição deste NPC para alterar atributos, vínculos, inventário e notas."
+                  badge="GM"
+                >
                   <button
                     type="button"
                     onClick={onEdit}
@@ -959,6 +1118,33 @@ export const NPCView: React.FC<NPCViewProps> = ({
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Tags Discretas de Pesquisa & Filtragem */}
+            {discreteTags.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                <span className="text-[11px] text-zinc-500 font-mono flex items-center gap-1 mr-0.5">
+                  <Tag className="w-3 h-3 text-zinc-500" />
+                  <span>Tags:</span>
+                </span>
+                {discreteTags.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => {
+                      if (onTagClick) {
+                        onTagClick(tag);
+                      } else {
+                        window.dispatchEvent(new CustomEvent('hecos:filter-by-tag', { detail: { tag } }));
+                      }
+                    }}
+                    className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-zinc-900/70 hover:bg-purple-950/50 text-zinc-400 hover:text-purple-300 border border-zinc-800 hover:border-purple-800/60 transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
+                    title={`Filtrar compêndio por #${tag}`}
+                  >
+                    <span>#{tag}</span>
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -1648,60 +1834,119 @@ export const NPCView: React.FC<NPCViewProps> = ({
                       {renderEyeToggle('questsAndRumors', 'Missões & Rumores')}
                     </div>
 
-                    <div className="space-y-2.5">
-                      {/* Quests */}
-                      {(isActualGm ? quests : visibleQuests).map((q) => {
-                        const isQuestRev = isFieldRevealed(`quest_${q.id}`, 'all') && !q.isSecret;
-                        return (
-                          <div
-                            key={q.id}
-                            className={`p-3 rounded-xl border text-xs space-y-1 transition-all ${
-                              isActualGm && !isQuestRev
-                                ? 'bg-rose-950/30 border-rose-800/60'
-                                : 'bg-amber-950/20 border-amber-800/40'
-                            }`}
-                          >
-                            <div className="font-bold text-amber-200 flex items-center justify-between gap-1.5">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <Sparkle className="w-3 h-3 text-amber-400 shrink-0" />
-                                <span className="truncate">{q.title}</span>
-                                {q.roleInQuest && <span className="text-[10px] font-mono text-zinc-400">({q.roleInQuest})</span>}
-                                {q.isSecret && (
-                                  <span className="text-[9px] px-1.5 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded font-mono">
-                                    Segredo GM
-                                  </span>
-                                )}
-                              </div>
-                              {renderEyeToggle(`quest_${q.id}`, `Missão: ${q.title}`, 'all', { compact: true })}
-                            </div>
-                            {q.description && <p className="text-zinc-300 text-[11px] leading-relaxed">{q.description}</p>}
+                    <div className="space-y-4">
+                      {/* Quests Displayed as Cards */}
+                      {(isActualGm ? quests : visibleQuests).length > 0 && (
+                        <div className="space-y-2.5">
+                          <h5 className="text-[11px] font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                            <Sparkle className="w-3 h-3 text-cyan-400" />
+                            Missões Associadas ({(isActualGm ? quests : visibleQuests).length})
+                          </h5>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                            {(isActualGm ? quests : visibleQuests).map((q) => {
+                              const isQuestRev = isFieldRevealed(`quest_${q.id}`, 'all') && !q.isSecret;
+                              const allEntities = HecosStorage.getEntities();
+                              const matchedEntity = allEntities.find(
+                                (e) =>
+                                  (e.category === 'quest' || Boolean(e.questData)) &&
+                                  (e.id === q.questEntityId || e.id === q.id || e.title.trim().toLowerCase() === q.title.trim().toLowerCase())
+                              );
+
+                              const targetEntity: HecosEntity = matchedEntity || {
+                                id: q.questEntityId || q.id,
+                                slug: q.id,
+                                title: q.title,
+                                subtitle: q.description || '',
+                                summary: q.description || '',
+                                category: 'quest',
+                                questData: {
+                                  status: 'not_started',
+                                  questType: 'Secundária',
+                                  difficulty: 'Moderada',
+                                  objectives: [],
+                                  questGiver: currentEntity.title,
+                                  questGiverEntityId: currentEntity.id,
+                                },
+                                isSecret: q.isSecret,
+                                tags: ['quest'],
+                                content: q.description || '',
+                                createdAt: new Date().toISOString(),
+                                updatedAt: new Date().toISOString(),
+                              };
+
+                              const questVisKey = `quest_${q.id || q.questEntityId}`;
+
+                              return (
+                                <div key={q.id || q.questEntityId || q.title} className="relative group/questcard">
+                                  {isActualGm && (
+                                    <div className="absolute top-3 right-10 z-10">
+                                      {renderEyeToggle(questVisKey, `Missão: ${q.title}`, 'all', { compact: true })}
+                                    </div>
+                                  )}
+                                  <QuestCard
+                                    entity={targetEntity}
+                                    onSelect={(id) => {
+                                      const targetId = matchedEntity?.id || q.questEntityId || q.id || targetEntity.id;
+                                      const targetSlug = matchedEntity?.slug || targetEntity.slug;
+                                      // Check access
+                                      if (!isActualGm && matchedEntity && !HecosStorage.canUserAccessItem(matchedEntity)) {
+                                        return;
+                                      }
+                                      window.dispatchEvent(
+                                        new CustomEvent('hecos:open-entity-drawer', {
+                                          detail: { entityId: targetId, slug: targetSlug },
+                                        })
+                                      );
+                                    }}
+                                    onUnlink={
+                                      isActualGm
+                                        ? () => handleUnlinkQuest(q.questEntityId || q.id || targetEntity.id)
+                                        : undefined
+                                    }
+                                    showRoleBadge={q.roleInQuest}
+                                    draggable={false}
+                                    compact={false}
+                                  />
+                                </div>
+                              );
+                            })}
                           </div>
-                        );
-                      })}
+                        </div>
+                      )}
 
                       {/* Rumors */}
-                      {(isActualGm ? rumors : visibleRumors).map((r) => {
-                        const isRumorRev = isFieldRevealed(`rumor_${r.id}`, 'all');
-                        return (
-                          <div
-                            key={r.id}
-                            className={`p-3 rounded-xl border text-xs italic text-zinc-300 flex items-start justify-between gap-2.5 transition-all ${
-                              isActualGm && !isRumorRev
-                                ? 'bg-rose-950/30 border-rose-800/60'
-                                : 'bg-black/40 border-zinc-800'
-                            }`}
-                          >
-                            <div className="flex items-start gap-2.5 min-w-0">
-                              <Quote className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
-                              <div>
-                                <p className="leading-relaxed">"{r.text}"</p>
-                                {r.source && <span className="text-[10px] text-zinc-500 font-mono not-italic mt-1 block">— {r.source}</span>}
-                              </div>
-                            </div>
-                            {renderEyeToggle(`rumor_${r.id}`, `Rumor`, 'all', { compact: true })}
+                      {(isActualGm ? rumors : visibleRumors).length > 0 && (
+                        <div className="space-y-2">
+                          <h5 className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                            <Quote className="w-3 h-3 text-amber-400" />
+                            Rumores & Boatos ({(isActualGm ? rumors : visibleRumors).length})
+                          </h5>
+                          <div className="space-y-2">
+                            {(isActualGm ? rumors : visibleRumors).map((r) => {
+                              const isRumorRev = isFieldRevealed(`rumor_${r.id}`, 'all');
+                              return (
+                                <div
+                                  key={r.id}
+                                  className={`p-3 rounded-xl border text-xs italic text-zinc-300 flex items-start justify-between gap-2.5 transition-all ${
+                                    isActualGm && !isRumorRev
+                                      ? 'bg-rose-950/30 border-rose-800/60'
+                                      : 'bg-black/40 border-zinc-800'
+                                  }`}
+                                >
+                                  <div className="flex items-start gap-2.5 min-w-0">
+                                    <Quote className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
+                                    <div>
+                                      <p className="leading-relaxed">&quot;{r.text}&quot;</p>
+                                      {r.source && <span className="text-[10px] text-zinc-500 font-mono not-italic mt-1 block">— {r.source}</span>}
+                                    </div>
+                                  </div>
+                                  {renderEyeToggle(`rumor_${r.id}`, `Rumor`, 'all', { compact: true })}
+                                </div>
+                              );
+                            })}
                           </div>
-                        );
-                      })}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

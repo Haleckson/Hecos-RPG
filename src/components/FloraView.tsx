@@ -263,12 +263,12 @@ export const FloraView: React.FC<FloraViewProps> = ({
             </div>
           </div>
 
-          {/* 4. PASTAS & SUBCATEGORIAS */}
-          {((currentEntity.subcategories && currentEntity.subcategories.length > 0) || currentEntity.subcategory) && (
+          {/* 4. PASTAS & SUBCATEGORIAS (EXCLUSIVO GM) */}
+          {isActualGm && ((currentEntity.subcategories && currentEntity.subcategories.length > 0) || currentEntity.subcategory) && (
             <div className="rounded-3xl bg-[#0a1410] border border-emerald-900/40 p-4 space-y-3 shadow-xl">
               <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
                 <Folder className="w-3.5 h-3.5 text-emerald-400" />
-                Pastas & Classificação
+                Pastas & Classificação (GM)
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {(currentEntity.subcategories || [currentEntity.subcategory!]).filter(Boolean).map((sub, idx) => (

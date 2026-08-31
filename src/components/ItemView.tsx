@@ -229,8 +229,8 @@ export const ItemView: React.FC<ItemViewProps> = ({
                 {itemData.rarity || 'Comum'}
               </span>
 
-              {/* Item Folders / Subcategories */}
-              {currentSubcategories.map((sub) => {
+              {/* Item Folders / Subcategories (GM only) */}
+              {isActualGm && currentSubcategories.map((sub) => {
                 const isSecret = HecosStorage.isFolderSecret(sub);
                 return (
                   <span

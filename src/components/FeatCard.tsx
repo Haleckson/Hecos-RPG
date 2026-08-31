@@ -555,11 +555,11 @@ export const FeatCard: React.FC<FeatCardProps> = ({
         )}
       </div>
 
-      {/* Bottom Footer: Folder Tags & Edit/Delete Actions */}
+      {/* Bottom Footer: Folder Tags (GM only) & Edit/Delete Actions */}
       <div className="mt-4 pt-3 border-t border-zinc-800/60 flex items-center justify-between gap-2">
-        {/* Folders assigned to this feat */}
+        {/* Folders assigned to this feat (GM only) */}
         <div className="flex items-center gap-1 flex-wrap flex-1 max-w-[70%]">
-          {subcats.length > 0 ? (
+          {isActualGm && subcats.length > 0 ? (
             subcats.map((sub, sIdx) => (
               <span
                 key={`sub-${sub}-${sIdx}`}
@@ -568,14 +568,15 @@ export const FeatCard: React.FC<FeatCardProps> = ({
                   onSelectSubcategory && onSelectSubcategory(sub);
                 }}
                 className="text-[10px] px-1.5 py-0.5 rounded bg-amber-950/50 text-amber-300 border border-amber-800/40 hover:border-amber-400 truncate transition-colors cursor-pointer flex items-center gap-1"
+                title={`Pasta: ${sub} (Exclusivo GM)`}
               >
                 <Folder className="w-2.5 h-2.5 shrink-0" />
                 <span className="truncate">{sub}</span>
               </span>
             ))
-          ) : (
+          ) : isActualGm ? (
             <span className="text-[10px] text-zinc-600 italic">Sem pasta</span>
-          )}
+          ) : null}
 
           {/* Manage Folders Trigger Button */}
           {isActualGm && entity && onOpenFolderAssign && (

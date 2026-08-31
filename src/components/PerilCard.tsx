@@ -858,11 +858,11 @@ export const PerilCard: React.FC<PerilCardProps> = ({
           )}
         </div>
 
-        {/* PASTAS / SUBCATEGORIAS */}
-        {(canViewTraits || effectiveIsGm) && subcategories.length > 0 && (
+        {/* PASTAS / SUBCATEGORIAS (EXCLUSIVO GM) */}
+        {effectiveIsGm && subcategories.length > 0 && (
           <div className="pt-2 border-t border-zinc-800/60 flex items-center gap-1.5 flex-wrap">
             {subcategories.map((sub) => (
-              <Tooltip key={sub} content={`Pasta: ${sub}`}>
+              <Tooltip key={sub} content={`Pasta: ${sub} (Exclusivo GM)`}>
                 <span className="text-[10px] px-2 py-0.5 rounded-md bg-rose-950/40 text-rose-300 border border-rose-900/40 flex items-center gap-1 cursor-help">
                   <Folder className="w-2.5 h-2.5 text-rose-400" />
                   <span>{sub}</span>

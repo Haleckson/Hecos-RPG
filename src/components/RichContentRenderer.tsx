@@ -607,9 +607,29 @@ export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
       }
 
       // 12. Standard Paragraph (render as div to avoid invalid HTML nesting when content has block elements)
+      let cleanLine = line;
+      const pMatch = cleanLine.match(/^<p(?:\s+class=(?:'|")([^'"]+)(?:'|"))?>([\s\S]*?)<\/p>$/i);
+      if (pMatch) {
+        const extraCls = pMatch[1] || '';
+        cleanLine = pMatch[2];
+        elements.push(
+          <div key={`p-${i}`} className={`text-zinc-200 text-sm leading-relaxed my-1 ${extraCls}`}>
+            {renderContentWithMentions(cleanLine, onNavigate)}
+          </div>
+        );
+        i++;
+        continue;
+      }
+
+      cleanLine = cleanLine.replace(/<\/?p\b[^>]*>/gi, '').trim();
+      if (!cleanLine) {
+        i++;
+        continue;
+      }
+
       elements.push(
         <div key={`p-${i}`} className="text-zinc-200 text-sm leading-relaxed my-1">
-          {renderContentWithMentions(line, onNavigate)}
+          {renderContentWithMentions(cleanLine, onNavigate)}
         </div>
       );
       i++;

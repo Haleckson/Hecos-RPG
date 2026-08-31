@@ -46,7 +46,7 @@ export function serializeLocationToHTML(
     parts.push(`<div class="mb-6">${extraDescription}</div>`);
   }
 
-  return parts.join('\n\n') || '<p>Nenhum detalhe adicional informado.</p>';
+  return parts.join('\n\n') || 'Nenhum detalhe adicional informado.';
 }
 
 /* =========================================================================
@@ -65,14 +65,30 @@ export function getEmptyQuestData(): QuestAttributes {
     questGiverEntityId: '',
     location: '',
     locationEntityId: '',
+    organization: '',
+    organizationEntityId: '',
+    faction: '',
+    factionEntityId: '',
+    involvedNpcIds: [],
+    involvedLocationIds: [],
+    involvedOrgIds: [],
     objectives: [
       { id: 'obj-1', text: 'Investigar os primeiros indícios', completed: false },
     ],
     rewards: {
       xp: 80,
       gold: '25 PO',
+      currency: {
+        pp: '',
+        gp: '25',
+        sp: '',
+        cp: '',
+        custom: '',
+      },
       items: [],
+      structuredItems: [],
       reputation: '',
+      organizationReputations: [],
     },
     actOrChapter: '',
     subcategories: [],
@@ -88,22 +104,17 @@ export function serializeQuestToHTML(
 ): string {
   const parts: string[] = [];
 
-  if (summary) {
-    parts.push(`<p class="lead-text italic text-cyan-200 mb-4">${summary}</p>`);
+  const mainNarrative = extraDescription || quest.briefing || quest.narrativeLore || '';
+
+  if (summary && !mainNarrative.includes(summary)) {
+    parts.push(summary);
   }
 
-  if (quest.objectives && quest.objectives.length > 0) {
-    parts.push(`<h3>Objetivos da Missão</h3>\n<ul>` +
-      quest.objectives.map(o => `<li>[${o.completed ? 'x' : ' '}] ${o.text}</li>`).join('\n') +
-      `\n</ul>`
-    );
+  if (mainNarrative) {
+    parts.push(mainNarrative);
   }
 
-  if (extraDescription) {
-    parts.push(`<div class="mb-6">${extraDescription}</div>`);
-  }
-
-  return parts.join('\n\n') || '<p>Nenhum detalhe de missão registrado.</p>';
+  return parts.join('\n\n') || 'Nenhum detalhe de missão registrado.';
 }
 
 /* =========================================================================
@@ -150,7 +161,7 @@ export function serializeOrganizationToHTML(
     parts.push(`<div class="mb-6">${extraDescription}</div>`);
   }
 
-  return parts.join('\n\n') || '<p>Nenhum detalhe de facção registrado.</p>';
+  return parts.join('\n\n') || 'Nenhum detalhe de facção registrado.';
 }
 
 /* =========================================================================

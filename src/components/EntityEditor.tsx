@@ -55,6 +55,7 @@ import { getFullAncestryTemplate } from '../utils/ancestryTemplate';
 import { AncestryEditor } from './AncestryEditor';
 import { FeatEditor } from './FeatEditor';
 import { Dna, Sliders } from 'lucide-react';
+import { entityIndexService, IndexedEntity, CATEGORY_CONFIG } from '../services/entityIndexService';
 
 interface EntityEditorProps {
   entity: HecosEntity;
@@ -107,18 +108,12 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const allEntities = HecosStorage.getEntities();
 
-  // Filter entities for mention dropdown
-  const filteredEntities = allEntities
-    .filter(
-      (e) =>
-        e.id !== entity.id &&
-        ((e.title || '').toLowerCase().includes(mentionQuery.toLowerCase()) ||
-          (e.slug || '').toLowerCase().includes(mentionQuery.toLowerCase()) ||
-          (e.tags || []).some((t) => (t || '').toLowerCase().includes(mentionQuery.toLowerCase())))
-    )
-    .slice(0, 8);
+  // Filter entities for mention dropdown with intelligent diacritic-insensitive index
+  const filteredEntities = entityIndexService.search(mentionQuery, {
+    excludeId: entity.id,
+    limit: 10,
+  });
 
   // Helper to wrap selected text with prefix & suffix (e.g. **bold**)
   const wrapSelection = (prefix: string, suffix: string = prefix, defaultPlaceholder: string = 'texto') => {
@@ -229,7 +224,7 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
   };
 
   // Insert selected mention
-  const insertMention = (selectedEntity: HecosEntity) => {
+  const insertMention = (selectedEntity: IndexedEntity | HecosEntity) => {
     if (!textareaRef.current) return;
     const textBeforeCursor = content.slice(0, textareaRef.current.selectionStart);
     const textAfterCursor = content.slice(textareaRef.current.selectionStart);
@@ -1388,37 +1383,49 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
 
             {/* Mention Autocomplete Dropdown Popup */}
             {showMentionMenu && filteredEntities.length > 0 && (
-              <div className="absolute left-6 bottom-12 z-50 w-80 max-h-72 overflow-y-auto rounded-2xl bg-[#130f21]/95 backdrop-blur-xl border border-purple-500/50 shadow-2xl p-2 animate-in fade-in zoom-in-95 duration-150">
-                <div className="px-2.5 py-1 text-[10px] font-bold uppercase text-purple-300 border-b border-zinc-800/80 mb-1.5 flex items-center justify-between">
+              <div className="absolute left-6 top-10 z-[99999] w-88 max-w-sm max-h-80 overflow-y-auto rounded-2xl bg-[#130f21]/98 backdrop-blur-2xl border-2 border-cyan-400/90 shadow-[0_25px_60px_rgba(0,0,0,0.95),0_0_40px_rgba(6,182,212,0.45)] p-2 animate-in fade-in zoom-in-95 duration-150 ring-2 ring-cyan-500/30">
+                <div className="px-2.5 py-1 text-[10px] font-bold uppercase text-cyan-300 border-b border-zinc-800/80 mb-1.5 flex items-center justify-between">
                   <span className="flex items-center gap-1">
                     <AtSign className="w-3 h-3 text-cyan-400" />
-                    <span>Linkar Entidade do Codex</span>
+                    <span>Indexador de Artigos Hecos</span>
                   </span>
                   <span className="text-zinc-500">{filteredEntities.length} resultados</span>
                 </div>
                 <div className="space-y-1">
-                  {filteredEntities.map((item, idx) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => insertMention(item)}
-                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs transition-all ${
-                        idx === mentionIndex
-                          ? 'bg-gradient-to-r from-cyan-950 to-purple-950 text-cyan-200 border border-cyan-600/70 shadow-sm'
-                          : 'hover:bg-zinc-800/60 text-zinc-300 border border-transparent'
-                      }`}
-                    >
-                      <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-black/60 border border-zinc-800 text-zinc-400 font-mono">
-                        {item.category}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-bold truncate text-zinc-100">{item.title}</div>
-                        {item.subtitle && (
-                          <div className="text-[10px] text-zinc-400 truncate">{item.subtitle}</div>
-                        )}
-                      </div>
-                    </button>
-                  ))}
+                  {filteredEntities.map((item, idx) => {
+                    const catConf = CATEGORY_CONFIG[item.category];
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => insertMention(item)}
+                        className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs transition-all ${
+                          idx === mentionIndex
+                            ? 'bg-gradient-to-r from-cyan-950 to-purple-950 text-cyan-200 border border-cyan-600/70 shadow-sm'
+                            : 'hover:bg-zinc-800/60 text-zinc-300 border border-transparent'
+                        }`}
+                      >
+                        <span
+                          className={`text-[9px] uppercase font-bold px-1.5 py-0.5 rounded border ${catConf?.bgClass || 'bg-black/60'} ${catConf?.textClass || 'text-zinc-400'} ${catConf?.borderClass || 'border-zinc-800'} font-mono`}
+                        >
+                          {item.categoryLabel?.split(' / ')[0] || item.category}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1">
+                            <span className="font-bold truncate text-zinc-100">{item.title}</span>
+                            {item.levelOrRank && (
+                              <span className="px-1 text-[9px] rounded font-mono bg-zinc-950 text-cyan-300 border border-zinc-700">
+                                {item.levelOrRank}
+                              </span>
+                            )}
+                          </div>
+                          {item.subtitle && (
+                            <div className="text-[10px] text-zinc-400 truncate">{item.subtitle}</div>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}

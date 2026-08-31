@@ -209,18 +209,26 @@ function parseInlineFormatting(
   // 2. Wikilinks/traits: [[trait:Name]] or [[Article Name]]
   // 3. Trait shortcuts: [trait:Name] or [tr:Name]
   // 4. Mentions: @slug
-  // 5. HTML tags: <span style="...">...</span>, <mark>...</mark>, <b/i/u/strong/em/del/code>...
+  // 5. HTML tags: <p class="...">...</p>, <span style="...">...</span>, <mark>...</mark>, <b/i/u/strong/em/del/code>...
   // 6. Markdown bold: **...** or __...__
   // 7. Markdown underline: ++...++
   // 8. Markdown strikethrough: ~~...~~
   // 9. Markdown inline code: `...`
   // 10. Markdown italic: *...* or _..._
-  const tokenRegex = /(<span[^>]*>[\s\S]*?<\/span>|<mark[^>]*>[\s\S]*?<\/mark>|<(?:b|strong|i|em|u|del|s|code|font)[^>]*>[\s\S]*?<\/(?:b|strong|i|em|u|del|s|code|font)>|\[(?:1-action|2-actions|3-actions|1-to-2-actions|1-to-3-actions|one-action|two-actions|three-actions|one-to-two-actions|one-to-three-actions|free-action|reaction|1-acao|2-acoes|3-acoes|acao-livre|reacao|1|2|3|r|f)\]|\[\[(?:trait:|tr:)?[\s\S]+?\]\]|\[(?:trait:|tr:)[\s\S]+?\]|@[a-zA-Z0-9_-]+|\*\*(?:[^*]|\*(?!\*))+\*\*|__(?:[^_]|_(?!_))+__|(?:\+\+(?:[^+]|\+(?!\+))+\+\+)|~~(?:[^~]|~(?!~))+~~|`[^`]+`|\*(?:[^*\n])+\*|_(?:[^_\n])+_)/gi;
+  const tokenRegex = /(<p\b[^>]*>[\s\S]*?<\/p>|<div\b[^>]*>[\s\S]*?<\/div>|<span[^>]*>[\s\S]*?<\/span>|<mark[^>]*>[\s\S]*?<\/mark>|<(?:b|strong|i|em|u|del|s|code|font)[^>]*>[\s\S]*?<\/(?:b|strong|i|em|u|del|s|code|font)>|<br\s*\/?>|<\/p>|<p\b[^>]*>|\[(?:1-action|2-actions|3-actions|1-to-2-actions|1-to-3-actions|one-action|two-actions|three-actions|one-to-two-actions|one-to-three-actions|free-action|reaction|1-acao|2-acoes|3-acoes|acao-livre|reacao|1|2|3|r|f)\]|\[\[(?:trait:|tr:)?[\s\S]+?\]\]|\[(?:trait:|tr:)[\s\S]+?\]|@[a-zA-Z0-9_-]+|\*\*(?:[^*]|\*(?!\*))+\*\*|__(?:[^_]|_(?!_))+__|(?:\+\+(?:[^+]|\+(?!\+))+\+\+)|~~(?:[^~]|~(?!~))+~~|`[^`]+`|\*(?:[^*\n])+\*|_(?:[^_\n])+_)/gi;
 
   const parts = text.split(tokenRegex);
 
   return parts.map((part, idx) => {
     if (!part) return null;
+
+    // 0. Standalone HTML paragraph or break tags
+    if (/^<br\s*\/?>$/i.test(part)) {
+      return <br key={idx} />;
+    }
+    if (/^<\/?p\b[^>]*>$/i.test(part)) {
+      return null;
+    }
 
     // 1. PF2e Action Glyphs [1-action], [2-actions], etc.
     if (part.startsWith('[') && part.endsWith(']')) {
@@ -288,8 +296,8 @@ function parseInlineFormatting(
       );
     }
 
-    // 4. HTML tags (span with style, mark, u, b, strong, i, em, del, code, font)
-    if (/^<(span|mark|b|strong|i|em|u|del|s|code|font)[^>]*>[\s\S]*<\/\1>$/i.test(part)) {
+    // 4. HTML tags (p, div, span with style, mark, u, b, strong, i, em, del, code, font)
+    if (/^<(p|div|span|mark|b|strong|i|em|u|del|s|code|font)[^>]*>[\s\S]*<\/\1>$/i.test(part)) {
       return <span key={idx} dangerouslySetInnerHTML={{ __html: part }} />;
     }
 

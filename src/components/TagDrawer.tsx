@@ -25,6 +25,9 @@ import { EntityIcon } from './EntityIcon';
 import { getCategoryMeta } from '../utils/categories';
 import { TagModal } from './TagModal';
 
+import { DrawerBreadcrumb } from '../types';
+import { DrawerStackHeader } from './DrawerStackHeader';
+
 interface TagDrawerProps {
   tag: string | null;
   isOpen: boolean;
@@ -32,6 +35,11 @@ interface TagDrawerProps {
   onNavigate: (entityId: string) => void;
   isGmMode?: boolean;
   onTagUpdated?: () => void;
+  stackIndex?: number;
+  stackTotal?: number;
+  stackBreadcrumbs?: DrawerBreadcrumb[];
+  onJumpToStackIndex?: (index: number) => void;
+  onCloseAll?: () => void;
 }
 
 export const TagDrawer: React.FC<TagDrawerProps> = ({
@@ -41,6 +49,11 @@ export const TagDrawer: React.FC<TagDrawerProps> = ({
   onNavigate,
   isGmMode = false,
   onTagUpdated,
+  stackIndex = 0,
+  stackTotal = 1,
+  stackBreadcrumbs = [],
+  onJumpToStackIndex,
+  onCloseAll,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
@@ -49,6 +62,19 @@ export const TagDrawer: React.FC<TagDrawerProps> = ({
   const [editCategory, setEditCategory] = useState('');
   const [isTagModalOpen, setIsTagModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Handle ESC key only for the top-most active drawer
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isTopDrawer = stackIndex === stackTotal - 1;
+      if (e.key === 'Escape' && isOpen && isTopDrawer) {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [isOpen, onClose, stackIndex, stackTotal]);
 
   const currentUser = HecosStorage.getCurrentUser();
   const effectiveIsGm = isGmMode || currentUser?.role === 'gm' || HecosStorage.getGmMode();
@@ -154,10 +180,24 @@ export const TagDrawer: React.FC<TagDrawerProps> = ({
 
   if (!isOpen || !tag) return null;
 
+  const zIndexVal = 50 + stackIndex * 10;
+
+  const handleEntityClick = (entityId: string) => {
+    window.dispatchEvent(
+      new CustomEvent('hecos:open-entity-drawer', {
+        detail: { entityId },
+      })
+    );
+  };
+
   return (
     <>
       <AnimatePresence>
-        <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
+        <div
+          className="fixed inset-0 overflow-hidden flex justify-end"
+          style={{ zIndex: zIndexVal }}
+          id={`hecos-tag-drawer-layer-${stackIndex}`}
+        >
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -165,7 +205,11 @@ export const TagDrawer: React.FC<TagDrawerProps> = ({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/75 backdrop-blur-sm"
+            className={`fixed inset-0 transition-opacity ${
+              stackIndex > 0
+                ? 'bg-black/60 backdrop-blur-[2px]'
+                : 'bg-black/75 backdrop-blur-sm'
+            }`}
           />
 
           {/* Lateral Drawer Panel */}
@@ -174,8 +218,22 @@ export const TagDrawer: React.FC<TagDrawerProps> = ({
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-            className="relative w-full max-w-xl bg-[#0b0814] border-l border-zinc-800 shadow-2xl z-10 flex flex-col h-full overflow-hidden"
+            className={`relative w-full max-w-xl bg-[#0b0814] border-l border-zinc-800 shadow-2xl z-10 flex flex-col h-full overflow-hidden ${
+              stackIndex > 0 ? 'ring-1 ring-cyan-500/30' : ''
+            }`}
           >
+            {/* Stack Breadcrumb Header Bar */}
+            {stackTotal > 1 && (
+              <DrawerStackHeader
+                breadcrumbs={stackBreadcrumbs}
+                currentIndex={stackIndex}
+                totalDrawers={stackTotal}
+                onPop={onClose}
+                onJumpToIndex={onJumpToStackIndex}
+                onCloseAll={onCloseAll}
+              />
+            )}
+
             {/* Header */}
             <div className="p-5 border-b border-zinc-800/90 bg-[#120d20] flex items-start justify-between gap-4">
               <div className="space-y-1.5 flex-1">
@@ -379,10 +437,7 @@ export const TagDrawer: React.FC<TagDrawerProps> = ({
                       return (
                         <div
                           key={ent.id}
-                          onClick={() => {
-                            onNavigate(ent.id);
-                            onClose();
-                          }}
+                          onClick={() => handleEntityClick(ent.id)}
                           className="group p-3.5 rounded-xl bg-[#100c1d] hover:bg-[#18122c] border border-zinc-800/80 hover:border-cyan-500/50 transition-all cursor-pointer flex items-start gap-3 relative shadow-sm hover:shadow-md"
                         >
                           <div className="p-2 rounded-lg bg-black/60 border border-zinc-800 text-cyan-400 group-hover:text-cyan-300 group-hover:border-cyan-500/40 shrink-0 transition-colors">

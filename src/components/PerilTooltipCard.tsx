@@ -300,7 +300,7 @@ export const PerilTooltipCard: React.FC<PerilTooltipCardProps> = ({
 
       {/* Hazard Mechanics (Disable / Routine snippet) */}
       {canViewMechanics && (perilData.disable || perilData.routine) && (
-        <div className="p-1.5 rounded-lg bg-[#181124] border border-amber-900/40 text-[10px] text-zinc-300 truncate">
+        <div className="p-1.5 rounded-lg bg-[#181124] border border-amber-900/40 text-[10px] text-zinc-300 break-words">
           <strong className="text-amber-300">
             {perilData.disable ? 'Desativação:' : 'Rotina:'}
           </strong>{' '}
@@ -308,9 +308,9 @@ export const PerilTooltipCard: React.FC<PerilTooltipCardProps> = ({
         </div>
       )}
 
-      {/* Description / Summary (compact line-clamp-2) */}
+      {/* Description / Summary */}
       {(canViewDescription || effectiveIsGm) && (peril.summary || perilData.description || peril.content) && (
-        <p className="text-[11px] text-zinc-400 leading-snug line-clamp-2">
+        <p className="text-[11px] text-zinc-300 leading-relaxed break-words">
           {peril.summary || perilData.description || peril.content}
         </p>
       )}

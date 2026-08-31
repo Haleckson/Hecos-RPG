@@ -229,7 +229,12 @@ export const NPCCreateModal: React.FC<NPCCreateModalProps> = ({
         setSelectedSubcategories(subs);
 
         const loadedNpcData = initEntity.npcData ? { ...initEntity.npcData } : getEmptyNPCData();
-        // Ensure arrays exist
+        // Ensure arrays exist and traits are cleanly initialized
+        if (loadedNpcData.traits === undefined) {
+          loadedNpcData.traits = Array.isArray(initEntity.traits) ? [...initEntity.traits] : [];
+        } else {
+          loadedNpcData.traits = Array.isArray(loadedNpcData.traits) ? [...loadedNpcData.traits] : [];
+        }
         loadedNpcData.loot = loadedNpcData.loot || [];
         loadedNpcData.relationships = loadedNpcData.relationships || [];
         loadedNpcData.quests = loadedNpcData.quests || [];
@@ -515,10 +520,20 @@ export const NPCCreateModal: React.FC<NPCCreateModalProps> = ({
     setNewQuestSecret(false);
   };
 
-  const handleRemoveQuest = (id: string) => {
+  const handleRemoveQuest = (idOrQuestEntityId: string) => {
+    const targetQ = (npcData.quests || []).find(
+      (q) => q.id === idOrQuestEntityId || q.questEntityId === idOrQuestEntityId
+    );
+    const questEntityIdToRemove = targetQ?.questEntityId || idOrQuestEntityId;
+
     setNpcData((prev) => ({
       ...prev,
-      quests: (prev.quests || []).filter((q) => q.id !== id),
+      quests: (prev.quests || []).filter(
+        (q) => q.id !== idOrQuestEntityId && q.questEntityId !== idOrQuestEntityId
+      ),
+      questIds: (prev.questIds || []).filter(
+        (qId) => qId !== idOrQuestEntityId && qId !== questEntityIdToRemove
+      ),
     }));
   };
 
@@ -600,6 +615,7 @@ export const NPCCreateModal: React.FC<NPCCreateModalProps> = ({
       subcategory: selectedSubcategories[0] || 'Geral',
       subcategories: selectedSubcategories,
       tags: tagsArray,
+      traits: finalNpcData.traits || [],
       summary: finalNpcData.concept || subtitle || undefined,
       content: finalContent,
       coverImage: finalNpcData.portraitImage || undefined,
@@ -1619,13 +1635,18 @@ export const NPCCreateModal: React.FC<NPCCreateModalProps> = ({
                       placeholder="Buscar e vincular missões a este NPC..."
                       badgeTheme="cyan"
                       onChange={(ids, entities) => {
-                        // Merge with existing quests array if not present
-                        const existingQuestIds = new Set((npcData.quests || []).map((q) => q.questEntityId).filter(Boolean));
-                        const newQuestsList = [...(npcData.quests || [])];
-                        
+                        const selectedIdsSet = new Set(ids);
+                        // Filter out any quest whose questEntityId is not in the selected ids (if it had a questEntityId)
+                        const filteredQuests = (npcData.quests || []).filter((q) => {
+                          if (!q.questEntityId) return true; // custom text-only quest
+                          return selectedIdsSet.has(q.questEntityId);
+                        });
+
+                        const existingEntityIds = new Set(filteredQuests.map((q) => q.questEntityId).filter(Boolean));
+
                         entities.forEach((ent) => {
-                          if (!existingQuestIds.has(ent.id)) {
-                            newQuestsList.push({
+                          if (!existingEntityIds.has(ent.id)) {
+                            filteredQuests.push({
                               id: `quest-${Date.now()}-${ent.id}`,
                               questEntityId: ent.id,
                               title: ent.title,
@@ -1639,7 +1660,7 @@ export const NPCCreateModal: React.FC<NPCCreateModalProps> = ({
                         setNpcData((prev) => ({
                           ...prev,
                           questIds: ids,
-                          quests: newQuestsList,
+                          quests: filteredQuests,
                         }));
                       }}
                     />
@@ -1747,16 +1768,16 @@ export const NPCCreateModal: React.FC<NPCCreateModalProps> = ({
                                   </span>
                                 )}
                               </div>
-                              <span className="text-xs text-zinc-400 font-medium">{q.roleInQuest}</span>
+                              <span className="text-xs text-cyan-300/80 font-medium">{q.roleInQuest}</span>
                             </div>
 
                             <button
                               type="button"
-                              onClick={() => handleRemoveQuest(q.id)}
-                              className="p-1 rounded text-zinc-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors"
-                              title="Remover quest"
+                              onClick={() => handleRemoveQuest(q.questEntityId || q.id)}
+                              className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-400 hover:bg-rose-950/60 transition-colors cursor-pointer"
+                              title="Remover / Desvincular missão"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
 

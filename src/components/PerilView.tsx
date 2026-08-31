@@ -291,12 +291,12 @@ export const PerilView: React.FC<PerilViewProps> = ({
             </div>
           </div>
 
-          {/* 3. METADADOS E PASTAS VINCULADAS */}
-          {subcategories.length > 0 && (
+          {/* 3. METADADOS E PASTAS VINCULADAS (EXCLUSIVO GM) */}
+          {isActualGm && subcategories.length > 0 && (
             <div className="rounded-2xl bg-[#0e0a19] border border-zinc-800/80 p-3.5 space-y-2 shadow-lg">
               <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-mono">
                 <Folder className="w-3.5 h-3.5 text-rose-400" />
-                Pastas Vinculadas
+                Pastas Vinculadas (GM)
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {subcategories.map((folder) => (

@@ -1,4 +1,4 @@
-import { HecosEntity, InteractiveMapData, YouTubeAmbianceTrack, GoogleDriveResource, TagInfo, HecosUser, FolderPermission, ItemVisibility, TrashedEntity, ImageAdjustment, EntityRelationshipUpdates } from '../types';
+import { HecosEntity, InteractiveMapData, YouTubeAmbianceTrack, GoogleDriveResource, TagInfo, HecosUser, FolderPermission, ItemVisibility, TrashedEntity, ImageAdjustment, EntityRelationshipUpdates, TimelineDate, TimelineEra, TimelineYear } from '../types';
 import { INITIAL_ENTITIES, INITIAL_MAPS, INITIAL_YOUTUBE_TRACKS, INITIAL_DRIVE_RESOURCES } from '../data/initialHecosData';
 import { migrateAllSpellEntities, migrateSpellEntity } from '../utils/spellMigration';
 import { MutualLinkService } from './mutualLinkService';
@@ -73,7 +73,134 @@ const STORAGE_KEYS = {
   IMAGE_ADJUSTMENTS: 'hecos_image_adjustments_v1',
   CUSTOM_TRAITS: 'hecos_custom_traits_v1',
   CUSTOM_TAGS: 'hecos_custom_tags_v1',
+  TIMELINE_DATES: 'hecos_timeline_dates_v2',
+  TIMELINE_ERAS: 'hecos_timeline_eras_v3',
+  TIMELINE_YEARS: 'hecos_timeline_years_v3',
 };
+
+export const DEFAULT_TIMELINE_ERAS: TimelineEra[] = [
+  {
+    id: 'era-primordial',
+    title: 'ERA 01 • Os Deuses Primordiais & A Forja Cósmica',
+    order: 1,
+    description: 'Antes do tempo ser medido pelos mortais, os titãs esculpiram os relevos de obsidiana e acenderam os primeiros sóis.',
+    color: '#a855f7',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'era-penumbra',
+    title: 'ERA 02 • A Penumbra & O Grande Eclipse',
+    order: 2,
+    description: 'O sol negro coroou o firmamento em chamas púrpuras, fundindo a matéria arcana com o sangue dos habitantes de Hecos.',
+    color: '#be123c',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'era-cidades',
+    title: 'ERA 03 • A Fundação das Cidades & Nova Obsidiana',
+    order: 3,
+    description: 'As primeiras muralhas protegidas contra a radiação do vazio foram erguidas pelos sobreviventes das cinco tribos.',
+    color: '#00f0ff',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'era-atual',
+    title: 'ERA 04 • O Despertar Carmesim (Era Atual)',
+    order: 4,
+    description: 'A era presente onde os aventureiros e guardiões da noite enfrentam os ecos das profundezas e conspirações palacianas.',
+    color: '#10b981',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+];
+
+export const DEFAULT_TIMELINE_YEARS: TimelineYear[] = [
+  {
+    id: 'year-primordial-1000',
+    eraId: 'era-primordial',
+    title: 'Ano -1000',
+    numericOrder: -1000,
+    description: 'Início dos registros históricos primordiais.',
+    color: '#a855f7',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'year-primordial-800',
+    eraId: 'era-primordial',
+    title: 'Ano -800',
+    numericOrder: -800,
+    description: 'Primeiros relatos arcanos e explorações ancestrais.',
+    color: '#a855f7',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'year-penumbra-100',
+    eraId: 'era-penumbra',
+    title: 'Ano -100',
+    numericOrder: -100,
+    description: 'Período de transição e grandes transformações.',
+    color: '#be123c',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'year-penumbra-50',
+    eraId: 'era-penumbra',
+    title: 'Ano -50',
+    numericOrder: -50,
+    description: 'Registros das migrações pela Bacia.',
+    color: '#be123c',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'year-cidades-0',
+    eraId: 'era-cidades',
+    title: 'Ano 01',
+    numericOrder: 1,
+    description: 'Fundação dos primeiros assentamentos e bastiões.',
+    color: '#00f0ff',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'year-cidades-120',
+    eraId: 'era-cidades',
+    title: 'Ano 120',
+    numericOrder: 120,
+    description: 'Consolidação das rotas e tratados regionais.',
+    color: '#00f0ff',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'year-atual-450',
+    eraId: 'era-atual',
+    title: 'Ano 450',
+    numericOrder: 450,
+    description: 'Acontecimentos e marcos históricos recentes.',
+    color: '#10b981',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'year-atual-452',
+    eraId: 'era-atual',
+    title: 'Ano 452',
+    numericOrder: 452,
+    description: 'Ano atual da campanha.',
+    color: '#10b981',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+];
+
+export const DEFAULT_TIMELINE_DATES: TimelineDate[] = DEFAULT_TIMELINE_YEARS;
 
 export const INITIAL_ADMIN_USER: HecosUser = {
   id: 'gm_henrick',
@@ -189,6 +316,9 @@ type MapSubscriber = (maps: InteractiveMapData[]) => void;
 type FeatCategoriesSubscriber = (config: Record<string, string[]>) => void;
 export type SpellCategoriesSubscriber = (config: Record<string, string[]>) => void;
 export type ItemCategoriesSubscriber = (config: Record<string, string[]>) => void;
+export type TimelineDatesSubscriber = (dates: TimelineDate[]) => void;
+export type TimelineErasSubscriber = (eras: TimelineEra[]) => void;
+export type TimelineYearsSubscriber = (years: TimelineYear[]) => void;
 
 export class HecosStorage {
   private static entitiesCache: HecosEntity[] | null = null;
@@ -198,6 +328,9 @@ export class HecosStorage {
   private static featCategoriesCache: Record<string, string[]> | null = null;
   private static spellCategoriesCache: Record<string, string[]> | null = null;
   private static itemCategoriesCache: Record<string, string[]> | null = null;
+  private static timelineDatesCache: TimelineDate[] | null = null;
+  private static timelineErasCache: TimelineEra[] | null = null;
+  private static timelineYearsCache: TimelineYear[] | null = null;
   private static usersCache: HecosUser[] | null = null;
   private static currentUserCache: HecosUser | null = null;
   private static folderPermissionsCache: Record<string, FolderPermission> | null = null;
@@ -208,6 +341,9 @@ export class HecosStorage {
   private static featCategoriesSubscribers = new Set<FeatCategoriesSubscriber>();
   private static spellCategoriesSubscribers = new Set<SpellCategoriesSubscriber>();
   private static itemCategoriesSubscribers = new Set<ItemCategoriesSubscriber>();
+  private static timelineDatesSubscribers = new Set<TimelineDatesSubscriber>();
+  private static timelineErasSubscribers = new Set<TimelineErasSubscriber>();
+  private static timelineYearsSubscribers = new Set<TimelineYearsSubscriber>();
   private static userSubscribers = new Set<(user: HecosUser | null) => void>();
   private static usersListSubscribers = new Set<(users: HecosUser[]) => void>();
   private static folderPermissionsSubscribers = new Set<(perms: Record<string, FolderPermission>) => void>();
@@ -381,36 +517,35 @@ export class HecosStorage {
       const map = new Map<string, HecosEntity>();
 
       current.forEach((e) => {
-        if (!this.isEntityDeleted(deletedIds, e.id, e.slug)) {
+        if (e && e.id && !this.isEntityDeleted(deletedIds, e.id, e.slug)) {
           map.set(e.id, e);
         }
       });
 
       let hasNewChanges = false;
       firebaseList.forEach((e: any) => {
-        if (e && e.id) {
-          // If remote entity was updated, un-delete it if it was erroneously marked
-          if (this.isEntityDeleted(deletedIds, e.id, e.slug)) {
-            deletedIds.delete(e.id);
-            deletedIds.delete(e.id.toLowerCase().trim());
-            if (e.slug) {
-              deletedIds.delete(e.slug);
-              deletedIds.delete(e.slug.toLowerCase().trim());
-            }
-            this.saveDeletedEntityIds(deletedIds);
-          }
+        if (!e || !e.id) return;
 
-          const existing = map.get(e.id);
-          // If not existing or Firebase RTDB node has newer update
-          if (!existing || (e.updatedAt && (!existing.updatedAt || e.updatedAt >= existing.updatedAt))) {
-            map.set(e.id, e);
-            hasNewChanges = true;
-          }
+        // If entity is marked as deleted or trashed, NEVER resurrect it!
+        if (this.isEntityDeleted(deletedIds, e.id, e.slug)) {
+          // Guarantee it is deleted from Firebase so it stops broadcasting
+          deleteEntityFromFirebase(e.id).catch(() => {});
+          if (e.slug) deleteEntityFromFirebase(e.slug).catch(() => {});
+          return;
+        }
+
+        const existing = map.get(e.id);
+        // If not existing or Firebase RTDB node has newer update
+        if (!existing || (e.updatedAt && (!existing.updatedAt || e.updatedAt >= existing.updatedAt))) {
+          map.set(e.id, e);
+          hasNewChanges = true;
         }
       });
 
       if (hasNewChanges || map.size !== current.length) {
-        const rawMerged = Array.from(map.values());
+        const rawMerged = Array.from(map.values()).filter(
+          (e) => Boolean(e && e.id && !this.isEntityDeleted(deletedIds, e.id, e.slug))
+        );
         const { entities: merged } = migrateAllSpellEntities(rawMerged);
         this.entitiesCache = merged;
         this.saveEntitiesLocal(merged);
@@ -602,25 +737,41 @@ export class HecosStorage {
    * Retrieves the set of deleted entity IDs and slugs (lowercase normalized)
    */
   static getDeletedEntityIds(): Set<string> {
+    const set = new Set<string>();
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.DELETED_ENTITIES);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
-          const set = new Set<string>();
           parsed.forEach(item => {
             if (typeof item === 'string') {
               set.add(item);
               set.add(item.toLowerCase().trim());
             }
           });
-          return set;
+        }
+      }
+      // Also ensure any items currently in trash are in the deleted/blocked set
+      const trashStored = localStorage.getItem(STORAGE_KEYS.TRASH);
+      if (trashStored) {
+        const parsedTrash = JSON.parse(trashStored);
+        if (Array.isArray(parsedTrash)) {
+          parsedTrash.forEach(t => {
+            if (t?.entity?.id) {
+              set.add(t.entity.id);
+              set.add(t.entity.id.toLowerCase().trim());
+            }
+            if (t?.entity?.slug) {
+              set.add(t.entity.slug);
+              set.add(t.entity.slug.toLowerCase().trim());
+            }
+          });
         }
       }
     } catch (e) {
       console.warn("Error reading deleted entity IDs:", e);
     }
-    return new Set<string>();
+    return set;
   }
 
   /**
@@ -642,16 +793,133 @@ export class HecosStorage {
     id?: string,
     slug?: string
   ): boolean {
-    if (!deletedIds || deletedIds.size === 0) return false;
-    if (id && (deletedIds.has(id) || deletedIds.has(id.toLowerCase().trim()))) return true;
-    if (slug && (deletedIds.has(slug) || deletedIds.has(slug.toLowerCase().trim()))) return true;
+    if (!id && !slug) return false;
+    if (deletedIds && deletedIds.size > 0) {
+      if (id && (deletedIds.has(id) || deletedIds.has(id.toLowerCase().trim()))) return true;
+      if (slug && (deletedIds.has(slug) || deletedIds.has(slug.toLowerCase().trim()))) return true;
+    }
+    // Also check active trashCache
+    if (this.trashCache && this.trashCache.length > 0) {
+      const isTrashed = this.trashCache.some(t => {
+        if (!t?.entity) return false;
+        if (id && (t.entity.id === id || t.entity.id.toLowerCase().trim() === id.toLowerCase().trim())) return true;
+        if (slug && (t.entity.slug === slug || (t.entity.slug && t.entity.slug.toLowerCase().trim() === slug.toLowerCase().trim()))) return true;
+        return false;
+      });
+      if (isTrashed) return true;
+    }
     return false;
   }
+
+  /**
+   * Purges all legacy and default timeline entries and phantom deleted entities
+   * from localStorage, memory cache, and Firebase Realtime Database.
+   */
+  static purgeLegacyAndTimelineEntries(): void {
+    try {
+      const deletedIds = this.getDeletedEntityIds();
+      const legacyTimelineIds = [
+        'timeline-o-grande-eclipse',
+        'timeline-o-grande-eclipse-primordial',
+        'timeline-a-forja-obsidiana',
+        'timeline-forja-obsidiana',
+        'timeline-os-sois-frios',
+        'timeline-invocacao-sois-frios',
+        'timeline-a-fundacao-solaris',
+        'timeline-fundacao-solaris',
+        'timeline-a-fundacao-do-circulo',
+        'timeline-fundacao-circulo-carmim',
+        'timeline-o-despertar-recente',
+        'timeline-o-despertar-das-profundezas',
+        'timeline-o-selamento-de-malakar',
+        'timeline-selamento-malakar',
+        'timeline-a-fundacao-de-lamento',
+        'timeline-fundacao-lamento',
+        'timeline-queda-de-lamento',
+        'timeline-a-queda-de-lamento',
+      ];
+
+      // Add all legacy ids and their variations to blacklist
+      legacyTimelineIds.forEach((id) => {
+        deletedIds.add(id);
+        deletedIds.add(id.toLowerCase().trim());
+        deleteEntityFromFirebase(id).catch(() => {});
+      });
+
+      let rawEntities: HecosEntity[] = [];
+      const stored = localStorage.getItem(STORAGE_KEYS.ENTITIES);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) rawEntities = parsed.filter(Boolean);
+        } catch {}
+      }
+      if (this.entitiesCache) {
+        rawEntities = [...rawEntities, ...this.entitiesCache];
+      }
+
+      // Filter out any entity that belongs to timeline or is in deleted list
+      const remainingEntities: HecosEntity[] = [];
+      const seenIds = new Set<string>();
+
+      rawEntities.forEach((ent) => {
+        if (!ent || !ent.id) return;
+        if (seenIds.has(ent.id)) return;
+        seenIds.add(ent.id);
+
+        const isTimeline =
+          ent.category === 'timeline' ||
+          Boolean(ent.timelineData) ||
+          ent.id.startsWith('timeline-') ||
+          legacyTimelineIds.includes(ent.id) ||
+          legacyTimelineIds.includes(ent.slug || '');
+
+        if (isTimeline || this.isEntityDeleted(deletedIds, ent.id, ent.slug)) {
+          deletedIds.add(ent.id);
+          deletedIds.add(ent.id.toLowerCase().trim());
+          if (ent.slug) {
+            deletedIds.add(ent.slug);
+            deletedIds.add(ent.slug.toLowerCase().trim());
+          }
+          deleteEntityFromFirebase(ent.id).catch(() => {});
+          if (ent.slug) deleteEntityFromFirebase(ent.slug).catch(() => {});
+        } else {
+          remainingEntities.push(ent);
+        }
+      });
+
+      // Also purge from Trash
+      const currentTrash = this.getTrashedEntities().filter((t) => {
+        if (!t?.entity?.id) return false;
+        const isTimeline =
+          t.entity.category === 'timeline' ||
+          Boolean(t.entity.timelineData) ||
+          t.entity.id.startsWith('timeline-') ||
+          legacyTimelineIds.includes(t.entity.id);
+        return !isTimeline && !this.isEntityDeleted(deletedIds, t.entity.id, t.entity.slug);
+      });
+      this.saveTrashLocal(currentTrash);
+
+      // Save purged list and deleted IDs
+      this.saveDeletedEntityIds(deletedIds);
+      this.entitiesCache = remainingEntities;
+      this.saveEntitiesLocal(remainingEntities);
+      this.notifyEntitySubscribers();
+    } catch (e) {
+      console.warn("Error purging legacy timeline entries:", e);
+    }
+  }
+
+  private static hasPurgedLegacyTimeline = false;
 
   /**
    * Initialize and retrieve entities
    */
   static getEntities(): HecosEntity[] {
+    if (!this.hasPurgedLegacyTimeline) {
+      this.hasPurgedLegacyTimeline = true;
+      this.purgeLegacyAndTimelineEntries();
+    }
     const deletedIds = this.getDeletedEntityIds();
     if (this.entitiesCache) {
       // Ensure cache does not contain deleted items
@@ -753,8 +1021,13 @@ export class HecosStorage {
           }
         });
         firebaseList.forEach((e) => {
-          if (e && e.id && !this.isEntityDeleted(deletedIds, e.id, e.slug)) {
-            map.set(e.id, e);
+          if (e && e.id) {
+            if (!this.isEntityDeleted(deletedIds, e.id, e.slug)) {
+              map.set(e.id, e);
+            } else {
+              deleteEntityFromFirebase(e.id).catch(() => {});
+              if (e.slug) deleteEntityFromFirebase(e.slug).catch(() => {});
+            }
           }
         });
         const rawMerged = Array.from(map.values());
@@ -1887,6 +2160,19 @@ export class HecosStorage {
     const currentTrash = this.getTrashedEntities().filter((t) => t.entity.id !== entity.id);
     currentTrash.unshift(trashedItem);
     this.saveTrashLocal(currentTrash);
+
+    // Register into deletedIds set immediately
+    const deletedIds = this.getDeletedEntityIds();
+    deletedIds.add(entity.id);
+    deletedIds.add(entity.id.toLowerCase().trim());
+    if (entity.slug) {
+      deletedIds.add(entity.slug);
+      deletedIds.add(entity.slug.toLowerCase().trim());
+    }
+    if (entity.title) {
+      deletedIds.add(entity.title.toLowerCase().trim());
+    }
+    this.saveDeletedEntityIds(deletedIds);
 
     // 2. Remove from active entities list
     const list = this.getEntities().filter((e) => e.id !== entity.id && e.slug !== entity.slug);
@@ -3977,6 +4263,237 @@ export class HecosStorage {
       this.notifyEntitySubscribers();
     }
     return { affectedCount };
+  }
+
+  /**
+   * --- TIMELINE ERAS MANAGEMENT ---
+   */
+  static getTimelineEras(): TimelineEra[] {
+    if (this.timelineErasCache) {
+      return [...this.timelineErasCache].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    }
+
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.TIMELINE_ERAS);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          this.timelineErasCache = parsed;
+          return [...this.timelineErasCache].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        }
+      }
+    } catch (e) {
+      console.warn("Error reading timeline eras from localStorage:", e);
+    }
+
+    // Initialize with default eras
+    this.timelineErasCache = [...DEFAULT_TIMELINE_ERAS];
+    try {
+      localStorage.setItem(STORAGE_KEYS.TIMELINE_ERAS, JSON.stringify(this.timelineErasCache));
+    } catch (e) {
+      console.warn("Error saving initial timeline eras to localStorage:", e);
+    }
+    return [...this.timelineErasCache].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }
+
+  static saveTimelineEra(era: TimelineEra): void {
+    const list = this.getTimelineEras();
+    const existingIndex = list.findIndex((e) => e.id === era.id);
+    const updatedEra: TimelineEra = {
+      ...era,
+      updatedAt: new Date().toISOString()
+    };
+
+    if (existingIndex >= 0) {
+      list[existingIndex] = updatedEra;
+    } else {
+      list.push(updatedEra);
+    }
+
+    this.timelineErasCache = list;
+    try {
+      localStorage.setItem(STORAGE_KEYS.TIMELINE_ERAS, JSON.stringify(list));
+    } catch (e) {
+      console.warn("Error saving timeline era:", e);
+    }
+    this.notifyTimelineErasSubscribers();
+  }
+
+  static deleteTimelineEra(eraId: string): void {
+    const list = this.getTimelineEras().filter((e) => e.id !== eraId);
+    this.timelineErasCache = list;
+    try {
+      localStorage.setItem(STORAGE_KEYS.TIMELINE_ERAS, JSON.stringify(list));
+    } catch (e) {
+      console.warn("Error deleting timeline era:", e);
+    }
+
+    // Unassign or delete years belonging to this era, or move to fallback
+    const years = this.getTimelineYears();
+    years.forEach((y) => {
+      if (y.eraId === eraId) {
+        if (list.length > 0) {
+          y.eraId = list[0].id;
+          this.saveTimelineYear(y);
+        } else {
+          this.deleteTimelineYear(y.id);
+        }
+      }
+    });
+
+    this.notifyTimelineErasSubscribers();
+  }
+
+  static subscribeTimelineEras(subscriber: TimelineErasSubscriber): () => void {
+    subscriber(this.getTimelineEras());
+    this.timelineErasSubscribers.add(subscriber);
+    return () => {
+      this.timelineErasSubscribers.delete(subscriber);
+    };
+  }
+
+  private static notifyTimelineErasSubscribers(): void {
+    const eras = this.getTimelineEras();
+    this.timelineErasSubscribers.forEach((sub) => {
+      try {
+        sub(eras);
+      } catch (e) {
+        console.warn("Error notifying timeline eras subscriber:", e);
+      }
+    });
+  }
+
+  /**
+   * --- TIMELINE YEARS & DATES CHRONOLOGICAL MANAGEMENT ---
+   */
+  static getTimelineYears(): TimelineYear[] {
+    if (this.timelineYearsCache) {
+      return [...this.timelineYearsCache].sort((a, b) => (a.numericOrder ?? 0) - (b.numericOrder ?? 0));
+    }
+
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.TIMELINE_YEARS);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          this.timelineYearsCache = parsed;
+          return [...this.timelineYearsCache].sort((a, b) => (a.numericOrder ?? 0) - (b.numericOrder ?? 0));
+        }
+      }
+    } catch (e) {
+      console.warn("Error reading timeline years from localStorage:", e);
+    }
+
+    // Initialize with default canonical years
+    this.timelineYearsCache = [...DEFAULT_TIMELINE_YEARS];
+    try {
+      localStorage.setItem(STORAGE_KEYS.TIMELINE_YEARS, JSON.stringify(this.timelineYearsCache));
+    } catch (e) {
+      console.warn("Error saving initial timeline years to localStorage:", e);
+    }
+    return [...this.timelineYearsCache].sort((a, b) => (a.numericOrder ?? 0) - (b.numericOrder ?? 0));
+  }
+
+  static saveTimelineYear(year: TimelineYear): void {
+    const list = this.getTimelineYears();
+    const existingIndex = list.findIndex((y) => y.id === year.id);
+    const updatedYear: TimelineYear = {
+      ...year,
+      updatedAt: new Date().toISOString()
+    };
+
+    if (existingIndex >= 0) {
+      list[existingIndex] = updatedYear;
+    } else {
+      list.push(updatedYear);
+    }
+
+    this.timelineYearsCache = list;
+    try {
+      localStorage.setItem(STORAGE_KEYS.TIMELINE_YEARS, JSON.stringify(list));
+    } catch (e) {
+      console.warn("Error saving timeline year:", e);
+    }
+    this.notifyTimelineYearsSubscribers();
+    this.notifyTimelineDatesSubscribers();
+  }
+
+  static deleteTimelineYear(yearId: string): void {
+    const list = this.getTimelineYears().filter((y) => y.id !== yearId);
+    this.timelineYearsCache = list;
+    try {
+      localStorage.setItem(STORAGE_KEYS.TIMELINE_YEARS, JSON.stringify(list));
+    } catch (e) {
+      console.warn("Error deleting timeline year:", e);
+    }
+
+    // Also unassign or clean entities belonging to this yearId / dateId
+    const entities = this.getEntities();
+    let changed = false;
+    entities.forEach((ent) => {
+      if (ent.category === 'timeline' && (ent.timelineData?.yearId === yearId || ent.timelineData?.dateId === yearId)) {
+        if (ent.timelineData) {
+          ent.timelineData.yearId = undefined;
+          ent.timelineData.dateId = undefined;
+        }
+        changed = true;
+        this.saveEntity(ent);
+      }
+    });
+
+    this.notifyTimelineYearsSubscribers();
+    this.notifyTimelineDatesSubscribers();
+  }
+
+  static subscribeTimelineYears(subscriber: TimelineYearsSubscriber): () => void {
+    subscriber(this.getTimelineYears());
+    this.timelineYearsSubscribers.add(subscriber);
+    return () => {
+      this.timelineYearsSubscribers.delete(subscriber);
+    };
+  }
+
+  private static notifyTimelineYearsSubscribers(): void {
+    const years = this.getTimelineYears();
+    this.timelineYearsSubscribers.forEach((sub) => {
+      try {
+        sub(years);
+      } catch (e) {
+        console.warn("Error notifying timeline years subscriber:", e);
+      }
+    });
+  }
+
+  // Backwards compatibility methods for TimelineDate
+  static getTimelineDates(): TimelineDate[] {
+    return this.getTimelineYears();
+  }
+
+  static saveTimelineDate(date: TimelineDate): void {
+    this.saveTimelineYear(date);
+  }
+
+  static deleteTimelineDate(dateId: string): void {
+    this.deleteTimelineYear(dateId);
+  }
+
+  static subscribeTimelineDates(subscriber: TimelineDatesSubscriber): () => void {
+    subscriber(this.getTimelineDates());
+    this.timelineDatesSubscribers.add(subscriber);
+    return () => {
+      this.timelineDatesSubscribers.delete(subscriber);
+    };
+  }
+
+  private static notifyTimelineDatesSubscribers(): void {
+    const dates = this.getTimelineDates();
+    this.timelineDatesSubscribers.forEach((sub) => {
+      try {
+        sub(dates);
+      } catch (e) {
+        console.warn("Error notifying timeline dates subscriber:", e);
+      }
+    });
   }
 
   /**

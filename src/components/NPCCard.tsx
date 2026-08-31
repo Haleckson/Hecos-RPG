@@ -85,7 +85,6 @@ function SmartNPCCardIndexBlocks({
       value: occupation.trim(),
       bgBorderClass: 'bg-purple-950/40 border-purple-800/60 hover:border-purple-500/60',
       labelColorClass: 'text-purple-300',
-      isWide: occupation.length > 18,
     });
   }
 
@@ -119,7 +118,6 @@ function SmartNPCCardIndexBlocks({
       value: organization.trim(),
       bgBorderClass: 'bg-fuchsia-950/40 border-fuchsia-800/60 hover:border-fuchsia-500/60',
       labelColorClass: 'text-fuchsia-300',
-      isWide: organization.length > 16,
     });
   }
 
@@ -147,13 +145,12 @@ function SmartNPCCardIndexBlocks({
         value: combatParts.join(' • '),
         bgBorderClass: 'bg-rose-950/40 border-rose-800/60 hover:border-rose-500/60',
         labelColorClass: 'text-rose-400',
-        isWide: combatParts.join(' • ').length > 16,
       });
     }
   }
 
   // 7. Riqueza
-  if (wealth && wealth.trim() && items.length < 5 && isVisible('wealth')) {
+  if (wealth && wealth.trim() && items.length < 6 && isVisible('wealth')) {
     items.push({
       key: 'wealth',
       label: 'Riqueza',
@@ -166,25 +163,21 @@ function SmartNPCCardIndexBlocks({
   if (items.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-2.5 pt-2.5 border-t border-zinc-800/80 text-[11px] auto-rows-min">
-      {items.map((item, idx) => {
-        const isLastOdd = items.length % 2 === 1 && idx === items.length - 1;
-        const colSpanClass = items.length === 1 || item.isWide || isLastOdd ? 'col-span-1 sm:col-span-2' : 'col-span-1';
-
-        return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-2 pt-2 border-t border-zinc-800/80 text-[11px] auto-rows-min">
+      {items.map((item) => (
+        <Tooltip key={item.key} title={item.label} description={item.value} badge="NPC">
           <div
-            key={item.key}
-            className={`p-1.5 px-2.5 rounded-lg border transition-all flex items-baseline gap-1.5 overflow-hidden shadow-xs ${item.bgBorderClass} ${colSpanClass}`}
+            className={`p-1.5 px-2.5 rounded-lg border transition-all flex items-baseline gap-1.5 overflow-hidden shadow-xs ${item.bgBorderClass} cursor-help`}
           >
             <strong className={`font-bold uppercase text-[10px] font-mono tracking-wider shrink-0 ${item.labelColorClass}`}>
               {item.label}:
             </strong>
-            <span className="text-zinc-200 break-words font-medium truncate sm:whitespace-normal" title={item.value}>
+            <span className="text-zinc-200 break-words font-medium truncate">
               {item.value}
             </span>
           </div>
-        );
-      })}
+        </Tooltip>
+      ))}
     </div>
   );
 }
@@ -238,12 +231,12 @@ export const NPCCard: React.FC<NPCCardProps> = ({
     return val !== 'gm';
   };
 
-  // Traits (hierarchical ordering with visibility check)
+  // Traits (strictly PF2e traits, separate from search tags)
   const rawTraits = (npc.traits && npc.traits.length > 0)
     ? npc.traits
     : (currentEntity.traits && currentEntity.traits.length > 0)
     ? currentEntity.traits
-    : (currentEntity.tags || []);
+    : [];
   const orderedTraits = sortTraitsHierarchically(rawTraits, { rarity: npc.rarity || 'Comum', size });
 
   const visibleTraits = effectiveIsGm
@@ -252,13 +245,13 @@ export const NPCCard: React.FC<NPCCardProps> = ({
     ? orderedTraits.filter(t => isFieldVisible(`tag_${t}`))
     : [];
 
-  // Subcategories / Folders (with visibility check)
+  // Discrete search tags
+  const discreteTags = (currentEntity.tags || []).filter(
+    (t) => !rawTraits.some((tr) => tr.toLowerCase() === t.toLowerCase())
+  );
+
+  // Subcategories / Folders (strictly GM only)
   const subcategories = npc.subcategories || currentEntity.subcategories || (currentEntity.subcategory ? [currentEntity.subcategory] : []);
-  const visibleSubcategories = effectiveIsGm
-    ? subcategories
-    : isFieldVisible('subcategories')
-    ? subcategories.filter(s => isFieldVisible(`folder_${s}`))
-    : [];
 
   // Summarized description
   const summaryText = currentEntity.summary || npc.concept || currentEntity.content?.slice(0, 140) || '';
@@ -278,12 +271,12 @@ export const NPCCard: React.FC<NPCCardProps> = ({
   return (
     <div
       id={`npc-card-${currentEntity.id}`}
-      className={`group relative flex flex-col justify-between rounded-2xl bg-[#0e0a17] hover:bg-[#140e22] border ${visStyle.border} ${visStyle.shadow} transition-all duration-200 overflow-hidden h-full min-h-[460px] shadow-lg`}
+      className={`group relative flex flex-col justify-between rounded-2xl bg-[#0e0a17] hover:bg-[#140e22] border ${visStyle.border} ${visStyle.shadow} transition-all duration-200 overflow-hidden h-full shadow-lg`}
     >
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
       {/* RETRATO COMO COVER DO CARD                                                 */}
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
-      <div className="relative w-full h-40 sm:h-44 bg-[#160f29] overflow-hidden border-b border-zinc-800/60 select-none shrink-0">
+      <div className="relative w-full h-36 sm:h-40 bg-[#160f29] overflow-hidden border-b border-zinc-800/60 select-none shrink-0">
         {coverImage ? (
           <AdjustableImage
             src={coverImage}
@@ -306,7 +299,11 @@ export const NPCCard: React.FC<NPCCardProps> = ({
         {/* Top Badges & GM Controls */}
         <div className="absolute top-2.5 inset-x-2.5 flex items-center justify-between pointer-events-none z-10">
           <div className="flex items-center gap-1.5 pointer-events-auto flex-wrap">
-            <Tooltip content={disposition ? `NPC • ${disposition.label}` : 'NPC / Personagem'}>
+            <Tooltip
+              title="Personagem Não-Jogável"
+              description="Ficha de NPC com traços, histórico e conexões sociais no mundo de jogo."
+              badge="NPC"
+            >
               <span className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-lg border backdrop-blur-md flex items-center gap-1 shadow-md bg-purple-950/90 text-purple-300 border-purple-700/60 cursor-help">
                 <User className="w-2.5 h-2.5 shrink-0 text-purple-400" />
                 <span>NPC</span>
@@ -314,7 +311,11 @@ export const NPCCard: React.FC<NPCCardProps> = ({
             </Tooltip>
 
             {level !== undefined && level !== null && (
-              <Tooltip content={`Nível do NPC: ${level}`}>
+              <Tooltip
+                title="Nível do NPC"
+                description={`Nível ${level} — Define o patamar de poder, atributos e perícias deste NPC.`}
+                badge={`Nv ${level}`}
+              >
                 <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg bg-black/85 text-purple-300 border border-purple-800/60 backdrop-blur-md shadow-md cursor-help">
                   Nv {level}
                 </span>
@@ -322,7 +323,11 @@ export const NPCCard: React.FC<NPCCardProps> = ({
             )}
 
             {disposition && (
-              <Tooltip content={`Atitude: ${disposition.label} - ${disposition.desc}`}>
+              <Tooltip
+                title={`Atitude: ${disposition.label}`}
+                description={disposition.desc}
+                badge="Comportamento"
+              >
                 <span
                   className={`text-[9px] font-bold px-2 py-0.5 rounded-lg border backdrop-blur-md shadow-sm cursor-help ${disposition.bg} ${disposition.text} ${disposition.border}`}
                 >
@@ -384,12 +389,12 @@ export const NPCCard: React.FC<NPCCardProps> = ({
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
       {/* CORPO DO CARD (Token como Ícone, Título, Traços e Blocos Inteligentes)     */}
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
-      <div className="p-3.5 space-y-3 flex-1 flex flex-col justify-between">
+      <div className="p-3.5 sm:p-4 space-y-3 flex-1 flex flex-col justify-between">
         <div className="space-y-2.5">
           {/* TOKEN + NOME + SUBTÍTULO */}
           <div className="flex items-start gap-2.5">
             <div
-              className="w-10 h-10 rounded-xl bg-[#1b1228] border border-purple-500/40 flex items-center justify-center text-purple-300 shrink-0 shadow-md mt-0.5 group-hover:border-purple-400 group-hover:scale-105 transition-all overflow-hidden"
+              className="w-11 h-11 rounded-xl bg-[#1b1228] border border-purple-500/40 flex items-center justify-center text-purple-300 shrink-0 shadow-md mt-0.5 group-hover:border-purple-400 group-hover:scale-105 transition-all overflow-hidden"
             >
               {tokenImage && (tokenImage.startsWith('http') || tokenImage.startsWith('data:')) ? (
                 <img
@@ -424,17 +429,17 @@ export const NPCCard: React.FC<NPCCardProps> = ({
               </button>
 
               {currentEntity.subtitle && (
-                <p className="text-[11px] text-[#d8b4fe] font-medium mt-0.5 break-words">
+                <p className="text-[11px] sm:text-xs text-[#d8b4fe] font-medium mt-0.5 break-words">
                   {currentEntity.subtitle}
                 </p>
               )}
             </div>
           </div>
 
-          {/* TRAÇOS */}
-          {visibleTraits.length > 0 && (
-            <div className="flex items-center gap-1 flex-wrap">
-              {visibleTraits.slice(0, 5).map((t) => (
+          {/* TRAÇOS & TAGS DISCRETAS */}
+          {(visibleTraits.length > 0 || discreteTags.length > 0) && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {visibleTraits.slice(0, 7).map((t) => (
                 <TraitBadge
                   key={t}
                   trait={t}
@@ -447,6 +452,27 @@ export const NPCCard: React.FC<NPCCardProps> = ({
                   }}
                 />
               ))}
+              {visibleTraits.length > 7 && (
+                <span className="text-[10px] text-zinc-500 font-mono">
+                  +{visibleTraits.length - 7}
+                </span>
+              )}
+
+              {/* Tags Discretas */}
+              {discreteTags.slice(0, 3).map((tag) => (
+                <span
+                  key={tag}
+                  className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-900/60 text-zinc-400 border border-zinc-800"
+                  title={`Tag: #${tag}`}
+                >
+                  #{tag}
+                </span>
+              ))}
+              {discreteTags.length > 3 && (
+                <span className="text-[9px] font-mono text-zinc-500">
+                  +{discreteTags.length - 3}
+                </span>
+              )}
             </div>
           )}
 
@@ -455,9 +481,9 @@ export const NPCCard: React.FC<NPCCardProps> = ({
 
           {/* CITAÇÃO / CONCEITO OU RESUMO */}
           {npc.concept && isFieldVisible('concept') ? (
-            <div className="p-2 rounded-xl bg-purple-950/25 border border-purple-900/40 text-[11px] text-purple-200/90 italic flex items-start gap-1.5 mt-1">
-              <Quote className="w-3 h-3 text-purple-400 shrink-0 mt-0.5 opacity-80" />
-              <p className="line-clamp-2">{npc.concept}</p>
+            <div className="p-2.5 rounded-xl bg-purple-950/25 border border-purple-900/40 text-xs text-purple-200/90 italic flex items-start gap-1.5 mt-1">
+              <Quote className="w-3.5 h-3.5 text-purple-400 shrink-0 mt-0.5 opacity-80" />
+              <p className="line-clamp-2 leading-relaxed">&ldquo;{npc.concept}&rdquo;</p>
             </div>
           ) : summaryText.trim() && isFieldVisible('narrativeLore') ? (
             <p className="text-xs text-zinc-400 line-clamp-2 leading-relaxed pt-1">
@@ -466,11 +492,11 @@ export const NPCCard: React.FC<NPCCardProps> = ({
           ) : null}
         </div>
 
-        {/* PASTAS / SUBCATEGORIAS */}
-        {visibleSubcategories.length > 0 && (
+        {/* PASTAS / SUBCATEGORIAS (EXCLUSIVO GM) */}
+        {effectiveIsGm && subcategories.length > 0 && (
           <div className="pt-2 border-t border-zinc-800/60 flex items-center gap-1.5 flex-wrap">
-            {visibleSubcategories.map((sub) => (
-              <Tooltip key={sub} content={`Pasta: ${sub}`}>
+            {subcategories.map((sub) => (
+              <Tooltip key={sub} content={`Pasta: ${sub} (Exclusivo GM)`}>
                 <span className="text-[10px] px-2 py-0.5 rounded-md bg-purple-950/40 text-purple-300 border border-purple-900/40 flex items-center gap-1 cursor-help">
                   <Folder className="w-2.5 h-2.5 text-purple-400" />
                   <span>{sub}</span>

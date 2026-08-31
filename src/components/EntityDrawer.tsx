@@ -45,6 +45,10 @@ import { SpellView } from './SpellView';
 import { ItemView } from './ItemView';
 import { NPCView } from './NPCView';
 import { PCView } from './PCView';
+import { QuestView } from './QuestView';
+
+import { DrawerBreadcrumb } from '../types';
+import { DrawerStackHeader } from './DrawerStackHeader';
 
 interface EntityDrawerProps {
   entityId: string | null;
@@ -53,6 +57,11 @@ interface EntityDrawerProps {
   onNavigateToPage: (entityId: string) => void;
   onEditEntity?: (entityId: string) => void;
   isGmMode?: boolean;
+  stackIndex?: number;
+  stackTotal?: number;
+  stackBreadcrumbs?: DrawerBreadcrumb[];
+  onJumpToStackIndex?: (index: number) => void;
+  onCloseAll?: () => void;
 }
 
 export const EntityDrawer: React.FC<EntityDrawerProps> = ({
@@ -62,6 +71,11 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
   onNavigateToPage,
   onEditEntity,
   isGmMode = false,
+  stackIndex = 0,
+  stackTotal = 1,
+  stackBreadcrumbs = [],
+  onJumpToStackIndex,
+  onCloseAll,
 }) => {
   // Navigation history inside drawer so user can explore @mentions without leaving drawer
   const [history, setHistory] = useState<string[]>([]);
@@ -71,20 +85,21 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
   useEffect(() => {
     if (isOpen && entityId) {
       setCurrentId(entityId);
-      setHistory([]);
     }
   }, [isOpen, entityId]);
 
-  // Handle ESC key
+  // Handle ESC key only for the top-most active drawer
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      const isTopDrawer = stackIndex === stackTotal - 1;
+      if (e.key === 'Escape' && isOpen && isTopDrawer) {
+        e.stopPropagation();
         onClose();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [isOpen, onClose, stackIndex, stackTotal]);
 
   // Prevent background body scrolling when drawer is open
   useEffect(() => {
@@ -97,22 +112,6 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
       document.body.style.overflow = '';
     };
   }, [isOpen]);
-
-  // Listen to hecos:open-entity-drawer events while drawer is open
-  useEffect(() => {
-    const handleOpenEvent = (e: Event) => {
-      const customEvent = e as CustomEvent<{ entityId?: string; slug?: string; id?: string }>;
-      const targetId = customEvent.detail?.entityId || customEvent.detail?.slug || customEvent.detail?.id;
-      if (targetId && targetId !== currentId) {
-        if (currentId) {
-          setHistory((prev) => [...prev, currentId]);
-        }
-        setCurrentId(targetId);
-      }
-    };
-    window.addEventListener('hecos:open-entity-drawer', handleOpenEvent);
-    return () => window.removeEventListener('hecos:open-entity-drawer', handleOpenEvent);
-  }, [currentId]);
 
   const allEntities = HecosStorage.getEntities();
   
@@ -130,12 +129,13 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
     );
   }, [currentId, allEntities]);
 
-  // Internal navigation inside the drawer
+  // Internal navigation inside the drawer: push a new drawer to the stack!
   const handleInternalNavigate = (targetId: string) => {
-    if (currentId && targetId !== currentId) {
-      setHistory((prev) => [...prev, currentId]);
-      setCurrentId(targetId);
-    }
+    window.dispatchEvent(
+      new CustomEvent('hecos:open-entity-drawer', {
+        detail: { entityId: targetId },
+      })
+    );
   };
 
   // Step back in drawer history
@@ -144,6 +144,8 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
       const prevId = history[history.length - 1];
       setHistory((prev) => prev.slice(0, prev.length - 1));
       setCurrentId(prevId);
+    } else if (stackIndex > 0) {
+      onClose();
     }
   };
 
@@ -152,10 +154,11 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
     window.dispatchEvent(new CustomEvent('hecos:open-tag-drawer', { detail: { tag } }));
   };
 
-  // Full page navigation: closes drawer and redirects the user
+  // Full page navigation: closes all drawers and redirects the user
   const handleOpenFullPage = () => {
     if (currentEntity) {
-      onClose();
+      if (onCloseAll) onCloseAll();
+      else onClose();
       onNavigateToPage(currentEntity.id);
     }
   };
@@ -165,6 +168,8 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
   const isActualGm = isGmMode || HecosStorage.isUserGm();
   const currentMeta = getCategoryMeta(currentEntity?.category);
   const currentTheme = getCategoryTheme(currentEntity?.category);
+  const zIndexVal = 50 + stackIndex * 10;
+  const isTopmost = stackIndex === stackTotal - 1;
 
   // Backlinks for current entity
   const backlinks = currentEntity
@@ -181,7 +186,11 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 overflow-hidden pointer-events-auto" id="hecos-entity-drawer-container">
+      <div
+        className="fixed inset-0 overflow-hidden pointer-events-auto"
+        style={{ zIndex: zIndexVal }}
+        id={`hecos-entity-drawer-container-layer-${stackIndex}`}
+      >
         {/* Soft Dimmed Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -189,28 +198,54 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
           onClick={onClose}
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
+          className={`fixed inset-0 transition-opacity ${
+            stackIndex > 0
+              ? 'bg-black/60 backdrop-blur-[2px]'
+              : 'bg-black/75 backdrop-blur-sm'
+          }`}
         />
 
-        {/* Slide-over Right Drawer Container - 95% Width Available as Requested */}
-        <div className="fixed inset-y-0 right-0 max-w-full flex pl-2 sm:pl-6">
+        {/* Slide-over Right Drawer Container */}
+        <div
+          className={`fixed inset-y-0 right-0 max-w-full flex ${
+            stackIndex === 0
+              ? 'pl-2 sm:pl-6'
+              : stackIndex === 1
+              ? 'pl-4 sm:pl-10 md:pl-14'
+              : 'pl-6 sm:pl-14 md:pl-20'
+          }`}
+        >
           <motion.div
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-            className="w-screen max-w-[95vw] bg-[#09080e] border-l border-zinc-800 shadow-2xl flex flex-col h-full overflow-hidden text-zinc-100 relative"
+            className={`w-screen max-w-[95vw] bg-[#09080e] border-l border-zinc-800 shadow-2xl flex flex-col h-full overflow-hidden text-zinc-100 relative ${
+              stackIndex > 0 ? 'ring-1 ring-purple-600/30' : ''
+            }`}
           >
+            {/* Stack Breadcrumb Header Bar */}
+            {stackTotal > 1 && (
+              <DrawerStackHeader
+                breadcrumbs={stackBreadcrumbs}
+                currentIndex={stackIndex}
+                totalDrawers={stackTotal}
+                onPop={onClose}
+                onJumpToIndex={onJumpToStackIndex}
+                onCloseAll={onCloseAll}
+              />
+            )}
+
             {/* 1. Header Toolbar */}
             <div className="px-5 py-3.5 bg-[#100d1b] border-b border-zinc-800/90 flex items-center justify-between gap-3 shrink-0 z-30 shadow-md">
               <div className="flex items-center gap-2 min-w-0 flex-1">
-                {/* Back Button for Internal Drawer Navigation */}
-                {history.length > 0 && (
+                {/* Back Button if in stack or history */}
+                {(history.length > 0 || stackIndex > 0) && (
                   <button
                     type="button"
                     onClick={handleGoBack}
                     className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-white transition-colors flex items-center gap-1 text-xs font-semibold shrink-0 cursor-pointer shadow-sm"
-                    title="Voltar ao artigo anterior no painel lateral"
+                    title="Voltar ao artigo ou painel anterior"
                   >
                     <ArrowLeft className="w-4 h-4" />
                     <span className="hidden sm:inline">Voltar</span>
@@ -373,6 +408,16 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
                         onTagClick={handleTagClick}
                       />
                     </div>
+                  ) : currentEntity.category === 'quest' || currentEntity.questData ? (
+                    <div className="rounded-2xl overflow-hidden bg-[#080d16] border border-zinc-800/90 shadow-xl p-3 sm:p-5">
+                      <QuestView
+                        entity={currentEntity}
+                        onEdit={() => onEditEntity?.(currentEntity.id)}
+                        onDelete={() => {}}
+                        onNavigate={handleInternalNavigate}
+                        onTagClick={handleTagClick}
+                      />
+                    </div>
                   ) : (
                     /* Robust General Entity View Layout for all other categories (Lore, Item, NPC, PC, Fauna, Flora, Location, Faction, Rule, Session, etc.) */
                     <div className="space-y-6">
@@ -442,6 +487,22 @@ export const EntityDrawer: React.FC<EntityDrawerProps> = ({
                                 <p className="text-xs sm:text-sm text-zinc-300 mt-1 font-medium italic">
                                   {currentEntity.subtitle}
                                 </p>
+                              )}
+
+                              {/* Timeline Event Metadata (Era, Year, Importance) */}
+                              {currentEntity.timelineData && (
+                                <div className="flex items-center gap-2 flex-wrap mt-2.5 p-2 rounded-xl bg-purple-950/40 border border-purple-800/60 text-xs">
+                                  <div className="flex items-center gap-1 font-mono font-bold text-cyan-300">
+                                    <Calendar className="w-3.5 h-3.5 text-cyan-400" />
+                                    <span>{currentEntity.timelineData.year || 'Ano Desconhecido'}</span>
+                                  </div>
+                                  <span className="text-zinc-600">•</span>
+                                  <span className="text-purple-200 font-semibold">{currentEntity.timelineData.era || 'Era Primordial'}</span>
+                                  <span className="text-zinc-600">•</span>
+                                  <span className="uppercase font-mono text-[10px] px-1.5 py-0.5 rounded font-bold bg-black/50 text-amber-300 border border-amber-800/60">
+                                    {currentEntity.timelineData.importance || 'major'}
+                                  </span>
+                                </div>
                               )}
                             </div>
                           </div>

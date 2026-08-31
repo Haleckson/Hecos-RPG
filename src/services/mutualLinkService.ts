@@ -247,6 +247,174 @@ export class MutualLinkService {
   }
 
   /**
+   * 1.1 GET LINKED ENTITIES FOR PC
+   */
+  static getLinkedForPC(
+    pcEntity: HecosEntity,
+    allEntities: HecosEntity[] = HecosStorage.getEntities()
+  ): LinkedEntitiesForNPC {
+    const pcData = pcEntity.pcData || {};
+    const pcId = pcEntity.id;
+    const pcTitle = pcEntity.title;
+
+    // --- Locations ---
+    const locationMap = new Map<string, HecosEntity>();
+
+    if (pcData.locationEntityId) {
+      const found = allEntities.find((e) => e.id === pcData.locationEntityId);
+      if (found) locationMap.set(found.id, found);
+    }
+    const allLinkedLocIds = [
+      ...(pcData.linkedLocationIds || []),
+      ...(pcData.locationIds || []),
+    ];
+    allLinkedLocIds.forEach((locId) => {
+      if (locId) {
+        const found = allEntities.find((e) => e.id === locId);
+        if (found) locationMap.set(found.id, found);
+      }
+    });
+
+    if (pcData.location && locationMap.size === 0) {
+      const found = allEntities.find(
+        (e) => (e.category === 'location' || Boolean(e.locationData)) && this.matchTitle(e.title, pcData.location)
+      );
+      if (found) locationMap.set(found.id, found);
+    }
+
+    // Mutual reverse-lookup: Locations that list this PC
+    allEntities.forEach((ent) => {
+      if (ent.category === 'location' || ent.locationData) {
+        const loc = ent.locationData;
+        if (
+          loc?.inhabitantNpcIds?.includes(pcId) ||
+          loc?.rulerEntityId === pcId ||
+          this.matchTitle(loc?.ruler, pcTitle)
+        ) {
+          locationMap.set(ent.id, ent);
+        }
+      }
+    });
+
+    // --- Organizations ---
+    const orgMap = new Map<string, HecosEntity>();
+
+    const primaryOrgId = pcData.organizationEntityId || pcData.factionEntityId;
+    if (primaryOrgId) {
+      const found = allEntities.find((e) => e.id === primaryOrgId);
+      if (found) orgMap.set(found.id, found);
+    }
+    const allLinkedOrgIds = [
+      ...(pcData.linkedOrganizationIds || []),
+      ...(pcData.organizationIds || []),
+    ];
+    allLinkedOrgIds.forEach((orgId) => {
+      if (orgId) {
+        const found = allEntities.find((e) => e.id === orgId);
+        if (found) orgMap.set(found.id, found);
+      }
+    });
+
+    const orgName = pcData.organization || pcData.faction;
+    if (orgName && orgMap.size === 0) {
+      const found = allEntities.find(
+        (e) => (e.category === 'organization' || Boolean(e.organizationData)) && this.matchTitle(e.title, orgName)
+      );
+      if (found) orgMap.set(found.id, found);
+    }
+
+    // Mutual reverse-lookup: Organizations that list this PC
+    allEntities.forEach((ent) => {
+      if (ent.category === 'organization' || ent.organizationData) {
+        const org = ent.organizationData;
+        if (
+          org?.memberNpcIds?.includes(pcId) ||
+          org?.leaderEntityId === pcId ||
+          this.matchTitle(org?.leader, pcTitle)
+        ) {
+          orgMap.set(ent.id, ent);
+        }
+      }
+    });
+
+    // --- Quests ---
+    const questMap = new Map<string, {
+      entity?: HecosEntity;
+      linkId?: string;
+      title: string;
+      roleInQuest?: string;
+      description?: string;
+      isSecret?: boolean;
+    }>();
+
+    // Direct questIds
+    (pcData.questIds || []).forEach((qId) => {
+      if (qId) {
+        const found = allEntities.find((e) => e.id === qId);
+        if (found) {
+          questMap.set(found.id, {
+            entity: found,
+            title: found.title,
+            roleInQuest: 'Missão Vinculada',
+            description: found.subtitle || '',
+            isSecret: found.isSecret || found.visibility === 'gm',
+          });
+        }
+      }
+    });
+
+    // Explicit quests array in PC
+    (pcData.quests || []).forEach((q) => {
+      let matchedEntity: HecosEntity | undefined;
+      if (q.questEntityId) {
+        matchedEntity = allEntities.find((e) => e.id === q.questEntityId);
+      }
+      if (!matchedEntity && q.title) {
+        matchedEntity = allEntities.find(
+          (e) => (e.category === 'quest' || Boolean(e.questData)) && this.matchTitle(e.title, q.title)
+        );
+      }
+
+      const key = matchedEntity ? matchedEntity.id : `custom-${q.id || q.title}`;
+      questMap.set(key, {
+        entity: matchedEntity,
+        linkId: q.id,
+        title: matchedEntity ? matchedEntity.title : q.title,
+        roleInQuest: q.roleInQuest || 'Envolvido',
+        description: q.description || (matchedEntity?.subtitle || ''),
+        isSecret: q.isSecret || matchedEntity?.isSecret,
+      });
+    });
+
+    // Mutual reverse-lookup: Quests that list this PC
+    allEntities.forEach((ent) => {
+      if (ent.category === 'quest' || ent.questData) {
+        const qd = ent.questData;
+        const isGiver = qd?.questGiverEntityId === pcId || this.matchTitle(qd?.questGiver, pcTitle);
+        const isInvolved = qd?.involvedNpcIds?.includes(pcId);
+
+        if (isGiver || isInvolved) {
+          if (!questMap.has(ent.id)) {
+            questMap.set(ent.id, {
+              entity: ent,
+              title: ent.title,
+              roleInQuest: isGiver ? 'Doador da Missão' : 'Personagem Envolvido',
+              description: ent.subtitle || '',
+              isSecret: ent.isSecret || ent.visibility === 'gm',
+            });
+          }
+        }
+      }
+    });
+
+    return {
+      locations: Array.from(locationMap.values()),
+      organizations: Array.from(orgMap.values()),
+      quests: Array.from(questMap.values()),
+    };
+  }
+
+  /**
    * 2. GET LINKED ENTITIES FOR LOCATION
    */
   static getLinkedForLocation(

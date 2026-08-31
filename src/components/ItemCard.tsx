@@ -415,7 +415,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({
   isGmMode = false,
 }) => {
   const currentUser = HecosStorage.getCurrentUser();
-  const isActualGm = isGmMode || currentUser?.role === 'gm';
+  const isActualGm = HecosStorage.isUserGm(currentUser) && (isGmMode !== false);
 
   // Extract or parse item data
   const data: PF2eItemAttributes = propItemData
@@ -570,45 +570,46 @@ export const ItemCard: React.FC<ItemCardProps> = ({
         </div>
       </div>
 
-      {/* Bottom Footer: Folder Tags & Edit/Delete Actions */}
-      <div className="mt-4 pt-3 border-t border-zinc-800/60 flex items-center justify-between gap-2">
-        {/* Folders assigned to this item */}
-        <div className="flex items-center gap-1 flex-wrap flex-1 max-w-[70%]">
-          {data.subcategories && data.subcategories.length > 0 ? (
-            data.subcategories.map((sub) => (
-              <span
-                key={sub}
+      {/* Bottom Footer: Folder Tags (GM only) & Edit/Delete Actions */}
+      {isActualGm && (
+        <div className="mt-4 pt-3 border-t border-zinc-800/60 flex items-center justify-between gap-2">
+          {/* Folders assigned to this item (GM Only) */}
+          <div className="flex items-center gap-1 flex-wrap flex-1 max-w-[70%]">
+            {data.subcategories && data.subcategories.length > 0 ? (
+              data.subcategories.map((sub) => (
+                <span
+                  key={sub}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectSubcategory?.(sub);
+                  }}
+                  className="text-[10px] px-1.5 py-0.5 rounded bg-amber-950/50 text-amber-300 border border-amber-800/40 hover:border-amber-400 truncate transition-colors cursor-pointer flex items-center gap-1"
+                  title={`Pasta: ${sub} (Exclusivo GM)`}
+                >
+                  <Folder className="w-2.5 h-2.5 shrink-0" />
+                  <span className="truncate">{sub}</span>
+                </span>
+              ))
+            ) : (
+              <span className="text-[10px] text-zinc-600 italic">Sem pasta</span>
+            )}
+
+            {/* Manage Folders Trigger Button */}
+            {entity && onOpenFolderAssign && (
+              <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onSelectSubcategory?.(sub);
+                  onOpenFolderAssign(entity);
                 }}
-                className="text-[10px] px-1.5 py-0.5 rounded bg-amber-950/50 text-amber-300 border border-amber-800/40 hover:border-amber-400 truncate transition-colors cursor-pointer flex items-center gap-1"
+                className="p-1 rounded text-zinc-500 hover:text-amber-300 hover:bg-zinc-900 transition-colors"
+                title="Organizar nas Pastas"
               >
-                <Folder className="w-2.5 h-2.5 shrink-0" />
-                <span className="truncate">{sub}</span>
-              </span>
-            ))
-          ) : (
-            <span className="text-[10px] text-zinc-600 italic">Sem pasta</span>
-          )}
+                <FolderPlus className="w-3 h-3" />
+              </button>
+            )}
+          </div>
 
-          {/* Manage Folders Trigger Button */}
-          {isActualGm && entity && onOpenFolderAssign && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenFolderAssign(entity);
-              }}
-              className="p-1 rounded text-zinc-500 hover:text-amber-300 hover:bg-zinc-900 transition-colors"
-              title="Organizar nas Pastas"
-            >
-              <FolderPlus className="w-3 h-3" />
-            </button>
-          )}
-        </div>
-
-        {/* Edit & Delete Buttons */}
-        {isActualGm && (
+          {/* Edit & Delete Buttons */}
           <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
             {onEditEntity && (
               <Tooltip title="Editar Item" description="Modificar estatísticas, preço, volume e descrição">
@@ -633,8 +634,8 @@ export const ItemCard: React.FC<ItemCardProps> = ({
               </Tooltip>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

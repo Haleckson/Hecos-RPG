@@ -664,8 +664,8 @@ export function SpellExplorer({
         if (activeCategory === 'extras' && data.spellType !== 'extras' && sp.category !== 'spell') return false;
       }
 
-      // 2. Subcategory / Folder filter
-      if (activeSubcategory) {
+      // 2. Subcategory / Folder filter (GM only)
+      if (isActualGm && activeSubcategory) {
         if (activeSubcategory === '__none__') {
           const subs = data.subcategories || sp.subcategories || (sp.subcategory ? [sp.subcategory] : []);
           if (subs.length > 0) return false;
@@ -1072,180 +1072,182 @@ export function SpellExplorer({
               )}
             </div>
 
-            {/* Folder / Subcategory Dropdown Filter */}
-            <div className="relative min-w-[200px] sm:w-56">
-              <button
-                type="button"
-                onClick={() => setIsFolderDropdownOpen(!isFolderDropdownOpen)}
-                className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                  activeSubcategory !== null
-                    ? 'bg-purple-950/70 border-purple-500/80 text-purple-200 shadow-sm'
-                    : 'bg-zinc-900/90 border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100'
-                }`}
-              >
-                <div className="flex items-center gap-2 truncate">
-                  <Folder className={`w-3.5 h-3.5 shrink-0 ${activeSubcategory ? 'text-purple-400' : 'text-zinc-400'}`} />
-                  <span className="truncate">
-                    {activeSubcategory === null
-                      ? 'Todas as Pastas'
-                      : activeSubcategory === '__none__'
-                      ? 'Sem Pasta Definida'
-                      : activeSubcategory}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-zinc-400 border border-zinc-800">
-                    {activeSubcategory === null
-                      ? filteredSpells.length
-                      : activeSubcategory === '__none__'
-                      ? subcategoryCounts.__none__ || 0
-                      : subcategoryCounts[activeSubcategory] || 0}
-                  </span>
-                  <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${isFolderDropdownOpen ? 'rotate-180' : ''}`} />
-                </div>
-              </button>
+            {/* Folder / Subcategory Dropdown Filter (GM only) */}
+            {isActualGm && (
+              <div className="relative min-w-[200px] sm:w-56">
+                <button
+                  type="button"
+                  onClick={() => setIsFolderDropdownOpen(!isFolderDropdownOpen)}
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                    activeSubcategory !== null
+                      ? 'bg-purple-950/70 border-purple-500/80 text-purple-200 shadow-sm'
+                      : 'bg-zinc-900/90 border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <Folder className={`w-3.5 h-3.5 shrink-0 ${activeSubcategory ? 'text-purple-400' : 'text-zinc-400'}`} />
+                    <span className="truncate">
+                      {activeSubcategory === null
+                        ? 'Todas as Pastas'
+                        : activeSubcategory === '__none__'
+                        ? 'Sem Pasta Definida'
+                        : activeSubcategory}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-zinc-400 border border-zinc-800">
+                      {activeSubcategory === null
+                        ? filteredSpells.length
+                        : activeSubcategory === '__none__'
+                        ? subcategoryCounts.__none__ || 0
+                        : subcategoryCounts[activeSubcategory] || 0}
+                    </span>
+                    <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${isFolderDropdownOpen ? 'rotate-180' : ''}`} />
+                  </div>
+                </button>
 
-              {/* Folder Selector Dropdown Menu */}
-              {isFolderDropdownOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-30"
-                    onClick={() => setIsFolderDropdownOpen(false)}
-                  />
-                  <div className="absolute left-0 right-0 sm:right-auto sm:w-72 mt-1.5 z-40 bg-[#0d0a17] border border-zinc-700/80 rounded-2xl shadow-2xl overflow-hidden animate-fade-in flex flex-col max-h-80">
-                    {/* Search inside folder dropdown */}
-                    <div className="p-2 border-b border-zinc-800/80 bg-zinc-950/60 flex items-center gap-1.5">
-                      <Search className="w-3.5 h-3.5 text-zinc-500 ml-1 shrink-0" />
-                      <input
-                        type="text"
-                        value={folderDropdownSearch}
-                        onChange={(e) => setFolderDropdownSearch(e.target.value)}
-                        placeholder="Filtrar pastas..."
-                        className="flex-1 bg-transparent text-xs text-zinc-200 placeholder-zinc-500 outline-none"
-                        autoFocus
-                      />
-                      {folderDropdownSearch && (
-                        <button
-                          type="button"
-                          onClick={() => setFolderDropdownSearch('')}
-                          className="p-1 text-zinc-500 hover:text-zinc-300"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
+                {/* Folder Selector Dropdown Menu */}
+                {isFolderDropdownOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-30"
+                      onClick={() => setIsFolderDropdownOpen(false)}
+                    />
+                    <div className="absolute left-0 right-0 sm:right-auto sm:w-72 mt-1.5 z-40 bg-[#0d0a17] border border-zinc-700/80 rounded-2xl shadow-2xl overflow-hidden animate-fade-in flex flex-col max-h-80">
+                      {/* Search inside folder dropdown */}
+                      <div className="p-2 border-b border-zinc-800/80 bg-zinc-950/60 flex items-center gap-1.5">
+                        <Search className="w-3.5 h-3.5 text-zinc-500 ml-1 shrink-0" />
+                        <input
+                          type="text"
+                          value={folderDropdownSearch}
+                          onChange={(e) => setFolderDropdownSearch(e.target.value)}
+                          placeholder="Filtrar pastas..."
+                          className="flex-1 bg-transparent text-xs text-zinc-200 placeholder-zinc-500 outline-none"
+                          autoFocus
+                        />
+                        {folderDropdownSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setFolderDropdownSearch('')}
+                            className="p-1 text-zinc-500 hover:text-zinc-300"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
 
-                    {/* Folders List */}
-                    <div className="p-1.5 overflow-y-auto space-y-1 flex-1">
-                      {/* Option: All Folders */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveSubcategory(null);
-                          setIsFolderDropdownOpen(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left ${
-                          activeSubcategory === null
-                            ? 'bg-purple-950/80 text-purple-200 border border-purple-500/50'
-                            : 'text-zinc-300 hover:bg-zinc-900/90'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <Folder className="w-3.5 h-3.5 text-cyan-400" />
-                          <span>Todas as Pastas</span>
-                        </div>
-                        <span className="text-[10px] font-mono text-zinc-400">
-                          {activeCategory === 'all' ? spellEntities.length : categoryCounts[activeCategory] || 0}
-                        </span>
-                      </button>
-
-                      {/* Option: Without Folder */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveSubcategory('__none__');
-                          setIsFolderDropdownOpen(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left ${
-                          activeSubcategory === '__none__'
-                            ? 'bg-purple-950/80 text-purple-200 border border-purple-500/50'
-                            : 'text-zinc-400 hover:bg-zinc-900/90'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <Folder className="w-3.5 h-3.5 text-zinc-600" />
-                          <span className="italic">Sem Pasta Definida</span>
-                        </div>
-                        <span className="text-[10px] font-mono text-zinc-500">
-                          {subcategoryCounts.__none__ || 0}
-                        </span>
-                      </button>
-
-                      <div className="my-1 border-t border-zinc-800/80" />
-
-                      {/* Custom subcategories */}
-                      {currentSubcategories
-                        .filter((s) =>
-                          s.toLowerCase().includes(folderDropdownSearch.toLowerCase().trim())
-                        )
-                        .map((subcat) => {
-                          const isSelected = activeSubcategory === subcat;
-                          const count = subcategoryCounts[subcat] || 0;
-
-                          return (
-                            <button
-                              key={subcat}
-                              type="button"
-                              onClick={() => {
-                                setActiveSubcategory(isSelected ? null : subcat);
-                                setIsFolderDropdownOpen(false);
-                              }}
-                              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left ${
-                                isSelected
-                                  ? 'bg-purple-950/80 text-purple-200 border border-purple-500/50'
-                                  : 'text-zinc-300 hover:bg-zinc-900/90'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2 truncate">
-                                <Folder className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                                <span className="truncate">{subcat}</span>
-                              </div>
-                              <span className="text-[10px] font-mono text-zinc-400 shrink-0 ml-1">
-                                {count}
-                              </span>
-                            </button>
-                          );
-                        })}
-
-                      {currentSubcategories.filter((s) =>
-                        s.toLowerCase().includes(folderDropdownSearch.toLowerCase().trim())
-                      ).length === 0 && (
-                        <div className="p-3 text-center text-xs text-zinc-500 italic">
-                          Nenhuma pasta encontrada
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Manage Folders footer action */}
-                    {isActualGm && (
-                      <div className="p-2 border-t border-zinc-800/80 bg-zinc-950/90">
+                      {/* Folders List */}
+                      <div className="p-1.5 overflow-y-auto space-y-1 flex-1">
+                        {/* Option: All Folders */}
                         <button
                           type="button"
                           onClick={() => {
+                            setActiveSubcategory(null);
                             setIsFolderDropdownOpen(false);
-                            setIsFolderManagerOpen(true);
                           }}
-                          className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-950/60 hover:bg-purple-900/70 border border-purple-600/40 text-purple-300 text-xs font-bold transition-all cursor-pointer"
+                          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left ${
+                            activeSubcategory === null
+                              ? 'bg-purple-950/80 text-purple-200 border border-purple-500/50'
+                              : 'text-zinc-300 hover:bg-zinc-900/90'
+                          }`}
                         >
-                          <FolderPlus className="w-3.5 h-3.5" />
-                          <span>Gerenciar Pastas</span>
+                          <div className="flex items-center gap-2">
+                            <Folder className="w-3.5 h-3.5 text-cyan-400" />
+                            <span>Todas as Pastas</span>
+                          </div>
+                          <span className="text-[10px] font-mono text-zinc-400">
+                            {activeCategory === 'all' ? spellEntities.length : categoryCounts[activeCategory] || 0}
+                          </span>
                         </button>
+
+                        {/* Option: Without Folder */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveSubcategory('__none__');
+                            setIsFolderDropdownOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left ${
+                            activeSubcategory === '__none__'
+                              ? 'bg-purple-950/80 text-purple-200 border border-purple-500/50'
+                              : 'text-zinc-400 hover:bg-zinc-900/90'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Folder className="w-3.5 h-3.5 text-zinc-600" />
+                            <span className="italic">Sem Pasta Definida</span>
+                          </div>
+                          <span className="text-[10px] font-mono text-zinc-500">
+                            {subcategoryCounts.__none__ || 0}
+                          </span>
+                        </button>
+
+                        <div className="my-1 border-t border-zinc-800/80" />
+
+                        {/* Custom subcategories */}
+                        {currentSubcategories
+                          .filter((s) =>
+                            s.toLowerCase().includes(folderDropdownSearch.toLowerCase().trim())
+                          )
+                          .map((subcat) => {
+                            const isSelected = activeSubcategory === subcat;
+                            const count = subcategoryCounts[subcat] || 0;
+
+                            return (
+                              <button
+                                key={subcat}
+                                type="button"
+                                onClick={() => {
+                                  setActiveSubcategory(isSelected ? null : subcat);
+                                  setIsFolderDropdownOpen(false);
+                                }}
+                                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left ${
+                                  isSelected
+                                    ? 'bg-purple-950/80 text-purple-200 border border-purple-500/50'
+                                    : 'text-zinc-300 hover:bg-zinc-900/90'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 truncate">
+                                  <Folder className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                                  <span className="truncate">{subcat}</span>
+                                </div>
+                                <span className="text-[10px] font-mono text-zinc-400 shrink-0 ml-1">
+                                  {count}
+                                </span>
+                              </button>
+                            );
+                          })}
+
+                        {currentSubcategories.filter((s) =>
+                          s.toLowerCase().includes(folderDropdownSearch.toLowerCase().trim())
+                        ).length === 0 && (
+                          <div className="p-3 text-center text-xs text-zinc-500 italic">
+                            Nenhuma pasta encontrada
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
+
+                      {/* Manage Folders footer action */}
+                      {isActualGm && (
+                        <div className="p-2 border-t border-zinc-800/80 bg-zinc-950/90">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsFolderDropdownOpen(false);
+                              setIsFolderManagerOpen(true);
+                            }}
+                            className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-950/60 hover:bg-purple-900/70 border border-purple-600/40 text-purple-300 text-xs font-bold transition-all cursor-pointer"
+                          >
+                            <FolderPlus className="w-3.5 h-3.5" />
+                            <span>Gerenciar Pastas</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Right: Rank, Tradition and Filter Panel Controls */}
@@ -1344,18 +1346,20 @@ export function SpellExplorer({
               >
                 <List className="w-3.5 h-3.5" />
               </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('folders')}
-                className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
-                  viewMode === 'folders'
-                    ? 'bg-cyan-500 text-black font-bold shadow-sm'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-                title="Visualização em Árvore de Pastas"
-              >
-                <FolderTree className="w-3.5 h-3.5" />
-              </button>
+              {isActualGm && (
+                <button
+                  type="button"
+                  onClick={() => setViewMode('folders')}
+                  className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+                    viewMode === 'folders'
+                      ? 'bg-cyan-500 text-black font-bold shadow-sm'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                  title="Visualização em Árvore de Pastas (Exclusivo GM)"
+                >
+                  <FolderTree className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1548,11 +1552,11 @@ export function SpellExplorer({
                   </div>
                 </div>
 
-                {/* Bottom Footer: Folder Tags & Edit/Delete Actions */}
+                {/* Bottom Footer: Folder Tags (GM only) & Edit/Delete Actions */}
                 <div className="mt-4 pt-3 border-t border-zinc-800/60 flex items-center justify-between gap-2">
-                  {/* Folders assigned to this spell */}
+                  {/* Folders assigned to this spell (GM only) */}
                   <div className="flex items-center gap-1 flex-wrap flex-1 max-w-[70%]">
-                    {data.subcategories && data.subcategories.length > 0 ? (
+                    {isActualGm && data.subcategories && data.subcategories.length > 0 ? (
                       data.subcategories.map((sub, sIdx) => (
                         <span
                           key={`${sp.id}-sub-${sub}-${sIdx}`}
@@ -1561,14 +1565,15 @@ export function SpellExplorer({
                             setActiveSubcategory(sub);
                           }}
                           className="text-[10px] px-1.5 py-0.5 rounded bg-purple-950/50 text-purple-300 border border-purple-800/40 hover:border-purple-400 truncate transition-colors cursor-pointer flex items-center gap-1"
+                          title={`Pasta: ${sub} (Exclusivo GM)`}
                         >
                           <Folder className="w-2.5 h-2.5 shrink-0" />
                           <span className="truncate">{sub}</span>
                         </span>
                       ))
-                    ) : (
+                    ) : isActualGm ? (
                       <span className="text-[10px] text-zinc-600 italic">Sem pasta</span>
-                    )}
+                    ) : null}
 
                     {/* Manage Folders Trigger Button */}
                     {isActualGm && (
@@ -1687,7 +1692,7 @@ export function SpellExplorer({
                       {sortBy === 'rarity' ? <ArrowDown className="w-3 h-3 text-cyan-400" /> : <ArrowUpDown className="w-3 h-3 opacity-40 hover:opacity-100" />}
                     </button>
                   </th>
-                  <th className="py-3 px-3">Pastas</th>
+                  {isActualGm && <th className="py-3 px-3">Pastas</th>}
                   <th className="py-3 px-3 text-right">Ações</th>
                 </tr>
               </thead>
@@ -1741,25 +1746,27 @@ export function SpellExplorer({
                           }}
                         />
                       </td>
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-1 flex-wrap max-w-[180px]">
-                          {data.subcategories && data.subcategories.length > 0 ? (
-                            data.subcategories.slice(0, 2).map((s, sIdx) => (
-                              <span
-                                key={`${sp.id}-tblsub-${s}-${sIdx}`}
-                                className="text-[10px] px-1.5 py-0.2 rounded bg-purple-950/60 text-purple-300 border border-purple-800/40 truncate max-w-[90px]"
-                              >
-                                {s}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-zinc-600 text-[10px]">—</span>
-                          )}
-                          {data.subcategories && data.subcategories.length > 2 && (
-                            <span className="text-[10px] text-zinc-500">+{data.subcategories.length - 2}</span>
-                          )}
-                        </div>
-                      </td>
+                      {isActualGm && (
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-1 flex-wrap max-w-[180px]">
+                            {data.subcategories && data.subcategories.length > 0 ? (
+                              data.subcategories.slice(0, 2).map((s, sIdx) => (
+                                <span
+                                  key={`${sp.id}-tblsub-${s}-${sIdx}`}
+                                  className="text-[10px] px-1.5 py-0.2 rounded bg-purple-950/60 text-purple-300 border border-purple-800/40 truncate max-w-[90px]"
+                                >
+                                  {s}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-zinc-600 text-[10px]">—</span>
+                            )}
+                            {data.subcategories && data.subcategories.length > 2 && (
+                              <span className="text-[10px] text-zinc-500">+{data.subcategories.length - 2}</span>
+                            )}
+                          </div>
+                        </td>
+                      )}
                       <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                         {isActualGm ? (
                           <div className="flex items-center justify-end gap-1.5">

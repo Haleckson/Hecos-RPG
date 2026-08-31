@@ -16,6 +16,7 @@ import { FaunaView } from './FaunaView';
 import { FloraView } from './FloraView';
 import { LocationView } from './LocationView';
 import { OrganizationView } from './OrganizationView';
+import { QuestView } from './QuestView';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { AdjustableImage } from './AdjustableImage';
 import { TraitBadge } from './TraitBadge';
@@ -208,6 +209,18 @@ export const EntityView: React.FC<EntityViewProps> = ({
   if (entity.category === 'organization' || entity.organizationData) {
     return (
       <OrganizationView
+        entity={entity}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onNavigate={onNavigate}
+        onTagClick={onTagClick}
+      />
+    );
+  }
+
+  if (entity.category === 'quest' || entity.questData) {
+    return (
+      <QuestView
         entity={entity}
         onEdit={onEdit}
         onDelete={onDelete}

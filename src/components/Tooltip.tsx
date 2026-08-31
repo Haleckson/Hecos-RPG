@@ -29,8 +29,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   side,
   placement,
   align = 'center',
-  delay = 140,
-  noScroll = false,
+  delay = 120,
   children,
   className = '',
   disabled = false,
@@ -42,8 +41,6 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const [coords, setCoords] = useState<{
     top: number;
     left: number;
-    maxHeight?: number;
-    maxWidth?: number;
     chosenSide: string;
   } | null>(null);
 
@@ -56,171 +53,119 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const isEnabled = hasContent && !disabled;
 
   const updatePosition = useCallback(() => {
-    if (!triggerRef.current) return;
+    if (!triggerRef.current || !tooltipRef.current) return;
     const triggerRect = triggerRef.current.getBoundingClientRect();
     const tooltipEl = tooltipRef.current;
 
     const viewportW = window.innerWidth;
     const viewportH = window.innerHeight;
 
-    const PADDING = 12; // Distance from viewport edges
-    const GAP = 12;     // Mandatory gap between trigger and tooltip to NEVER overlap
+    const PADDING = 12; // Safety margin from viewport boundaries
+    const GAP = 10;     // Spacing between trigger and tooltip box
 
-    // Measured natural dimensions of the tooltip
-    let naturalWidth = tooltipEl ? tooltipEl.offsetWidth : 360;
-    let naturalHeight = tooltipEl ? tooltipEl.offsetHeight : 200;
+    // Natural dimensions measured directly from the DOM
+    const naturalWidth = tooltipEl.offsetWidth || 280;
+    const naturalHeight = tooltipEl.offsetHeight || 100;
 
-    if (naturalWidth <= 0) naturalWidth = 360;
-    if (naturalHeight <= 0) naturalHeight = 200;
+    // Available space around trigger
+    const spaceAbove = triggerRect.top - PADDING - GAP;
+    const spaceBelow = viewportH - triggerRect.bottom - PADDING - GAP;
+    const spaceLeft = triggerRect.left - PADDING - GAP;
+    const spaceRight = viewportW - triggerRect.right - PADDING - GAP;
 
-    // Available space in each direction relative to the trigger rect
-    const spaceAbove = Math.max(0, triggerRect.top - PADDING - GAP);
-    const spaceBelow = Math.max(0, viewportH - triggerRect.bottom - PADDING - GAP);
-    const spaceLeft = Math.max(0, triggerRect.left - PADDING - GAP);
-    const spaceRight = Math.max(0, viewportW - triggerRect.right - PADDING - GAP);
-
-    // Determine the optimal placement
+    // Determine optimal placement side
     let chosenSide: 'top' | 'bottom' | 'right' | 'left' = 'right';
 
     if (preferredSide === 'auto') {
-      // For rich tooltips/cards, prefer side placement (right/left) where horizontal space is ample
-      if (spaceRight >= 320) {
+      // Prioritize right or left if width fits, otherwise top or bottom with most space
+      if (spaceRight >= naturalWidth) {
         chosenSide = 'right';
-      } else if (spaceLeft >= 320) {
+      } else if (spaceLeft >= naturalWidth) {
         chosenSide = 'left';
-      } else if (spaceRight >= 240) {
-        chosenSide = 'right';
-      } else if (spaceLeft >= 240) {
-        chosenSide = 'left';
-      } else if (spaceBelow >= spaceAbove) {
-        chosenSide = 'bottom';
-      } else {
-        chosenSide = 'top';
-      }
-    } else if (preferredSide === 'right') {
-      if (spaceRight >= Math.min(naturalWidth, 260)) {
-        chosenSide = 'right';
-      } else if (spaceLeft >= Math.min(naturalWidth, 260)) {
-        chosenSide = 'left';
-      } else if (spaceBelow >= spaceAbove) {
-        chosenSide = 'bottom';
-      } else {
-        chosenSide = 'top';
-      }
-    } else if (preferredSide === 'left') {
-      if (spaceLeft >= Math.min(naturalWidth, 260)) {
-        chosenSide = 'left';
-      } else if (spaceRight >= Math.min(naturalWidth, 260)) {
-        chosenSide = 'right';
-      } else if (spaceBelow >= spaceAbove) {
-        chosenSide = 'bottom';
-      } else {
-        chosenSide = 'top';
-      }
-    } else if (preferredSide === 'top') {
-      if (spaceAbove >= naturalHeight) {
-        chosenSide = 'top';
       } else if (spaceBelow >= naturalHeight) {
         chosenSide = 'bottom';
-      } else if (spaceRight >= 320) {
+      } else if (spaceAbove >= naturalHeight) {
+        chosenSide = 'top';
+      } else {
+        // Pick the side with the maximum available dimension
+        const maxSpace = Math.max(spaceRight, spaceLeft, spaceBelow, spaceAbove);
+        if (maxSpace === spaceRight) chosenSide = 'right';
+        else if (maxSpace === spaceLeft) chosenSide = 'left';
+        else if (maxSpace === spaceBelow) chosenSide = 'bottom';
+        else chosenSide = 'top';
+      }
+    } else if (preferredSide === 'right') {
+      if (spaceRight >= naturalWidth || spaceRight >= spaceLeft) {
         chosenSide = 'right';
-      } else if (spaceLeft >= 320) {
+      } else {
         chosenSide = 'left';
-      } else if (spaceAbove >= spaceBelow) {
+      }
+    } else if (preferredSide === 'left') {
+      if (spaceLeft >= naturalWidth || spaceLeft >= spaceRight) {
+        chosenSide = 'left';
+      } else {
+        chosenSide = 'right';
+      }
+    } else if (preferredSide === 'top') {
+      if (spaceAbove >= naturalHeight || spaceAbove >= spaceBelow) {
         chosenSide = 'top';
       } else {
         chosenSide = 'bottom';
       }
     } else if (preferredSide === 'bottom') {
-      if (spaceBelow >= naturalHeight) {
-        chosenSide = 'bottom';
-      } else if (spaceAbove >= naturalHeight) {
-        chosenSide = 'top';
-      } else if (spaceRight >= 320) {
-        chosenSide = 'right';
-      } else if (spaceLeft >= 320) {
-        chosenSide = 'left';
-      } else if (spaceBelow >= spaceAbove) {
+      if (spaceBelow >= naturalHeight || spaceBelow >= spaceAbove) {
         chosenSide = 'bottom';
       } else {
         chosenSide = 'top';
       }
     }
 
-    let calculatedMaxHeight: number | undefined = undefined;
-    let calculatedMaxWidth: number | undefined = undefined;
     let finalTop = 0;
     let finalLeft = 0;
 
     if (chosenSide === 'right') {
-      // STRICT GUARANTEE: Tooltip left edge starts at triggerRect.right + GAP
       finalLeft = triggerRect.right + GAP;
-      calculatedMaxWidth = Math.max(160, viewportW - (triggerRect.right + GAP) - PADDING);
-      calculatedMaxHeight = Math.max(120, viewportH - 2 * PADDING);
-
-      const actualH = Math.min(naturalHeight, calculatedMaxHeight);
-      // Vertically center with trigger, but clamp strictly within viewport bounds
-      const idealTop = triggerRect.top + (triggerRect.height - actualH) / 2;
-      finalTop = Math.max(PADDING, Math.min(viewportH - PADDING - actualH, idealTop));
+      // Vertically center with trigger, clamped strictly within viewport bounds
+      const idealTop = triggerRect.top + (triggerRect.height - naturalHeight) / 2;
+      finalTop = idealTop;
     } else if (chosenSide === 'left') {
-      // STRICT GUARANTEE: Tooltip right edge ends at triggerRect.left - GAP
-      calculatedMaxWidth = Math.max(160, triggerRect.left - GAP - PADDING);
-      calculatedMaxHeight = Math.max(120, viewportH - 2 * PADDING);
-
-      const actualW = Math.min(naturalWidth, calculatedMaxWidth);
-      const actualH = Math.min(naturalHeight, calculatedMaxHeight);
-
-      finalLeft = triggerRect.left - GAP - actualW;
-      finalLeft = Math.max(PADDING, finalLeft);
-
-      const idealTop = triggerRect.top + (triggerRect.height - actualH) / 2;
-      finalTop = Math.max(PADDING, Math.min(viewportH - PADDING - actualH, idealTop));
+      finalLeft = triggerRect.left - GAP - naturalWidth;
+      const idealTop = triggerRect.top + (triggerRect.height - naturalHeight) / 2;
+      finalTop = idealTop;
     } else if (chosenSide === 'top') {
-      // STRICT GUARANTEE: Tooltip bottom edge ends at triggerRect.top - GAP
-      calculatedMaxHeight = Math.max(60, triggerRect.top - GAP - PADDING);
-      calculatedMaxWidth = Math.max(160, viewportW - 2 * PADDING);
-
-      const actualH = Math.min(naturalHeight, calculatedMaxHeight);
-      const actualW = Math.min(naturalWidth, calculatedMaxWidth);
-
-      finalTop = triggerRect.top - GAP - actualH;
-      finalTop = Math.max(PADDING, finalTop);
-
+      finalTop = triggerRect.top - GAP - naturalHeight;
       if (align === 'start') {
         finalLeft = triggerRect.left;
       } else if (align === 'end') {
-        finalLeft = triggerRect.right - actualW;
+        finalLeft = triggerRect.right - naturalWidth;
       } else {
-        finalLeft = triggerRect.left + (triggerRect.width - actualW) / 2;
+        finalLeft = triggerRect.left + (triggerRect.width - naturalWidth) / 2;
       }
-      finalLeft = Math.max(PADDING, Math.min(viewportW - PADDING - actualW, finalLeft));
     } else if (chosenSide === 'bottom') {
-      // STRICT GUARANTEE: Tooltip top edge starts at triggerRect.bottom + GAP
       finalTop = triggerRect.bottom + GAP;
-      calculatedMaxHeight = Math.max(60, viewportH - (triggerRect.bottom + GAP) - PADDING);
-      calculatedMaxWidth = Math.max(160, viewportW - 2 * PADDING);
-
-      const actualW = Math.min(naturalWidth, calculatedMaxWidth);
-
       if (align === 'start') {
         finalLeft = triggerRect.left;
       } else if (align === 'end') {
-        finalLeft = triggerRect.right - actualW;
+        finalLeft = triggerRect.right - naturalWidth;
       } else {
-        finalLeft = triggerRect.left + (triggerRect.width - actualW) / 2;
+        finalLeft = triggerRect.left + (triggerRect.width - naturalWidth) / 2;
       }
-      finalLeft = Math.max(PADDING, Math.min(viewportW - PADDING - actualW, finalLeft));
     }
 
+    // Strict clamping within viewport boundaries so the entire tooltip is always 100% visible
+    const clampedMaxLeft = viewportW - naturalWidth - PADDING;
+    const clampedLeft = Math.max(PADDING, Math.min(clampedMaxLeft, finalLeft));
+
+    const clampedMaxTop = viewportH - naturalHeight - PADDING;
+    const clampedTop = Math.max(PADDING, Math.min(clampedMaxTop, finalTop));
+
     setCoords({
-      left: Math.round(finalLeft),
-      top: Math.round(finalTop),
-      maxHeight: noScroll ? undefined : calculatedMaxHeight,
-      maxWidth: calculatedMaxWidth,
+      left: Math.round(clampedLeft),
+      top: Math.round(clampedTop),
       chosenSide,
     });
     setIsMeasured(true);
-  }, [preferredSide, align, noScroll]);
+  }, [preferredSide, align]);
 
   const showTooltip = () => {
     if (!isEnabled) return;
@@ -248,7 +193,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
       setIsVisible(false);
       setIsMeasured(false);
       setCoords(null);
-    }, 90);
+    }, 80);
   };
 
   const cancelHide = () => {
@@ -258,14 +203,12 @@ export const Tooltip: React.FC<TooltipProps> = ({
     }
   };
 
-  // Measure and position whenever visibility changes or element mounts
   useLayoutEffect(() => {
     if (isVisible) {
       updatePosition();
     }
   }, [isVisible, updatePosition]);
 
-  // Use ResizeObserver on tooltip element for live dynamic content updates
   useEffect(() => {
     if (!isVisible || !tooltipRef.current) return;
     const observer = new ResizeObserver(() => {
@@ -275,7 +218,6 @@ export const Tooltip: React.FC<TooltipProps> = ({
     return () => observer.disconnect();
   }, [isVisible, updatePosition]);
 
-  // Window listeners to handle scroll or screen resize
   useEffect(() => {
     if (!isVisible) return;
 
@@ -295,7 +237,6 @@ export const Tooltip: React.FC<TooltipProps> = ({
     };
   }, [isVisible]);
 
-  // Immediate dismiss on clicking trigger to ensure clean instant navigation/drawer opening
   const handleTriggerClick = () => {
     if (showTimerRef.current) {
       clearTimeout(showTimerRef.current);
@@ -306,7 +247,16 @@ export const Tooltip: React.FC<TooltipProps> = ({
     setCoords(null);
   };
 
-  const isCustomContentOnly = Boolean(content && !title && !description && !englishTitle && !badge);
+  const isStructured = Boolean(title || description || englishTitle || badge || shortcut);
+  const isStringContent = typeof content === 'string' || typeof content === 'number';
+
+  // Dynamic width class based on content length
+  const descriptionLength = (description || '').length + (typeof content === 'string' ? content.length : 0);
+  const dynamicWidthClass = descriptionLength > 300
+    ? 'w-[480px] max-w-[calc(100vw-28px)]'
+    : descriptionLength > 140
+    ? 'w-[380px] max-w-[calc(100vw-28px)]'
+    : 'w-auto max-w-[320px]';
 
   const tooltipElement = isVisible && (
     <div
@@ -326,57 +276,62 @@ export const Tooltip: React.FC<TooltipProps> = ({
         willChange: 'transform, opacity',
         opacity: isMeasured && coords ? 1 : 0,
         pointerEvents: isMeasured && coords ? 'auto' : 'none',
-        maxHeight: coords?.maxHeight ? `${coords.maxHeight}px` : noScroll ? 'none' : 'calc(100vh - 24px)',
-        maxWidth: coords?.maxWidth ? `${coords.maxWidth}px` : 'calc(100vw - 24px)',
+        overflow: 'visible', // NEVER have scrolls
       }}
-      className={`transition-opacity duration-150 ease-out text-left ${
-        noScroll ? 'overflow-visible' : 'overflow-y-auto overscroll-contain custom-scrollbar'
-      } ${
-        isCustomContentOnly
-          ? 'w-auto'
-          : 'max-w-xs sm:max-w-md rounded-xl p-3.5 bg-[#0d0a17] border border-zinc-700/90 shadow-[0_16px_40px_rgba(0,0,0,0.95)] ring-1 ring-white/10'
-      }`}
+      className="transition-opacity duration-150 ease-out text-left select-none overflow-visible"
     >
-      {/* Header with Title and English/Badge */}
-      {(title || englishTitle || badge) && (
-        <div className="flex items-center justify-between gap-2 border-b border-zinc-800/80 pb-2 mb-2">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {title && <span className="font-extrabold text-xs text-amber-200">{title}</span>}
-            {englishTitle && (
-              <span className="text-xs text-zinc-400 font-mono italic">
-                ({englishTitle})
-              </span>
-            )}
-          </div>
-          {badge && (
-            <span className="text-xs font-mono px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800/60 uppercase font-bold">
-              {badge}
-            </span>
+      {isStructured ? (
+        <div className={`${dynamicWidthClass} rounded-xl p-3.5 bg-[#0d0a17] border border-purple-500/40 text-zinc-100 shadow-[0_16px_40px_rgba(0,0,0,0.95),0_0_20px_rgba(168,85,247,0.2)] ring-1 ring-white/10 overflow-visible`}>
+          {/* Header with Title and English/Badge */}
+          {(title || englishTitle || badge) && (
+            <div className="flex items-center justify-between gap-2 border-b border-zinc-800/80 pb-2 mb-2">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {title && <span className="font-extrabold text-xs text-amber-200 break-words">{title}</span>}
+                {englishTitle && (
+                  <span className="text-xs text-zinc-400 font-mono italic break-words">
+                    ({englishTitle})
+                  </span>
+                )}
+              </div>
+              {badge && (
+                <span className="text-xs font-mono px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800/60 uppercase font-bold shrink-0 whitespace-nowrap">
+                  {badge}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Main Description (Never clipped, never scrollable) */}
+          {description && (
+            <p className="text-xs leading-relaxed text-zinc-200 font-normal break-words whitespace-normal">
+              {description}
+            </p>
+          )}
+
+          {/* Custom Node Content */}
+          {content && (
+            <div className="text-xs text-zinc-200 mt-1 break-words whitespace-normal overflow-visible">
+              {content}
+            </div>
+          )}
+
+          {/* Footer / Shortcut */}
+          {shortcut && (
+            <div className="mt-2.5 pt-1.5 border-t border-zinc-800/60 flex items-center justify-between text-xs text-zinc-400 font-mono">
+              <span>Atalho:</span>
+              <kbd className="px-1.5 py-0.5 rounded bg-purple-950 border border-purple-600/50 text-purple-200 whitespace-nowrap">
+                {shortcut}
+              </kbd>
+            </div>
           )}
         </div>
-      )}
-
-      {/* Main Description */}
-      {description && (
-        <p className="text-xs leading-relaxed text-zinc-200 font-normal">
-          {description}
-        </p>
-      )}
-
-      {/* Custom Node Content */}
-      {content && (
-        <div className={isCustomContentOnly ? '' : 'text-xs text-zinc-200 mt-1'}>
+      ) : isStringContent ? (
+        <div className="max-w-[340px] px-3 py-2 rounded-xl bg-[#120d1c] border border-purple-500/50 text-zinc-100 shadow-[0_12px_36px_rgba(0,0,0,0.9),0_0_16px_rgba(168,85,247,0.25)] ring-1 ring-white/10 text-xs font-medium font-sans leading-relaxed tracking-wide backdrop-blur-md break-words whitespace-normal overflow-visible">
           {content}
         </div>
-      )}
-
-      {/* Footer / Shortcut */}
-      {shortcut && (
-        <div className="mt-2.5 pt-1.5 border-t border-zinc-800/60 flex items-center justify-between text-xs text-zinc-400 font-mono">
-          <span>Atalho:</span>
-          <kbd className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-zinc-200">
-            {shortcut}
-          </kbd>
+      ) : (
+        <div className="w-auto max-w-[calc(100vw-28px)] overflow-visible">
+          {content}
         </div>
       )}
     </div>
@@ -399,4 +354,3 @@ export const Tooltip: React.FC<TooltipProps> = ({
     </Component>
   );
 };
-

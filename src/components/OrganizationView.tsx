@@ -355,12 +355,12 @@ export const OrganizationView: React.FC<OrganizationViewProps> = ({
             </div>
           </div>
 
-          {/* 4. PASTAS & SUBCATEGORIAS */}
-          {((currentEntity.subcategories && currentEntity.subcategories.length > 0) || currentEntity.subcategory) && (
+          {/* 4. PASTAS & SUBCATEGORIAS (EXCLUSIVO GM) */}
+          {isActualGm && ((currentEntity.subcategories && currentEntity.subcategories.length > 0) || currentEntity.subcategory) && (
             <div className="rounded-3xl bg-[#140b22] border border-purple-900/40 p-4 space-y-3 shadow-xl">
               <span className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
                 <Folder className="w-3.5 h-3.5 text-purple-400" />
-                Pastas & Facções
+                Pastas & Facções (GM)
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {(currentEntity.subcategories || [currentEntity.subcategory!]).filter(Boolean).map((sub, idx) => (

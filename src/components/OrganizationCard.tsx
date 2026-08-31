@@ -194,12 +194,12 @@ export const OrganizationCard: React.FC<OrganizationCardProps> = ({
 
         {/* Bottom tags & subcategory */}
         <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/80 text-[10px]">
-          {entity.subcategory ? (
-            <span className="px-2 py-0.5 rounded bg-rose-950/60 border border-rose-800/60 text-rose-300 font-mono">
+          {isGm && entity.subcategory ? (
+            <span className="px-2 py-0.5 rounded bg-rose-950/60 border border-rose-800/60 text-rose-300 font-mono" title="Pasta (Exclusivo GM)">
               {entity.subcategory}
             </span>
           ) : (
-            <span className="text-zinc-500 italic">Geral</span>
+            <div />
           )}
 
           {ranksCount > 0 && (

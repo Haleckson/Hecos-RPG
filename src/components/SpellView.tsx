@@ -151,14 +151,14 @@ export const SpellView: React.FC<SpellViewProps> = ({
           {/* Top Bar: Pastas/Subcategorias, Category & Quick Actions */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              {/* Indicador de Pastas antes da Categoria */}
-              {subcats.map((subcat) => (
+              {/* Indicador de Pastas (Exclusivo GM) */}
+              {isActualGm && subcats.map((subcat) => (
                 <button
                   key={subcat}
                   type="button"
                   onClick={() => onTagClick(subcat)}
                   className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-pink-950/60 hover:bg-pink-900/70 text-pink-300 border border-pink-700/40 transition-colors shadow-sm cursor-pointer"
-                  title={`Filtrar pela pasta ${subcat}`}
+                  title={`Filtrar pela pasta ${subcat} (Exclusivo GM)`}
                 >
                   <Folder className="w-3 h-3 text-pink-400" />
                   <span>{subcat}</span>

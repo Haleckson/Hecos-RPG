@@ -90,6 +90,7 @@ export const QuestBoard: React.FC<QuestBoardProps> = ({
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedPriority, setSelectedPriority] = useState<string>('all');
   const [sortBy, setSortBy] = useState<SortOption>('recent');
+  const [dragOverCol, setDragOverCol] = useState<QuestStatus | null>(null);
 
   const currentUser = HecosStorage.getCurrentUser();
   const isActualGm = Boolean(isGmMode || currentUser?.role === 'gm');
@@ -309,39 +310,86 @@ export const QuestBoard: React.FC<QuestBoardProps> = ({
             </select>
           </div>
 
-          {/* Ordenação */}
-          <div className="flex items-center gap-1.5 bg-black/50 border border-zinc-800/80 px-2.5 py-1.5 rounded-xl text-xs">
-            <span className="text-zinc-400 font-semibold flex items-center gap-1">
-              <ArrowUpDown className="w-3.5 h-3.5 text-cyan-400" />
-              Ordenar por:
-            </span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="bg-transparent border-0 text-cyan-300 font-semibold focus:outline-none cursor-pointer"
+          {/* Ordenação (Icon-Only) */}
+          <div className="relative shrink-0 flex items-center">
+            <div
+              className={`w-9 h-9 flex items-center justify-center rounded-xl border transition-all cursor-pointer shadow-sm relative overflow-hidden ${
+                sortBy !== 'recent'
+                  ? 'bg-cyan-950/60 border-cyan-500/70 text-cyan-300 shadow-sm'
+                  : 'bg-zinc-900/90 border-zinc-700/80 text-zinc-300 hover:border-zinc-600 hover:text-zinc-100 hover:bg-zinc-800'
+              }`}
+              title={`Ordenar Missões (Ativo: ${
+                sortBy === 'recent'
+                  ? 'Mais Recentes'
+                  : sortBy === 'level_asc'
+                  ? 'Nível (Menor → Maior)'
+                  : sortBy === 'level_desc'
+                  ? 'Nível (Maior → Menor)'
+                  : sortBy === 'alpha_asc'
+                  ? 'Alfabética (A → Z)'
+                  : sortBy === 'alpha_desc'
+                  ? 'Alfabética (Z → A)'
+                  : 'Prioridade (Urgente 1º)'
+              })`}
             >
-              <option value="recent">Mais Recentes</option>
-              <option value="level_asc">Nível (Menor → Maior)</option>
-              <option value="level_desc">Nível (Maior → Menor)</option>
-              <option value="alpha_asc">Alfabética (A → Z)</option>
-              <option value="alpha_desc">Alfabética (Z → A)</option>
-              <option value="priority">Prioridade (Urgente 1º)</option>
-            </select>
+              <ArrowUpDown className="w-4 h-4 shrink-0" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortOption)}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-xs"
+                title="Alterar ordenação de missões"
+              >
+                <option value="recent" className="bg-[#0f0d1a] text-zinc-200">Mais Recentes</option>
+                <option value="level_asc" className="bg-[#0f0d1a] text-zinc-200">Nível (Menor → Maior)</option>
+                <option value="level_desc" className="bg-[#0f0d1a] text-zinc-200">Nível (Maior → Menor)</option>
+                <option value="alpha_asc" className="bg-[#0f0d1a] text-zinc-200">Alfabética (A → Z)</option>
+                <option value="alpha_desc" className="bg-[#0f0d1a] text-zinc-200">Alfabética (Z → A)</option>
+                <option value="priority" className="bg-[#0f0d1a] text-zinc-200">Prioridade (Urgente 1º)</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Kanban Board Grid */}
+      {/* Kanban Board Grid with Drag and Drop */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
         {COLUMNS.map((column) => {
           const colQuests = sortedQuests.filter(
             (q) => (q.questData?.status || 'not_started') === column.id
           );
+          const isCurrentDragTarget = dragOverCol === column.id;
 
           return (
             <div
               key={column.id}
-              className={`flex flex-col rounded-2xl border ${column.color} p-4 min-h-[500px] shadow-xl backdrop-blur-sm transition-all`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                if (dragOverCol !== column.id) {
+                  setDragOverCol(column.id);
+                }
+              }}
+              onDragEnter={(e) => {
+                e.preventDefault();
+                setDragOverCol(column.id);
+              }}
+              onDragLeave={(e) => {
+                if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                setDragOverCol((prev) => (prev === column.id ? null : prev));
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOverCol(null);
+                const questId = e.dataTransfer.getData('text/plain');
+                if (questId) {
+                  handleStatusChange(questId, column.id);
+                }
+              }}
+              className={`flex flex-col rounded-2xl border ${column.color} p-4 min-h-[520px] shadow-xl backdrop-blur-sm transition-all duration-200 ${
+                isCurrentDragTarget
+                  ? 'ring-2 ring-cyan-400 border-cyan-400 bg-cyan-950/30 scale-[1.01] shadow-[0_0_25px_rgba(6,182,212,0.25)]'
+                  : ''
+              }`}
             >
               {/* Column Header */}
               <div className="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-zinc-800/80">
@@ -356,11 +404,20 @@ export const QuestBoard: React.FC<QuestBoardProps> = ({
                 </span>
               </div>
 
+              {/* Drag Over Indicator Slot on Top */}
+              {isCurrentDragTarget && (
+                <div className="mb-3 p-3 border-2 border-dashed border-cyan-400/80 rounded-xl bg-cyan-950/40 text-cyan-300 text-xs font-bold text-center flex items-center justify-center gap-2 animate-pulse">
+                  <CheckSquare className="w-4 h-4 text-cyan-400" />
+                  <span>Solte aqui para mover para "{column.label}"</span>
+                </div>
+              )}
+
               {/* Quest Cards in Column */}
               <div className="space-y-3 flex-1">
-                {colQuests.length === 0 ? (
-                  <div className="p-8 text-center border border-dashed border-zinc-800 rounded-xl text-xs text-zinc-500">
-                    Nenhuma missão nesta coluna.
+                {colQuests.length === 0 && !isCurrentDragTarget ? (
+                  <div className="p-8 text-center border border-dashed border-zinc-800/80 rounded-xl text-xs text-zinc-500 flex flex-col items-center justify-center gap-2">
+                    <span>Nenhuma missão nesta coluna.</span>
+                    <span className="text-[11px] text-zinc-600">Arraste um card para cá</span>
                   </div>
                 ) : (
                   colQuests.map((quest) => (
@@ -372,6 +429,7 @@ export const QuestBoard: React.FC<QuestBoardProps> = ({
                       onDelete={onDeleteEntity}
                       onStatusChange={handleStatusChange}
                       isGm={isActualGm}
+                      draggable={true}
                     />
                   ))
                 )}

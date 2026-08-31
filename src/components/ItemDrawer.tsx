@@ -12,12 +12,13 @@ import {
   Coins,
   Weight
 } from 'lucide-react';
-import { HecosEntity } from '../types';
+import { HecosEntity, DrawerBreadcrumb } from '../types';
 import { HecosStorage } from '../services/storage';
 import { ItemView } from './ItemView';
 import { Tooltip } from './Tooltip';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { parseItemFromContent } from '../utils/itemSerializer';
+import { DrawerStackHeader } from './DrawerStackHeader';
 
 interface ItemDrawerProps {
   itemId: string | null;
@@ -29,6 +30,11 @@ interface ItemDrawerProps {
   onDeleteItem?: (entityId: string) => void;
   onTagClick?: (tag: string) => void;
   isGmMode?: boolean;
+  stackIndex?: number;
+  stackTotal?: number;
+  stackBreadcrumbs?: DrawerBreadcrumb[];
+  onJumpToStackIndex?: (index: number) => void;
+  onCloseAll?: () => void;
 }
 
 export const ItemDrawer: React.FC<ItemDrawerProps> = ({
@@ -41,6 +47,11 @@ export const ItemDrawer: React.FC<ItemDrawerProps> = ({
   onDeleteItem,
   onTagClick,
   isGmMode = false,
+  stackIndex = 0,
+  stackTotal = 1,
+  stackBreadcrumbs = [],
+  onJumpToStackIndex,
+  onCloseAll,
 }) => {
   const currentUser = HecosStorage.getCurrentUser();
   const effectiveIsGm = isGmMode || currentUser?.role === 'gm' || HecosStorage.getGmMode();
@@ -74,22 +85,30 @@ export const ItemDrawer: React.FC<ItemDrawerProps> = ({
     );
   }, [activeItem]);
 
-  // Keyboard shortcut: Escape to close drawer
+  // Keyboard shortcut: Escape to close top-most drawer
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      const isTopDrawer = stackIndex === stackTotal - 1;
+      if (e.key === 'Escape' && isOpen && isTopDrawer) {
+        e.stopPropagation();
         onClose();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [isOpen, onClose, stackIndex, stackTotal]);
 
   if (!isOpen) return null;
 
+  const zIndexVal = 50 + stackIndex * 10;
+
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 overflow-hidden">
+      <div
+        className="fixed inset-0 overflow-hidden"
+        style={{ zIndex: zIndexVal }}
+        id={`hecos-item-drawer-layer-${stackIndex}`}
+      >
         {/* Backdrop overlay */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -97,18 +116,44 @@ export const ItemDrawer: React.FC<ItemDrawerProps> = ({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
           onClick={onClose}
-          className="absolute inset-0 bg-black/70 backdrop-blur-xs cursor-pointer"
+          className={`absolute inset-0 cursor-pointer transition-opacity ${
+            stackIndex > 0
+              ? 'bg-black/60 backdrop-blur-[2px]'
+              : 'bg-black/70 backdrop-blur-xs'
+          }`}
         />
 
         {/* Sliding Drawer Container */}
-        <div className="absolute inset-y-0 right-0 max-w-full flex pl-6 sm:pl-10">
+        <div
+          className={`absolute inset-y-0 right-0 max-w-full flex ${
+            stackIndex === 0
+              ? 'pl-6 sm:pl-10'
+              : stackIndex === 1
+              ? 'pl-8 sm:pl-14'
+              : 'pl-10 sm:pl-18'
+          }`}
+        >
           <motion.div
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-            className="w-screen max-w-3xl bg-[#09080e] border-l border-zinc-800 shadow-2xl flex flex-col h-full overflow-hidden text-zinc-100"
+            className={`w-screen max-w-3xl bg-[#09080e] border-l border-zinc-800 shadow-2xl flex flex-col h-full overflow-hidden text-zinc-100 ${
+              stackIndex > 0 ? 'ring-1 ring-amber-500/30' : ''
+            }`}
           >
+            {/* Stack Breadcrumb Header Bar */}
+            {stackTotal > 1 && (
+              <DrawerStackHeader
+                breadcrumbs={stackBreadcrumbs}
+                currentIndex={stackIndex}
+                totalDrawers={stackTotal}
+                onPop={onClose}
+                onJumpToIndex={onJumpToStackIndex}
+                onCloseAll={onCloseAll}
+              />
+            )}
+
             {/* Top Sticky Header */}
             <div className="p-4 sm:px-6 bg-[#0e0a1a]/95 backdrop-blur-md border-b border-zinc-800/80 flex items-center justify-between gap-3 shrink-0 z-10">
               <div className="flex items-center gap-3 min-w-0">

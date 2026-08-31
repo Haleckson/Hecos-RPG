@@ -300,8 +300,8 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
         if (!matchesCategory) return false;
       }
 
-      // 2. Filter by Subcategory (folder)
-      if (selectedSubcategory !== 'all') {
+      // 2. Filter by Subcategory (folder - GM only)
+      if (isActualGm && selectedSubcategory !== 'all') {
         if (selectedSubcategory === '__none__') {
           if (entitySubcats.length > 0) return false;
         } else {
@@ -478,7 +478,7 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
 
   const hasActiveFilters =
     searchQuery !== '' ||
-    selectedSubcategory !== 'all' ||
+    (isActualGm && selectedSubcategory !== 'all') ||
     filterLevel !== 'all' ||
     filterAction !== 'all' ||
     filterRarity !== 'all' ||
@@ -606,228 +606,290 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
       </div>
 
       {/* 3. SEARCH, FILTERS AND VIEW MODES TOOLBAR */}
-      <div className="p-3.5 rounded-xl bg-[#0e0b17] border border-zinc-800/90 space-y-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-2.5">
-          {/* Search Input */}
-          <div className="relative flex-1 min-w-[220px]">
+      <div className="p-3.5 rounded-2xl bg-[#0e0b17] border border-zinc-800/90 space-y-2.5">
+        <div className="flex flex-col lg:flex-row items-center gap-3">
+          {/* 1. Sort Selector (Icon-Only, Leftmost) */}
+          <div className="relative shrink-0 flex items-center">
+            <div
+              className={`w-9 h-9 flex items-center justify-center rounded-xl border transition-all cursor-pointer shadow-sm relative overflow-hidden ${
+                sortBy !== 'name-asc' && sortBy !== 'level-asc'
+                  ? 'bg-amber-950/60 border-amber-500/70 text-amber-300 shadow-sm'
+                  : 'bg-zinc-900/90 border-zinc-700/80 text-zinc-300 hover:border-zinc-600 hover:text-zinc-100 hover:bg-zinc-800'
+              }`}
+              title={`Ordenar Talentos (Ativo: ${
+                sortBy === 'level-asc'
+                  ? 'Nível (1 → 20)'
+                  : sortBy === 'level-desc'
+                  ? 'Nível (20 → 1)'
+                  : sortBy === 'name-asc'
+                  ? 'Nome (A → Z)'
+                  : sortBy === 'name-desc'
+                  ? 'Nome (Z → A)'
+                  : sortBy === 'rarity'
+                  ? 'Raridade'
+                  : 'Mais Recentes'
+              })`}
+            >
+              <ArrowUpDown className="w-4 h-4 shrink-0" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortOption)}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-xs"
+                title="Alterar ordenação de talentos"
+              >
+                <option value="level-asc" className="bg-[#0f0d1a] text-zinc-200">Nível (1 → 20)</option>
+                <option value="level-desc" className="bg-[#0f0d1a] text-zinc-200">Nível (20 → 1)</option>
+                <option value="name-asc" className="bg-[#0f0d1a] text-zinc-200">Nome (A → Z)</option>
+                <option value="name-desc" className="bg-[#0f0d1a] text-zinc-200">Nome (Z → A)</option>
+                <option value="rarity" className="bg-[#0f0d1a] text-zinc-200">Raridade</option>
+                <option value="updated" className="bg-[#0f0d1a] text-zinc-200">Recentes</option>
+              </select>
+            </div>
+          </div>
+
+          {/* 2. Search Input */}
+          <div className="relative flex-1 w-full min-w-[200px]">
+            <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Pesquisar por nome, traços, requisitos, regras..."
-              className="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg bg-zinc-900/90 border border-zinc-700/80 text-zinc-100 placeholder-zinc-500 outline-none focus:border-amber-400 transition-colors"
+              className="w-full pl-10 pr-9 py-2 text-xs sm:text-sm rounded-xl bg-zinc-900/90 border border-zinc-700/80 text-zinc-100 placeholder-zinc-500 outline-none focus:border-amber-400 transition-colors"
             />
-            <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-2.5" />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-2 text-zinc-500 hover:text-zinc-300"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-100 cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
 
-          {/* Quick Select: Folder Dropdown */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setIsFolderDropdownOpen(!isFolderDropdownOpen)}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border flex items-center gap-1.5 transition-all cursor-pointer ${
-                selectedSubcategory !== 'all'
-                  ? 'bg-amber-950/80 text-amber-200 border-amber-600/80'
-                  : 'bg-zinc-900 text-zinc-300 border-zinc-700 hover:border-zinc-600'
-              }`}
-              title="Filtrar por Pasta/Subcategoria"
-            >
-              <Folder className="w-3.5 h-3.5 text-amber-400" />
-              <span className="max-w-[130px] truncate">
-                {selectedSubcategory === 'all'
-                  ? 'Todas as Pastas'
-                  : selectedSubcategory === '__none__'
-                  ? 'Sem Pasta'
-                  : selectedSubcategory}
-              </span>
-              <ChevronDown className="w-3 h-3 text-zinc-400" />
-            </button>
-
-            {/* Folder Dropdown Popover */}
-            {isFolderDropdownOpen && (
-              <div className="absolute right-0 sm:left-0 top-full mt-1 w-72 rounded-xl bg-[#140f22] border border-amber-500/30 shadow-2xl p-2 z-50 space-y-2 animate-fade-in">
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={folderDropdownSearch}
-                    onChange={(e) => setFolderDropdownSearch(e.target.value)}
-                    placeholder="Pesquisar pasta..."
-                    className="w-full pl-7 pr-2 py-1 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 placeholder-zinc-500 outline-none focus:border-amber-400"
-                    autoFocus
-                  />
-                  <Search className="w-3 h-3 text-zinc-500 absolute left-2 top-2" />
+          {/* 3. Folder Dropdown (GM only) */}
+          {isActualGm && (
+            <div className="relative w-full sm:w-60 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsFolderDropdownOpen(!isFolderDropdownOpen)}
+                className={`w-full h-9 px-3 rounded-xl text-xs font-semibold border flex items-center justify-between gap-2 transition-all cursor-pointer ${
+                  selectedSubcategory !== 'all'
+                    ? 'bg-amber-950/80 text-amber-200 border-amber-600/80'
+                    : 'bg-zinc-900/90 text-zinc-300 border-zinc-700/80 hover:border-zinc-600 hover:text-zinc-100'
+                }`}
+                title="Filtrar por Pasta/Subcategoria (Exclusivo GM)"
+              >
+                <div className="flex items-center gap-2 truncate">
+                  <Folder className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span className="truncate">
+                    {selectedSubcategory === 'all'
+                      ? 'Todas as Pastas'
+                      : selectedSubcategory === '__none__'
+                      ? 'Sem Pasta Definida'
+                      : selectedSubcategory}
+                  </span>
                 </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-amber-300 border border-zinc-800">
+                    {selectedSubcategory === 'all'
+                      ? allFeatEntities.length
+                      : selectedSubcategory === '__none__'
+                      ? subcategoryCounts.__none__ || 0
+                      : subcategoryCounts[selectedSubcategory] || 0}
+                  </span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${isFolderDropdownOpen ? 'rotate-180' : ''}`} />
+                </div>
+              </button>
 
-                <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedSubcategory('all');
-                      setIsFolderDropdownOpen(false);
-                    }}
-                    className={`w-full px-2.5 py-1 rounded-lg text-xs text-left flex items-center justify-between ${
-                      selectedSubcategory === 'all'
-                        ? 'bg-amber-500 text-black font-bold'
-                        : 'text-zinc-300 hover:bg-zinc-800'
-                    }`}
-                  >
-                    <span>Todas as Pastas</span>
-                    <span className="text-[10px] opacity-70 font-mono">{allFeatEntities.length}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedSubcategory('__none__');
-                      setIsFolderDropdownOpen(false);
-                    }}
-                    className={`w-full px-2.5 py-1 rounded-lg text-xs text-left flex items-center justify-between ${
-                      selectedSubcategory === '__none__'
-                        ? 'bg-rose-500 text-black font-bold'
-                        : 'text-zinc-400 hover:bg-zinc-800'
-                    }`}
-                  >
-                    <span>Sem Pasta Definida</span>
-                    <span className="text-[10px] opacity-70 font-mono">{subcategoryCounts.__none__ || 0}</span>
-                  </button>
-
-                  <div className="pt-1 border-t border-zinc-800 text-[10px] font-mono text-zinc-500 uppercase px-1">
-                    Pastas ({currentAvailableSubcategories.length})
-                  </div>
-
-                  {currentAvailableSubcategories
-                    .filter((s) => s.toLowerCase().includes(folderDropdownSearch.toLowerCase()))
-                    .map((sub) => {
-                      const count = subcategoryCounts[sub] || 0;
-                      const isSel = selectedSubcategory === sub;
-
-                      return (
+              {/* Folder Dropdown Popover */}
+              {isFolderDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setIsFolderDropdownOpen(false)}
+                  />
+                  <div className="absolute left-0 right-0 sm:right-auto sm:w-80 mt-1.5 z-50 rounded-2xl bg-[#140f22] border border-zinc-700/80 shadow-2xl overflow-hidden flex flex-col max-h-80 animate-fade-in">
+                    <div className="p-2.5 border-b border-zinc-800/80 bg-zinc-950/70 flex items-center gap-1.5">
+                      <Search className="w-3.5 h-3.5 text-zinc-500 ml-1 shrink-0" />
+                      <input
+                        type="text"
+                        value={folderDropdownSearch}
+                        onChange={(e) => setFolderDropdownSearch(e.target.value)}
+                        placeholder="Pesquisar pasta..."
+                        className="flex-1 bg-transparent text-xs text-zinc-200 placeholder-zinc-500 outline-none"
+                        autoFocus
+                      />
+                      {folderDropdownSearch && (
                         <button
-                          key={sub}
+                          type="button"
+                          onClick={() => setFolderDropdownSearch('')}
+                          className="p-1 text-zinc-500 hover:text-zinc-300"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="p-1.5 overflow-y-auto space-y-1 flex-1 scrollbar-thin scrollbar-thumb-zinc-800">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedSubcategory('all');
+                          setIsFolderDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left cursor-pointer ${
+                          selectedSubcategory === 'all'
+                            ? 'bg-amber-950/80 text-amber-200 border border-amber-500/50'
+                            : 'text-zinc-300 hover:bg-zinc-900/90'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Folder className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Todas as Pastas</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-zinc-400">{allFeatEntities.length}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedSubcategory('__none__');
+                          setIsFolderDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left cursor-pointer ${
+                          selectedSubcategory === '__none__'
+                            ? 'bg-amber-950/80 text-amber-200 border border-amber-500/50'
+                            : 'text-zinc-400 hover:bg-zinc-900/90'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Folder className="w-3.5 h-3.5 text-zinc-600" />
+                          <span className="italic">Sem Pasta Definida</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-zinc-500">{subcategoryCounts.__none__ || 0}</span>
+                      </button>
+
+                      <div className="my-1 border-t border-zinc-800/80" />
+
+                      {currentAvailableSubcategories
+                        .filter((s) => s.toLowerCase().includes(folderDropdownSearch.toLowerCase()))
+                        .map((sub) => {
+                          const count = subcategoryCounts[sub] || 0;
+                          const isSel = selectedSubcategory === sub;
+
+                          return (
+                            <button
+                              key={sub}
+                              type="button"
+                              onClick={() => {
+                                setSelectedSubcategory(sub);
+                                setIsFolderDropdownOpen(false);
+                              }}
+                              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left cursor-pointer ${
+                                isSel
+                                  ? 'bg-amber-950/80 text-amber-200 border border-amber-500/50'
+                                  : 'text-zinc-300 hover:bg-zinc-900/90'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 truncate">
+                                <Folder className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                <span className="truncate">{sub}</span>
+                              </div>
+                              <span className="text-[10px] font-mono text-zinc-400 shrink-0 ml-2">{count}</span>
+                            </button>
+                          );
+                        })}
+                    </div>
+
+                    {effectiveGmMode && (
+                      <div className="p-2 border-t border-zinc-800/80 bg-zinc-950/50">
+                        <button
                           type="button"
                           onClick={() => {
-                            setSelectedSubcategory(sub);
                             setIsFolderDropdownOpen(false);
+                            setIsManageSubcategoriesModalOpen(true);
                           }}
-                          className={`w-full px-2.5 py-1 rounded-lg text-xs text-left flex items-center justify-between ${
-                            isSel
-                              ? 'bg-amber-950 text-amber-200 font-bold border border-amber-600/50'
-                              : 'text-zinc-300 hover:bg-zinc-800'
-                          }`}
+                          className="w-full py-1.5 px-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                         >
-                          <div className="flex items-center gap-1.5 truncate">
-                            <Folder className="w-3 h-3 text-amber-400 shrink-0" />
-                            <span className="truncate">{sub}</span>
-                          </div>
-                          <span className="text-[10px] font-mono text-zinc-400 shrink-0 ml-1">{count}</span>
+                          <Settings className="w-3.5 h-3.5" />
+                          <span>Gerenciar Pastas</span>
                         </button>
-                      );
-                    })}
-                </div>
-
-                {effectiveGmMode && (
-                  <div className="pt-1.5 border-t border-zinc-800/80">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsFolderDropdownOpen(false);
-                        setIsManageSubcategoriesModalOpen(true);
-                      }}
-                      className="w-full py-1.5 px-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                      <Settings className="w-3.5 h-3.5" />
-                      <span>Gerenciar Pastas</span>
-                    </button>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* 4. Category-Specific Filters (Level, Action Cost) */}
+          <div className="flex items-center gap-2 flex-wrap shrink-0 w-full sm:w-auto">
+            {/* Level Filter */}
+            <select
+              value={filterLevel}
+              onChange={(e) => setFilterLevel(e.target.value)}
+              className="h-9 px-2.5 rounded-xl bg-zinc-900/90 border border-zinc-700/80 text-zinc-200 text-xs outline-none focus:border-amber-400 cursor-pointer"
+            >
+              <option value="all">Nível: Todos</option>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].map((lvl) => (
+                <option key={lvl} value={lvl.toString()}>
+                  Nível {lvl}
+                </option>
+              ))}
+            </select>
+
+            {/* Action Cost Filter */}
+            <select
+              value={filterAction}
+              onChange={(e) => setFilterAction(e.target.value)}
+              className="h-9 px-2.5 rounded-xl bg-zinc-900/90 border border-zinc-700/80 text-zinc-200 text-xs outline-none focus:border-amber-400 cursor-pointer"
+            >
+              <option value="all">Ações: Todas</option>
+              <option value="1">1 Ação (◆)</option>
+              <option value="2">2 Ações (◆◆)</option>
+              <option value="3">3 Ações (◆◆◆)</option>
+              <option value="reaction">Reação (↺)</option>
+              <option value="free">Livre (◇)</option>
+              <option value="passive">Passivo</option>
+            </select>
           </div>
 
-          {/* Level Filter */}
-          <select
-            value={filterLevel}
-            onChange={(e) => setFilterLevel(e.target.value)}
-            className="px-2 py-1.5 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 text-xs outline-none focus:border-amber-400"
-          >
-            <option value="all">Nível: Todos</option>
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].map((lvl) => (
-              <option key={lvl} value={lvl.toString()}>
-                Nível {lvl}
-              </option>
-            ))}
-          </select>
-
-          {/* Action Cost Filter */}
-          <select
-            value={filterAction}
-            onChange={(e) => setFilterAction(e.target.value)}
-            className="px-2 py-1.5 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 text-xs outline-none focus:border-amber-400"
-          >
-            <option value="all">Ações: Todas</option>
-            <option value="1">1 Ação (◆)</option>
-            <option value="2">2 Ações (◆◆)</option>
-            <option value="3">3 Ações (◆◆◆)</option>
-            <option value="reaction">Reação (↺)</option>
-            <option value="free">Livre (◇)</option>
-            <option value="passive">Passivo</option>
-          </select>
-
-          {/* Sort By */}
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortOption)}
-            className="px-2 py-1.5 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 text-xs outline-none focus:border-amber-400"
-          >
-            <option value="level-asc">Nível (1 → 20)</option>
-            <option value="level-desc">Nível (20 → 1)</option>
-            <option value="name-asc">Nome (A → Z)</option>
-            <option value="name-desc">Nome (Z → A)</option>
-            <option value="rarity">Raridade</option>
-            <option value="updated">Recentes</option>
-          </select>
-
-          {/* View Mode Switcher */}
-          <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-zinc-900 border border-zinc-800">
+          {/* 5. View Mode Switcher (Rightmost) */}
+          <div className="flex items-center bg-zinc-900/90 border border-zinc-700/80 rounded-xl p-0.5 shrink-0 ml-auto lg:ml-0">
             <button
               type="button"
               onClick={() => setViewMode('grid')}
-              className={`p-1 rounded-md text-xs transition-all ${
-                viewMode === 'grid' ? 'bg-amber-500 text-black font-bold shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
+              className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+                viewMode === 'grid' ? 'bg-amber-500 text-zinc-950 font-bold shadow-xs' : 'text-zinc-400 hover:text-zinc-100'
               }`}
               title="Grade"
             >
-              <LayoutGrid className="w-3.5 h-3.5" />
+              <LayoutGrid className="w-4 h-4" />
             </button>
             <button
               type="button"
               onClick={() => setViewMode('table')}
-              className={`p-1 rounded-md text-xs transition-all ${
-                viewMode === 'table' ? 'bg-amber-500 text-black font-bold shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
+              className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+                viewMode === 'table' ? 'bg-amber-500 text-zinc-950 font-bold shadow-xs' : 'text-zinc-400 hover:text-zinc-100'
               }`}
               title="Tabela"
             >
-              <List className="w-3.5 h-3.5" />
+              <List className="w-4 h-4" />
             </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('folders')}
-              className={`p-1 rounded-md text-xs transition-all ${
-                viewMode === 'folders' ? 'bg-amber-500 text-black font-bold shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
-              }`}
-              title="Hierarquia"
-            >
-              <FolderTree className="w-3.5 h-3.5" />
-            </button>
+            {isActualGm && (
+              <button
+                type="button"
+                onClick={() => setViewMode('folders')}
+                className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+                  viewMode === 'folders' ? 'bg-amber-500 text-zinc-950 font-bold shadow-xs' : 'text-zinc-400 hover:text-zinc-100'
+                }`}
+                title="Hierarquia (Exclusivo GM)"
+              >
+                <FolderTree className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -836,10 +898,10 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
           <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t border-zinc-800/60 text-xs">
             <div className="flex flex-wrap items-center gap-1.5 text-zinc-400">
               <span className="text-[11px] text-zinc-500">Filtros:</span>
-              {selectedSubcategory !== 'all' && (
+              {isActualGm && selectedSubcategory !== 'all' && (
                 <span className="px-2 py-0.5 rounded-md bg-amber-950/80 text-amber-300 border border-amber-800 text-[11px] flex items-center gap-1">
                   <span>Pasta: {selectedSubcategory === '__none__' ? 'Sem Pasta' : selectedSubcategory}</span>
-                  <button type="button" onClick={() => setSelectedSubcategory('all')} className="hover:text-white">
+                  <button type="button" onClick={() => setSelectedSubcategory('all')} className="hover:text-white cursor-pointer">
                     <X className="w-3 h-3" />
                   </button>
                 </span>
@@ -847,7 +909,7 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
               {filterLevel !== 'all' && (
                 <span className="px-2 py-0.5 rounded-md bg-cyan-950/80 text-cyan-300 border border-cyan-800 text-[11px] flex items-center gap-1">
                   <span>Nível {filterLevel}</span>
-                  <button type="button" onClick={() => setFilterLevel('all')} className="hover:text-white">
+                  <button type="button" onClick={() => setFilterLevel('all')} className="hover:text-white cursor-pointer">
                     <X className="w-3 h-3" />
                   </button>
                 </span>
@@ -855,7 +917,7 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
               {filterAction !== 'all' && (
                 <span className="px-2 py-0.5 rounded-md bg-purple-950/80 text-purple-300 border border-purple-800 text-[11px] flex items-center gap-1">
                   <span>Ação: {filterAction}</span>
-                  <button type="button" onClick={() => setFilterAction('all')} className="hover:text-white">
+                  <button type="button" onClick={() => setFilterAction('all')} className="hover:text-white cursor-pointer">
                     <X className="w-3 h-3" />
                   </button>
                 </span>
@@ -868,7 +930,7 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
             <button
               type="button"
               onClick={handleClearFilters}
-              className="text-xs text-rose-400 hover:text-rose-300 hover:underline font-bold"
+              className="text-xs text-rose-400 hover:text-rose-300 hover:underline font-bold cursor-pointer"
             >
               Limpar Todos os Filtros
             </button>
@@ -969,7 +1031,7 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
                     </button>
                   </th>
                   <th className="py-3 px-4">Categoria</th>
-                  <th className="py-3 px-4">Subcategorias / Pastas</th>
+                  {isActualGm && <th className="py-3 px-4">Subcategorias / Pastas</th>}
                   <th className="py-3 px-4">
                     <button
                       type="button"
@@ -1047,32 +1109,34 @@ export const FeatExplorer: React.FC<FeatExplorerProps> = ({
                         </span>
                       </td>
 
-                      {/* Subcategories (Folders) */}
-                      <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex flex-wrap items-center gap-1">
-                          {subcats.map((subcat) => (
-                            <button
-                              key={subcat}
-                              type="button"
-                              onClick={() => setSelectedSubcategory(subcat)}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-950/60 hover:bg-amber-900 text-amber-300 border border-amber-600/40 cursor-pointer transition-colors"
-                            >
-                              <Folder className="w-2.5 h-2.5 text-amber-400" />
-                              <span>{subcat}</span>
-                            </button>
-                          ))}
-                          {isActualGm && (
-                            <button
-                              type="button"
-                              onClick={() => openAssignModal(ent)}
-                              className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-amber-300 cursor-pointer"
-                              title="Editar pastas deste talento"
-                            >
-                              <Plus className="w-3 h-3" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
+                      {/* Subcategories (Folders - GM only) */}
+                      {isActualGm && (
+                        <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex flex-wrap items-center gap-1">
+                            {subcats.map((subcat) => (
+                              <button
+                                key={subcat}
+                                type="button"
+                                onClick={() => setSelectedSubcategory(subcat)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-950/60 hover:bg-amber-900 text-amber-300 border border-amber-600/40 cursor-pointer transition-colors"
+                              >
+                                <Folder className="w-2.5 h-2.5 text-amber-400" />
+                                <span>{subcat}</span>
+                              </button>
+                            ))}
+                            {isActualGm && (
+                              <button
+                                type="button"
+                                onClick={() => openAssignModal(ent)}
+                                className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-amber-300 cursor-pointer"
+                                title="Editar pastas deste talento"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
 
                       {/* Rarity Trait */}
                       <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>

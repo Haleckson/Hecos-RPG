@@ -21,6 +21,9 @@ import { Tooltip } from './Tooltip';
 import { VisibilityBadgeMenu } from './VisibilityBadgeMenu';
 import { parseFeatFromContent, getFeatTypeLabel } from '../utils/featSerializer';
 
+import { DrawerBreadcrumb } from '../types';
+import { DrawerStackHeader } from './DrawerStackHeader';
+
 interface FeatDrawerProps {
   featId: string | null;
   entities: HecosEntity[];
@@ -31,6 +34,11 @@ interface FeatDrawerProps {
   onDeleteFeat?: (entityId: string) => void;
   onTagClick?: (tag: string) => void;
   isGmMode?: boolean;
+  stackIndex?: number;
+  stackTotal?: number;
+  stackBreadcrumbs?: DrawerBreadcrumb[];
+  onJumpToStackIndex?: (index: number) => void;
+  onCloseAll?: () => void;
 }
 
 export const FeatDrawer: React.FC<FeatDrawerProps> = ({
@@ -43,9 +51,27 @@ export const FeatDrawer: React.FC<FeatDrawerProps> = ({
   onDeleteFeat,
   onTagClick,
   isGmMode = false,
+  stackIndex = 0,
+  stackTotal = 1,
+  stackBreadcrumbs = [],
+  onJumpToStackIndex,
+  onCloseAll,
 }) => {
   const currentUser = HecosStorage.getCurrentUser();
   const effectiveIsGm = isGmMode || currentUser?.role === 'gm' || HecosStorage.getGmMode();
+
+  // Handle ESC key only for the top-most active drawer
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isTopDrawer = stackIndex === stackTotal - 1;
+      if (e.key === 'Escape' && isOpen && isTopDrawer) {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [isOpen, onClose, stackIndex, stackTotal]);
 
   // Find active entity in real-time
   const activeFeat = useMemo(() => {
@@ -173,10 +199,16 @@ export const FeatDrawer: React.FC<FeatDrawerProps> = ({
     }
   };
 
+  const zIndexVal = 50 + stackIndex * 10;
+
   return (
     <AnimatePresence>
       {isOpen && activeFeat && (
-        <div className="fixed inset-0 z-50 overflow-hidden flex justify-end" id="hecos-feat-drawer-container">
+        <div
+          className="fixed inset-0 overflow-hidden flex justify-end"
+          style={{ zIndex: zIndexVal }}
+          id={`hecos-feat-drawer-container-layer-${stackIndex}`}
+        >
           {/* Backdrop Blur Overlay */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -184,7 +216,11 @@ export const FeatDrawer: React.FC<FeatDrawerProps> = ({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm"
+            className={`fixed inset-0 transition-opacity ${
+              stackIndex > 0
+                ? 'bg-black/60 backdrop-blur-[2px]'
+                : 'bg-black/70 backdrop-blur-sm'
+            }`}
           />
 
           {/* Sliding Drawer Panel */}
@@ -193,8 +229,22 @@ export const FeatDrawer: React.FC<FeatDrawerProps> = ({
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-            className="relative z-10 w-full sm:w-[580px] md:w-[700px] lg:w-[820px] max-w-full bg-[#090710] border-l border-amber-500/30 text-zinc-100 shadow-2xl flex flex-col h-full overflow-hidden"
+            className={`relative z-10 w-full sm:w-[580px] md:w-[700px] lg:w-[820px] max-w-full bg-[#090710] border-l border-amber-500/30 text-zinc-100 shadow-2xl flex flex-col h-full overflow-hidden ${
+              stackIndex > 0 ? 'ring-1 ring-amber-500/30' : ''
+            }`}
           >
+            {/* Stack Breadcrumb Header Bar */}
+            {stackTotal > 1 && (
+              <DrawerStackHeader
+                breadcrumbs={stackBreadcrumbs}
+                currentIndex={stackIndex}
+                totalDrawers={stackTotal}
+                onPop={onClose}
+                onJumpToIndex={onJumpToStackIndex}
+                onCloseAll={onCloseAll}
+              />
+            )}
+
             {/* Top Fixed Drawer Header */}
             <div className="px-5 py-3.5 bg-gradient-to-r from-[#120e1f] via-[#171228] to-[#120e1f] border-b border-zinc-800/80 flex items-center justify-between gap-3 shrink-0 shadow-md">
               <div className="flex items-center gap-3 min-w-0">

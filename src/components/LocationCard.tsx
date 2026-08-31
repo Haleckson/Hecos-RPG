@@ -191,12 +191,12 @@ export const LocationCard: React.FC<LocationCardProps> = ({
 
         {/* Bottom tags & subcategory */}
         <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/80 text-[10px]">
-          {entity.subcategory ? (
-            <span className="px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-800/60 text-cyan-300 font-mono">
+          {isGm && entity.subcategory ? (
+            <span className="px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-800/60 text-cyan-300 font-mono" title="Pasta (Exclusivo GM)">
               {entity.subcategory}
             </span>
           ) : (
-            <span className="text-zinc-500 italic">Geral</span>
+            <div />
           )}
 
           {poiCount > 0 && (

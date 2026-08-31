@@ -234,11 +234,38 @@ export interface SessionAttributes {
   locationsVisited?: string[];
 }
 
-export interface TimelineEventAttributes {
-  era: string;
-  year: string;
+export interface TimelineEra {
+  id: string;
+  title: string;
   order: number;
-  importance: 'cosmic' | 'major' | 'minor' | 'session';
+  description?: string;
+  color?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TimelineYear {
+  id: string;
+  eraId: string;
+  title: string;
+  numericOrder: number;
+  description?: string;
+  color?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type TimelineDate = TimelineYear;
+
+export interface TimelineEventAttributes {
+  eraId?: string;
+  yearId?: string;
+  dateId?: string;
+  dayMonth?: string;
+  era?: string;
+  year?: string;
+  order?: number;
+  importance?: 'cosmic' | 'major' | 'minor' | 'session';
   relatedEntityIds?: string[];
 }
 
@@ -252,6 +279,131 @@ export interface QuestObjective {
   text: string;
   completed: boolean;
   isSecret?: boolean;
+  visibility?: ItemVisibility;
+  allowedUserIds?: string[];
+}
+
+export type QuestAttachmentType = 'image' | 'audio' | 'video' | 'document' | 'map' | 'handout' | 'other';
+
+export interface QuestAttachment {
+  id: string;
+  title: string;
+  url: string;
+  type: QuestAttachmentType;
+  caption?: string;
+  description?: string;
+  authorOrSource?: string;
+  createdAt?: string | number;
+  visibility?: ItemVisibility;
+  allowedUserIds?: string[];
+  isSecret?: boolean;
+  // YouTube or Google Drive metadata
+  videoId?: string;
+  embedUrl?: string;
+  driveFileId?: string;
+  isDriveAudio?: boolean;
+}
+
+export interface QuestFieldVisibility {
+  // Identidade & Metadados
+  status?: ItemVisibility | boolean;
+  difficulty?: ItemVisibility | boolean;
+  recommendedLevel?: ItemVisibility | boolean;
+  questType?: ItemVisibility | boolean;
+  priority?: ItemVisibility | boolean;
+  deadline?: ItemVisibility | boolean;
+  actOrChapter?: ItemVisibility | boolean;
+  subcategories?: ItemVisibility | boolean;
+  tags?: ItemVisibility | boolean;
+
+  // Envolvidos & Localidades
+  questGiver?: ItemVisibility | boolean;
+  location?: ItemVisibility | boolean;
+  organization?: ItemVisibility | boolean;
+  involvedNpcs?: ItemVisibility | boolean;
+  involvedLocations?: ItemVisibility | boolean;
+  involvedOrgs?: ItemVisibility | boolean;
+
+  // Objetivos & Narrativa
+  objectivesBlock?: ItemVisibility | boolean;
+  objectives?: ItemVisibility | boolean;
+  narrativeLore?: ItemVisibility | boolean;
+  briefing?: ItemVisibility | boolean;
+
+  // Recompensas
+  rewardsBlock?: ItemVisibility | boolean;
+  rewardsXp?: ItemVisibility | boolean;
+  rewardsCurrency?: ItemVisibility | boolean;
+  rewardsItems?: ItemVisibility | boolean;
+  rewardsReputation?: ItemVisibility | boolean;
+  rewardsOrgReputation?: ItemVisibility | boolean;
+
+  // Anexos & Multimídia (Imagens, Músicas, Vídeos, Documentos, etc.)
+  attachmentsBlock?: ItemVisibility | boolean;
+  attachmentImages?: ItemVisibility | boolean;
+  attachmentAudio?: ItemVisibility | boolean;
+  attachmentVideos?: ItemVisibility | boolean;
+  attachmentDocuments?: ItemVisibility | boolean;
+  attachmentHandouts?: ItemVisibility | boolean;
+
+  // Conexões & Backlinks
+  backlinks?: ItemVisibility | boolean;
+
+  // Usuários com permissão personalizada
+  allowedUsers?: Record<string, string[]>;
+
+  // Chaves dinâmicas para objetivos (obj_ID), itens (item_ID), anexos (att_ID), npcs (npc_ID), locs (loc_ID), orgs (org_ID)
+  [key: string]: any;
+}
+
+export interface QuestRewardCurrency {
+  cp?: number | string;
+  sp?: number | string;
+  gp?: number | string;
+  pp?: number | string;
+  custom?: string;
+}
+
+export interface QuestRewardItem {
+  id?: string;
+  name: string;
+  quantity?: number | string;
+  itemEntityId?: string;
+  itemId?: string;
+  slug?: string;
+  itemType?: string;
+  rarity?: string;
+  level?: number;
+  price?: string;
+  bulk?: string;
+  traits?: string[];
+  icon?: string;
+  description?: string;
+  notes?: string;
+  visibility?: ItemVisibility;
+  allowedUserIds?: string[];
+  isSecret?: boolean;
+}
+
+export interface QuestOrganizationReputation {
+  id?: string;
+  organizationEntityId?: string;
+  organizationName: string;
+  reputationChange: string | number; // ex: "+15", "+1 Favor", "Respeito +2"
+  notes?: string;
+  visibility?: ItemVisibility;
+  allowedUserIds?: string[];
+  isSecret?: boolean;
+}
+
+export interface QuestRewards {
+  xp?: number;
+  gold?: string; // Mantido para compatibilidade
+  currency?: QuestRewardCurrency; // Moedas detalhadas (cp, sp, gp, pp, custom)
+  items?: (string | QuestRewardItem)[]; // Lista de itens (nomes ou itens detalhados)
+  structuredItems?: QuestRewardItem[]; // Lista tipada de itens
+  reputation?: string; // Reputação geral / favores
+  organizationReputations?: QuestOrganizationReputation[]; // Reputação específica com organizações
 }
 
 export interface QuestAttributes {
@@ -271,18 +423,19 @@ export interface QuestAttributes {
   organization?: string; // Nome da Organização patrocinadora/vinculada
   organizationEntityId?: string;
   involvedOrgIds?: string[]; // Organizações envolvidas
+  linkedOrganizationIds?: string[]; // Alias para involvedOrgIds
   faction?: string; // Alias para organization
   factionEntityId?: string; // Alias para organizationEntityId
   objectives: QuestObjective[];
-  rewards?: {
-    xp?: number;
-    gold?: string;
-    items?: string[]; // Entity IDs or descriptions
-    reputation?: string;
-  };
+  rewards?: QuestRewards;
+  attachments?: QuestAttachment[];
+  briefing?: string;
+  narrativeLore?: string;
   actOrChapter?: string;
   subcategories?: string[];
   gmNotes?: string;
+  gmSecrets?: string;
+  fieldVisibility?: QuestFieldVisibility;
 }
 
 export type OrganizationType =
@@ -382,19 +535,88 @@ export interface FloraAttributes {
 }
 
 export interface PCAttributes {
+  // Identidade & Jogador
   playerName?: string;
   characterClass?: string;
   class?: string; // alias
   subclass?: string;
   level?: number;
-  ancestry?: string;
-  heritage?: string;
-  background?: string;
-  deity?: string;
-  alignment?: string;
-  size?: string;
-  portraitImage?: string;
-  tokenImage?: string;
+  rarity?: NPCRarity;
+  size?: NPCSize | string;
+  traits?: string[];
+  subcategories?: string[];
+
+  // Imagens Especializadas
+  portraitImage?: string; // Retrato vertical
+  tokenImage?: string;    // Token quadrado/circular de mesa/VTT
+
+  // Perfil & Origem
+  ancestry?: string;      // ex: Humano, Elfo de Vidro, Autômato
+  ancestryEntityId?: string;
+  heritage?: string;      // ex: Herança do Crepúsculo
+  background?: string;    // Antecedente
+  deity?: string;         // Divindade / Patrono
+  alignment?: string;     // Alinhamento / Filosofia
+  occupation?: string;    // Papel / Ocupação / Título
+  role?: string;          // Alias for occupation / role
+  organization?: string;  // Facção / Afiliação / Guilda
+  organizationEntityId?: string;
+  linkedOrganizationIds?: string[];
+  organizationIds?: string[];
+  faction?: string;
+  factionEntityId?: string;
+  location?: string;      // Onde reside / Base atual
+  locationEntityId?: string;
+  linkedLocationIds?: string[];
+  locationIds?: string[];
+  questIds?: string[];
+  wealth?: string;        // Nível de riqueza / Condição
+  pronouns?: string;      // ex: Ele/Dele, Ela/Dela, Neutro
+  age?: string;           // Idade aparente ou real
+  gender?: string;
+
+  // Guia de Interpretação / Roleplay
+  concept?: string;        // Essência / Conceito em 1 frase
+  voiceAndSpeech?: string; // Tom de voz, sotaque, velocidade, gírias
+  voice?: string;          // Alias
+  mannerisms?: string;     // Gestos, tiques, hábitos, postura
+  personality?: string;    // Personalidade
+  appearance?: string;     // Aparência física
+  firstImpression?: string;// Primeira impressão do personagem
+
+  // Narrativa & Dinâmica Social
+  motivations?: string;    // O que deseja / Objetivos
+  motivation?: string;     // Alias
+  triggers?: string;       // O que o irrita / Gatilhos emocionais
+  canOffer?: string;       // Favores, serviços, itens ou informações
+  secrets?: string;        // Segredos conhecidos
+  backstory?: string;      // Histórico prévio / Background
+  notes?: string;
+
+  // Relacionamentos & Vínculos Sociais
+  relationships?: NPCRelationship[];
+
+  // Rumores & Missões (Quests)
+  rumors?: NPCRumor[];
+  quests?: NPCQuestLink[];
+
+  // Loot & Inventário / Posses
+  loot?: NPCLootItem[];
+  inventory?: any[];
+  currency?: {
+    po?: number | string;
+    pp?: number | string;
+    pc?: number | string;
+    custom?: string;
+  };
+
+  // Confidencial do Mestre (GM-Only)
+  gmSecret?: string;
+  gmPlotHook?: string;
+  gmNotes?: string;
+
+  // Estatísticas Mecânicas & Combate
+  hasCombatStats?: boolean;
   ac?: number;
   hp?: number;
   maxHp?: number;
@@ -410,6 +632,11 @@ export interface PCAttributes {
   fort?: number;
   ref?: number;
   will?: number;
+  saves?: {
+    fortitude?: number;
+    reflex?: number;
+    will?: number;
+  };
   attributes?: {
     str?: number;
     dex?: number;
@@ -419,12 +646,15 @@ export interface PCAttributes {
     cha?: number;
   };
   attacks?: any[];
-  backstory?: string;
-  concept?: string;
-  notes?: string;
-  gmNotes?: string;
-  subcategories?: string[];
-  traits?: string[];
+  spells?: any;
+  keySkills?: string;
+  specialAbilities?: any;
+
+  // Memória & Histórico de Sessões
+  sessionLog?: NPCSessionMemory[];
+
+  // Visibilidade granular de campos
+  fieldVisibility?: NPCFieldVisibility;
 }
 
 export interface GMNoteAttributes {
@@ -1215,4 +1445,23 @@ export interface EntityRelationshipUpdates {
   removeFloraIds?: string[];
   /** Exact full list of Flora IDs */
   floraIds?: string[];
+}
+
+export type DrawerType = 'entity' | 'trait' | 'tag' | 'feat' | 'item';
+
+export interface DrawerStackItem {
+  id: string;
+  type: DrawerType;
+  targetId?: string;
+  data?: any;
+  title?: string;
+  category?: EntityCategory;
+}
+
+export interface DrawerBreadcrumb {
+  id: string;
+  type: DrawerType;
+  targetId?: string;
+  title: string;
+  index: number;
 }

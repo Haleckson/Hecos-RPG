@@ -483,7 +483,7 @@ Descrição mecânica completa da habilidade.
   return (
     <div
       ref={menuRef}
-      className="absolute left-6 bottom-14 z-50 w-96 max-h-96 overflow-hidden flex flex-col rounded-2xl bg-[#0f0c1a]/95 backdrop-blur-xl border border-purple-500/50 shadow-[0_10px_35px_rgba(0,0,0,0.8)] text-zinc-100 animate-in fade-in zoom-in-95 duration-150"
+      className="absolute left-6 top-10 z-[99999] w-96 max-h-96 overflow-hidden flex flex-col rounded-2xl bg-[#0f0c1a]/98 backdrop-blur-2xl border-2 border-purple-500/80 shadow-[0_25px_60px_rgba(0,0,0,0.95),0_0_40px_rgba(168,85,247,0.4)] text-zinc-100 animate-in fade-in zoom-in-95 duration-150 ring-2 ring-purple-500/30"
       onClick={(e) => e.stopPropagation()}
     >
       {/* Header */}
