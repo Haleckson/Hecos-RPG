@@ -908,6 +908,7 @@ export type FeatCategoryType =
   | 'skill'
   | 'class'
   | 'archetype'
+  | 'vocation'
   | 'ancestry'
   | 'extras'
   | 'hecos';
@@ -947,6 +948,11 @@ export interface PF2eFeatAttributes {
   criticalFailure?: string;
   special?: string;
   associatedClassOrAncestry?: string;
+  // Archetype & Vocation specific metadata
+  mentorNpcNames?: string[];
+  questRequirement?: string;
+  vocationLevel?: 1 | 3 | 6 | 9 | 12 | 15 | 18;
+  vocationProgressionLine?: string;
   hecosLore?: string;
   roleplayTips?: string;
   gmNotes?: string;
@@ -1206,6 +1212,7 @@ export interface ClassFeature {
   description: string;
   actionCost?: string;
   traits?: string[];
+  featEntityId?: string;
 }
 
 export interface ClassSubclass {
@@ -1223,13 +1230,24 @@ export interface ClassArchetypeFeat {
   prerequisites?: string;
   actionCost?: string;
   traits?: string[];
+  featEntityId?: string;
+}
+
+export interface VocationProgressionLevel {
+  level: 1 | 3 | 6 | 9 | 12 | 15 | 18;
+  title: string;
+  actionCost?: string;
+  traits?: string[];
+  description: string;
+  benefitsSummary?: string;
+  featEntityId?: string;
 }
 
 export interface ClassAttributes {
   level?: number;
   isSpellcaster?: boolean;
   subcategories?: string[];
-  kind: 'class' | 'archetype';
+  kind: 'class' | 'archetype' | 'vocation';
   hpPerLevel?: number; // e.g. 6, 8, 10, 12
   keyAttribute?: string; // Força, Destreza, etc.
   rarity?: 'Comum' | 'Incomum' | 'Raro' | 'Único';
@@ -1259,12 +1277,22 @@ export interface ClassAttributes {
   features?: ClassFeature[];
   subclasses?: ClassSubclass[];
 
-  // Archetype specifics
+  // Archetype specifics (PF2e + Quests + NPC Trainers)
   archetypeDedicationLevel?: number;
   prerequisites?: string;
   access?: string;
   dedicationFeat?: ClassArchetypeFeat;
   archetypeFeats?: ClassArchetypeFeat[];
+  trainerNpcs?: string[]; // Names or titles of NPCs who provide training
+  trainerNpcIds?: string[]; // Entity IDs of linked NPCs
+  linkedQuests?: string[]; // Names of linked quests
+  linkedQuestIds?: string[]; // Entity IDs of linked quests
+  trainingRequirements?: string; // Training time, narrative condition, costs
+
+  // Vocation specifics (Background+ with fixed progression at levels 1, 3, 6, 9, 12, 15, 18)
+  vocationTheme?: string;
+  initialBonusSkill?: string; // e.g. "Treinado em Sobrevivência e Lore (Ermos)"
+  vocationProgression?: VocationProgressionLevel[];
 
   description?: string;
   hecosLore?: string;

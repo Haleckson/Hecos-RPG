@@ -60,11 +60,79 @@
       ".read": true,
       ".write": true
     },
+    "hecos_peril_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_class_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_archetype_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_vocation_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_ancestry_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_fauna_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_flora_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_location_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_pc_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_npc_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_organization_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_map_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_tag_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_quest_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_configs": {
+      ".read": true,
+      ".write": true
+    },
     "hecos_public_folders": {
       ".read": true,
       ".write": true
     },
     "hecos_secret_folders": {
+      ".read": true,
+      ".write": true
+    },
+    "$other": {
       ".read": true,
       ".write": true
     },

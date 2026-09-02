@@ -346,7 +346,7 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
   const [routine, setRoutine] = useState(initPeril?.routine || '');
 
   // Spells
-  const [tradition, setTradition] = useState(initPeril?.spells?.tradition || 'Arcana');
+  const [tradition, setTradition] = useState(initPeril?.spells?.tradition || 'Cinética');
   const [spellDc, setSpellDc] = useState(initPeril?.spells?.dc ? String(initPeril.spells.dc) : '');
   const [spellAttack, setSpellAttack] = useState(
     initPeril?.spells?.attack ? String(initPeril.spells.attack) : ''
@@ -523,7 +523,7 @@ export const PerilCreateModal: React.FC<PerilCreateModalProps> = ({
     setResetCondition(peril?.reset || '');
     setRoutine(peril?.routine || '');
 
-    setTradition(peril?.spells?.tradition || 'Arcana');
+    setTradition(peril?.spells?.tradition || 'Cinética');
     setSpellDc(peril?.spells?.dc ? String(peril.spells.dc) : '');
     setSpellAttack(peril?.spells?.attack ? String(peril.spells.attack) : '');
     setSpellsList(peril?.spells?.spellsList || '');

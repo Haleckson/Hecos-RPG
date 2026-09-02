@@ -54,6 +54,7 @@ import {
   Settings,
   Eye,
   EyeOff,
+  GraduationCap,
 } from 'lucide-react';
 
 interface FeatExplorerProps {
@@ -138,10 +139,20 @@ export const MAIN_FEAT_CATEGORIES: {
   },
   {
     id: 'archetype',
-    name: 'Vocação',
-    englishName: 'Vocação / Dedication',
-    description: 'Talentos de vocação, dedicação e caminhos multidisciplinares.',
+    name: 'Arquétipo',
+    englishName: 'Archetype / Dedication',
+    description: 'Talentos de arquétipo desbloqueados por quests e mestres de treino.',
     icon: BookOpen,
+    color: '#74b6c2',
+    badgeBg: 'bg-cyan-950/40',
+    badgeBorder: 'border-cyan-600/40',
+  },
+  {
+    id: 'vocation',
+    name: 'Vocação',
+    englishName: 'Vocation (1-18)',
+    description: 'Talentos de vocação de evolução linear nos níveis 1, 3, 6, 9, 12, 15 e 18.',
+    icon: GraduationCap,
     color: '#b19ecc',
     badgeBg: 'bg-purple-950/40',
     badgeBorder: 'border-purple-600/40',

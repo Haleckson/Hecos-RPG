@@ -199,7 +199,7 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
       return [
         { id: 'all', name: 'Todas as Vocações', description: 'Todas as vocações e arquétipos' },
         { id: 'combat', name: 'Dedicações Marciais', description: 'Vocações de combate e armas' },
-        { id: 'mystic', name: 'Vocações Místicas', description: 'Vocações arcanas, divinas e do vazio' },
+        { id: 'mystic', name: 'Vocações Místicas', description: 'Vocações etéreas, cinéticas e do vazio' },
         { id: 'specialist', name: 'Vocações de Ofício & Perícia', description: 'Vocações de ofício, perícia e prestígio' },
       ];
     }
@@ -282,6 +282,72 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
 
     return Array.from(set).sort();
   }, [categoriesConfig, categoryEntities]);
+
+  // Handle creating entity directly in the appropriate category modal
+  const handleCreateEntity = () => {
+    if (categoryKey === 'class' || categoryKey === 'classes') {
+      onCreateNewEntity('class');
+      return;
+    }
+    if (
+      categoryKey === 'archetype' ||
+      categoryKey === 'arquetipos' ||
+      categoryKey === 'vocacao' ||
+      categoryKey === 'vocation'
+    ) {
+      onCreateNewEntity('archetype');
+      return;
+    }
+    if (categoryKey === 'peril' || categoryKey === 'creature' || categoryKey === 'perigos') {
+      onCreateNewEntity('peril');
+      return;
+    }
+    if (categoryKey === 'spell' || categoryKey === 'feiticos') {
+      onCreateNewEntity('spell');
+      return;
+    }
+    if (categoryKey === 'item' || categoryKey === 'itens') {
+      onCreateNewEntity('item');
+      return;
+    }
+    if (categoryKey === 'feat' || categoryKey === 'talentos') {
+      onCreateNewEntity('feat');
+      return;
+    }
+    if (categoryKey === 'ancestry' || categoryKey === 'ancestralidades') {
+      onCreateNewEntity('ancestry');
+      return;
+    }
+    if (categoryKey === 'npc') {
+      onCreateNewEntity('npc');
+      return;
+    }
+    if (categoryKey === 'location' || categoryKey === 'locais') {
+      onCreateNewEntity('location');
+      return;
+    }
+    if (categoryKey === 'quest' || categoryKey === 'quests' || categoryKey === 'missoes') {
+      onCreateNewEntity('quest');
+      return;
+    }
+    if (categoryKey === 'organization' || categoryKey === 'organizacoes') {
+      onCreateNewEntity('organization');
+      return;
+    }
+    if (categoryKey === 'fauna') {
+      onCreateNewEntity('fauna');
+      return;
+    }
+    if (categoryKey === 'flora') {
+      onCreateNewEntity('flora');
+      return;
+    }
+    if (categoryKey === 'pc') {
+      onCreateNewEntity('pc');
+      return;
+    }
+    onCreateNewEntity(categoryKey);
+  };
 
   // Folder live item counts
   const folderCounts = useMemo(() => {
@@ -793,7 +859,7 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => onCreateNewEntity(categoryKey === 'peril' || categoryKey === 'creature' ? 'peril' : (selectedFolder && selectedFolder !== '__none__' ? selectedFolder : categoryKey))}
+                  onClick={handleCreateEntity}
                   className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-extrabold shadow-md transition-all cursor-pointer ${themeClasses.btnBg}`}
                 >
                   <Plus className="w-4 h-4 stroke-[3]" />
@@ -1177,7 +1243,7 @@ export const CategoryEntityExplorer: React.FC<CategoryEntityExplorerProps> = ({
           {isActualGm && (
             <button
               type="button"
-              onClick={() => onCreateNewEntity(categoryKey === 'peril' || categoryKey === 'creature' ? 'peril' : (selectedFolder && selectedFolder !== '__none__' ? selectedFolder : categoryKey))}
+              onClick={handleCreateEntity}
               className={`px-4 py-2 text-xs font-bold rounded-xl shadow-md cursor-pointer transition-all ${themeClasses.btnBg}`}
             >
               {categoryKey === 'peril' || categoryKey === 'creature' ? 'Criar Primeiro Perigo' : `Criar Primeira Entrada em ${meta.name}`}

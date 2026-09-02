@@ -182,6 +182,20 @@ export const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
             viewType: 'entities'
           },
           {
+            id: 'arquetipos',
+            name: 'Arquétipo / Vocação',
+            categoryKey: 'archetype',
+            subcategory: 'Arquétipos',
+            icon: Layers,
+            color: '#8b5cf6', // Violet / Violeta Profundo
+            accentColor: 'violet',
+            badgeBg: 'bg-violet-950/80',
+            badgeBorder: 'border-violet-500/60',
+            badgeText: 'text-violet-300',
+            description: 'Arquétipos desbloqueados por quests/treinadores e Vocações com progressão linear (Níveis 1, 3, 6, 9, 12, 15, 18).',
+            viewType: 'entities'
+          },
+          {
             id: 'classes',
             name: 'Classes',
             categoryKey: 'class',
@@ -206,7 +220,7 @@ export const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
             badgeBg: 'bg-pink-950/80',
             badgeBorder: 'border-pink-500/60',
             badgeText: 'text-pink-300',
-            description: 'Grimório de magias arcanas, divinas, ocultas e primais.',
+            description: 'Grimório de magias das tradições Cinética, Etérea, Biológica, Abiótica e Omni.',
             viewType: 'entities'
           },
           {
@@ -277,20 +291,6 @@ export const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
             badgeBorder: 'border-amber-600/60',
             badgeText: 'text-amber-300',
             description: 'Talentos de ancestralidade, classe, perícia e gerais.',
-            viewType: 'entities'
-          },
-          {
-            id: 'arquetipos',
-            name: 'Vocação',
-            categoryKey: 'archetype',
-            subcategory: 'Vocação',
-            icon: Layers,
-            color: '#8b5cf6', // Violet / Violeta Profundo
-            accentColor: 'violet',
-            badgeBg: 'bg-violet-950/80',
-            badgeBorder: 'border-violet-500/60',
-            badgeText: 'text-violet-300',
-            description: 'Dedicações, vocações e caminhos de prestígio no cenário.',
             viewType: 'entities'
           }
         ]
@@ -397,6 +397,20 @@ export const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
         viewType: 'entities'
       },
       {
+        id: 'arquetipos',
+        name: 'Arquétipo / Vocação',
+        categoryKey: 'archetype',
+        subcategory: 'Arquétipos',
+        icon: Layers,
+        color: '#8b5cf6',
+        accentColor: 'violet',
+        badgeBg: 'bg-violet-950/80',
+        badgeBorder: 'border-violet-500/60',
+        badgeText: 'text-violet-300',
+        description: 'Arquétipos desbloqueados por quests/treinadores e Vocações com progressão linear (Níveis 1, 3, 6, 9, 12, 15, 18).',
+        viewType: 'entities'
+      },
+      {
         id: 'classes',
         name: 'Classes',
         categoryKey: 'class',
@@ -421,7 +435,7 @@ export const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
         badgeBg: 'bg-pink-950/80',
         badgeBorder: 'border-pink-500/60',
         badgeText: 'text-pink-300',
-        description: 'Grimório de magias arcanas, divinas, ocultas e primais.',
+        description: 'Grimório de magias das tradições Cinética, Etérea, Biológica, Abiótica e Omni.',
         viewType: 'entities'
       },
       {
@@ -492,20 +506,6 @@ export const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
         badgeBorder: 'border-amber-600/60',
         badgeText: 'text-amber-300',
         description: 'Talentos de ancestralidade, classe, perícia e gerais.',
-        viewType: 'entities'
-      },
-      {
-        id: 'arquetipos',
-        name: 'Vocação',
-        categoryKey: 'archetype',
-        subcategory: 'Vocação',
-        icon: Layers,
-        color: '#8b5cf6',
-        accentColor: 'violet',
-        badgeBg: 'bg-violet-950/80',
-        badgeBorder: 'border-violet-500/60',
-        badgeText: 'text-violet-300',
-        description: 'Dedicações, vocações e caminhos de prestígio no cenário.',
         viewType: 'entities'
       }
     ]
@@ -617,13 +617,14 @@ export function getCategoryMeta(keyOrId?: string, subcategory?: string) {
     ancestralidades: 'Ancestralidades',
     class: 'Classes',
     classes: 'Classes',
-    archetype: 'Vocação',
-    arquetipos: 'Vocação',
-    arquetipo: 'Vocação',
-    vocacao: 'Vocação',
-    vocação: 'Vocação',
-    vocacoes: 'Vocação',
-    vocações: 'Vocação',
+    archetype: 'Arquétipo / Vocação',
+    arquetipos: 'Arquétipo / Vocação',
+    arquetipo: 'Arquétipo / Vocação',
+    vocacao: 'Arquétipo / Vocação',
+    vocação: 'Arquétipo / Vocação',
+    vocacoes: 'Arquétipo / Vocação',
+    vocações: 'Arquétipo / Vocação',
+    vocation: 'Arquétipo / Vocação',
     session: 'Diário',
     diario: 'Diário',
     gm_note: 'Notas do GM',

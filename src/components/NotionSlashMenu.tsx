@@ -172,7 +172,7 @@ export const NotionSlashMenu: React.FC<NotionSlashMenuProps> = ({
       category: 'caixas',
       icon: <Sparkles className="w-4 h-4 text-purple-400" />,
       keywords: ['eclipse', 'malva', 'penumbra', 'magia', 'oculto', 'ritual'],
-      execute: () => onInsertSnippet('> 🌌 **EFEITO DE PENUMBRA:** Durante o eclipse de Hecos, magias de tradição Oculta recebem +1 de status na CD de salvamento.\n\n'),
+      execute: () => onInsertSnippet('> 🌌 **EFEITO DE PENUMBRA:** Durante o eclipse de Hecos, magias de tradição Etérea recebem +1 de status na CD de salvamento.\n\n'),
     },
     {
       id: 'callout_treasure',
@@ -289,7 +289,7 @@ export const NotionSlashMenu: React.FC<NotionSlashMenuProps> = ({
       keywords: ['magia', 'feitico', 'spell', 'grimorio', 'tradicao', 'rank', 'ritual'],
       execute: () =>
         onInsertSnippet(`### Feitiço: Véu da Penumbra de Hecos
-- **Rank:** 3 | **Tradições:** Arcana, Oculta
+- **Rank:** 3 | **Tradições:** Cinética, Etérea
 - **Conjuração:** [2-actions] somática, verbal
 - **Alcance:** 60 pés | **Área:** Explosão de 20 pés
 - **Duração:** 1 minuto | **Salvamento:** Reflexos básico CD 20

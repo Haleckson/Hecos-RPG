@@ -232,12 +232,17 @@ export const NPCCard: React.FC<NPCCardProps> = ({
   };
 
   // Traits (strictly PF2e traits, separate from search tags)
-  const rawTraits = (npc.traits && npc.traits.length > 0)
+  const rawTraits = Array.isArray(npc.traits)
     ? npc.traits
-    : (currentEntity.traits && currentEntity.traits.length > 0)
+    : Array.isArray(currentEntity.traits)
     ? currentEntity.traits
+    : Array.isArray(currentEntity.statblock?.traits)
+    ? currentEntity.statblock.traits
     : [];
-  const orderedTraits = sortTraitsHierarchically(rawTraits, { rarity: npc.rarity || 'Comum', size });
+  const orderedTraits = sortTraitsHierarchically(rawTraits, {
+    rarity: npc.rarity && npc.rarity !== 'Comum' ? npc.rarity : undefined,
+    size: npc.size ? size : undefined,
+  });
 
   const visibleTraits = effectiveIsGm
     ? orderedTraits

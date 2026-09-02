@@ -937,25 +937,92 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
                     onKeyDown={handleKeyDown}
                     placeholder="Digite aqui para editar texto ou digite @ ou [[ para inserir novas menções com badges..."
                     style={{ minHeight: `${inputBoxHeight}px`, height: `${inputBoxHeight}px` }}
-                    className="w-full p-3.5 pr-12 pb-8 bg-zinc-900/95 border-2 border-zinc-700/80 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 rounded-xl text-zinc-100 placeholder-zinc-500 font-mono text-xs leading-relaxed resize-y selection:bg-purple-900/50 shadow-inner transition-colors"
+                    className="w-full p-3.5 pr-28 pb-8 bg-zinc-900/95 border-2 border-zinc-700/80 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 rounded-t-xl rounded-b-none text-zinc-100 placeholder-zinc-500 font-mono text-xs leading-relaxed resize-y selection:bg-purple-900/50 shadow-inner transition-colors"
                   />
 
                   {/* Accessible prominent corner drag handle right on the interactive typing box */}
                   <div
                     onMouseDown={handleInputResizeMouseDown}
                     onTouchStart={handleInputResizeMouseDown}
-                    onDoubleClick={() => setInputBoxHeight((prev) => (prev > 260 ? defaultInputBoxHeight : 380))}
-                    title="Atalho de Redimensionamento: Arraste para ajustar a altura da caixa de digitação (ou duplo clique para expandir/recolher)"
-                    className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg bg-[#0e0a1c] border-2 border-cyan-500/80 hover:border-cyan-300 active:border-cyan-200 shadow-[0_0_12px_rgba(6,182,212,0.5)] hover:shadow-[0_0_20px_rgba(6,182,212,0.8)] cursor-ns-resize select-none z-10 transition-all hover:scale-105"
+                    onDoubleClick={() => setInputBoxHeight((prev) => (prev > 260 ? defaultInputBoxHeight : 420))}
+                    title="Atalho de Redimensionamento: Arraste para ajustar a altura da caixa de digitação (ou clique duplo para alternar tamanho)"
+                    className="absolute bottom-2 right-2 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#0e0a1c] border-2 border-cyan-500/90 hover:border-cyan-300 active:border-cyan-200 shadow-[0_0_14px_rgba(6,182,212,0.6)] hover:shadow-[0_0_22px_rgba(6,182,212,0.9)] cursor-ns-resize select-none z-10 transition-all hover:scale-105"
                   >
-                    <span className="text-[9px] font-mono font-bold text-cyan-300 tracking-tighter uppercase mr-0.5">
-                      Redimensionar
+                    <span className="text-[10px] font-mono font-bold text-cyan-300 tracking-tight uppercase mr-0.5">
+                      ⇕ Redimensionar
                     </span>
                     <div className="flex flex-col gap-0.5 items-end">
-                      <div className="w-3.5 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-cyan-300 rounded-full" />
-                      <div className="w-2.5 h-0.5 bg-gradient-to-r from-transparent via-purple-400 to-cyan-400 rounded-full" />
-                      <div className="w-1.5 h-0.5 bg-cyan-400 rounded-full" />
+                      <div className="w-3.5 h-0.5 bg-cyan-300 rounded-full" />
+                      <div className="w-2.5 h-0.5 bg-cyan-400 rounded-full" />
+                      <div className="w-1.5 h-0.5 bg-purple-400 rounded-full" />
                     </div>
+                  </div>
+                </div>
+
+                {/* Highly Accessible Horizontal Drag Handle Bar for Interactive Text Box */}
+                <div
+                  onMouseDown={handleInputResizeMouseDown}
+                  onTouchStart={handleInputResizeMouseDown}
+                  onDoubleClick={() => setInputBoxHeight((prev) => (prev > 260 ? defaultInputBoxHeight : 420))}
+                  title="Barra de Redimensionamento da Caixa de Digitação: Clique e arraste verticalmente ou use os botões rápidos"
+                  className="w-full -mt-2 py-1.5 px-3 rounded-b-xl bg-gradient-to-r from-zinc-900 via-[#101322] to-zinc-900 border-x-2 border-b-2 border-zinc-700/80 hover:border-cyan-500/80 active:border-cyan-400 flex items-center justify-between gap-2 cursor-ns-resize select-none group transition-all"
+                >
+                  <div className="flex items-center gap-1.5 text-[10px] font-mono text-cyan-400/90 group-hover:text-cyan-300">
+                    <span className="font-bold">⠿</span>
+                    <span className="font-semibold uppercase tracking-wider text-[9px]">
+                      Arraste para redimensionar caixa de texto ({inputBoxHeight}px)
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setInputBoxHeight(140);
+                      }}
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors ${
+                        inputBoxHeight <= 150 ? 'bg-cyan-950 text-cyan-300 border border-cyan-700' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+                      }`}
+                    >
+                      140px
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setInputBoxHeight(260);
+                      }}
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors ${
+                        inputBoxHeight > 150 && inputBoxHeight <= 300 ? 'bg-cyan-950 text-cyan-300 border border-cyan-700' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+                      }`}
+                    >
+                      260px
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setInputBoxHeight(420);
+                      }}
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors ${
+                        inputBoxHeight > 300 && inputBoxHeight <= 500 ? 'bg-cyan-950 text-cyan-300 border border-cyan-700' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+                      }`}
+                    >
+                      420px
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setInputBoxHeight(650);
+                      }}
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors ${
+                        inputBoxHeight > 500 ? 'bg-cyan-950 text-cyan-300 border border-cyan-700' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+                      }`}
+                    >
+                      650px
+                    </button>
                   </div>
                 </div>
 

@@ -447,7 +447,12 @@ export const FeatEditor: React.FC<FeatEditorProps> = ({
                       className="w-20 px-3 py-2 rounded-lg bg-zinc-900/90 border border-zinc-700 text-amber-300 font-bold text-center text-sm outline-none focus:border-amber-400"
                     />
                     <div className="flex flex-wrap gap-1">
-                      {COMMON_LEVELS.slice(0, 6).map((lvl) => (
+                      {(data.featType === 'vocation'
+                        ? [1, 3, 6, 9, 12, 15, 18]
+                        : data.featType === 'archetype'
+                        ? [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+                        : COMMON_LEVELS.slice(0, 6)
+                      ).map((lvl) => (
                         <button
                           key={lvl}
                           type="button"
@@ -480,7 +485,8 @@ export const FeatEditor: React.FC<FeatEditorProps> = ({
                     <option value="extras">Extra</option>
                     <option value="general">Geral</option>
                     <option value="skill">Perícia</option>
-                    <option value="archetype">Vocação</option>
+                    <option value="archetype">Arquétipo (PF2e & Quests)</option>
+                    <option value="vocation">Vocação (Linear 1-18)</option>
                   </select>
                 </div>
 

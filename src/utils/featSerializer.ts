@@ -94,6 +94,10 @@ export function serializeFeatToHTML(title: string, data: PF2eFeatAttributes): st
 
     <!-- REQUISITOS E ATIVAÇÃO -->
     <section class="feat-prerequisites" style="font-size: 0.9rem; line-height: 1.6; margin-bottom: 16px; display: grid; gap: 4px;">
+        ${data.featType === 'vocation' ? `<div style="color: #c084fc;"><strong>Progressão de Vocação:</strong> Nível ${data.level || data.vocationLevel || 1} (Evolução Automática Linear)</div>` : ''}
+        ${data.vocationProgressionLine ? `<div style="color: #e9d5ff;"><strong>Trilha de Vocação:</strong> ${data.vocationProgressionLine}</div>` : ''}
+        ${data.mentorNpcNames && data.mentorNpcNames.length > 0 ? `<div style="color: #67e8f9;"><strong>Treinamento com Instrutor(es):</strong> ${data.mentorNpcNames.join(', ')}</div>` : ''}
+        ${data.questRequirement ? `<div style="color: #fde047;"><strong>Requisito de Quest / Campanha:</strong> ${data.questRequirement}</div>` : ''}
         ${data.prerequisites ? `<div><strong>Pré-requisitos:</strong> ${data.prerequisites}</div>` : ''}
         ${data.frequency ? `<div><strong>Frequência:</strong> ${data.frequency}</div>` : ''}
         ${data.trigger ? `<div><strong>Gatilho:</strong> ${data.trigger}</div>` : ''}
@@ -254,6 +258,8 @@ export function getFeatTypeLabel(type: FeatCategoryType): string {
     case 'skill':
       return 'Perícia';
     case 'archetype':
+      return 'Arquétipo';
+    case 'vocation':
       return 'Vocação';
     case 'hecos':
       return 'Extra';

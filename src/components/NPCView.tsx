@@ -67,7 +67,8 @@ import {
   ExternalLink,
   Building2,
   Scroll,
-  Flag
+  Flag,
+  X
 } from 'lucide-react';
 
 interface NPCViewProps {
@@ -224,6 +225,43 @@ export const NPCView: React.FC<NPCViewProps> = ({
     setCurrentEntity(updatedEntity);
   };
 
+  // Remove a trait directly from NPCView (GM only)
+  const handleRemoveTraitFromNpc = (traitToRemove: string) => {
+    if (!isActualGm || !traitToRemove) return;
+    const target = traitToRemove.trim().toLowerCase();
+
+    const currentNpcTraits = Array.isArray(npc.traits) ? npc.traits : [];
+    const currentBaseTraits = Array.isArray(currentEntity.traits) ? currentEntity.traits : [];
+    const currentStatblockTraits = Array.isArray(currentEntity.statblock?.traits) ? currentEntity.statblock.traits : [];
+
+    const updatedNpcTraits = currentNpcTraits.filter((t) => t.trim().toLowerCase() !== target);
+    const updatedBaseTraits = currentBaseTraits.filter((t) => t.trim().toLowerCase() !== target);
+    const updatedStatblockTraits = currentStatblockTraits.filter((t) => t.trim().toLowerCase() !== target);
+
+    // If trait matched rarity or size, clear those as well
+    const updatedRarity = npc.rarity && npc.rarity.toLowerCase() === target ? undefined : npc.rarity;
+    const updatedSize = npc.size && npc.size.toLowerCase() === target ? undefined : npc.size;
+
+    const updatedNpcData: NPCAttributes = {
+      ...(currentEntity.npcData || {}),
+      traits: updatedNpcTraits,
+      rarity: updatedRarity,
+      size: updatedSize,
+    };
+
+    const updatedEntity: HecosEntity = {
+      ...currentEntity,
+      traits: updatedBaseTraits,
+      statblock: currentEntity.statblock
+        ? { ...currentEntity.statblock, traits: updatedStatblockTraits }
+        : undefined,
+      npcData: updatedNpcData,
+    };
+
+    HecosStorage.saveEntity(updatedEntity);
+    setCurrentEntity(updatedEntity);
+  };
+
   // Quick Action: Reveal All / Hide All or Hide Sensitive Data
   const handleSetAllVisibility = (mode: 'all_visible' | 'all_hidden' | 'hide_sensitive') => {
     if (!isActualGm) return;
@@ -249,11 +287,11 @@ export const NPCView: React.FC<NPCViewProps> = ({
 
     // Collect all dynamic item keys
     const dynamicKeys: string[] = [];
-    const rawT = (npc.traits && npc.traits.length > 0)
+    const rawT = Array.isArray(npc.traits)
       ? npc.traits
-      : (currentEntity.traits && currentEntity.traits.length > 0)
+      : Array.isArray(currentEntity.traits)
       ? currentEntity.traits
-      : [];
+      : (currentEntity.statblock?.traits || []);
     rawT.forEach(t => dynamicKeys.push(`tag_${t}`));
 
     const subc = currentEntity.subcategories || (currentEntity.subcategory ? [currentEntity.subcategory] : []);
@@ -463,12 +501,17 @@ export const NPCView: React.FC<NPCViewProps> = ({
   const tokenImage = npc.tokenImage || currentEntity.icon;
 
   // Traits (with permission filtering for non-GMs) - strictly PF2e traits, separate from search tags
-  const rawTraits = (npc.traits && npc.traits.length > 0)
+  const rawTraits = Array.isArray(npc.traits)
     ? npc.traits
-    : (currentEntity.traits && currentEntity.traits.length > 0)
+    : Array.isArray(currentEntity.traits)
     ? currentEntity.traits
+    : Array.isArray(currentEntity.statblock?.traits)
+    ? currentEntity.statblock.traits
     : [];
-  const orderedTraits = sortTraitsHierarchically(rawTraits, { rarity: npc.rarity || 'Comum', size });
+  const orderedTraits = sortTraitsHierarchically(rawTraits, {
+    rarity: npc.rarity && npc.rarity !== 'Comum' ? npc.rarity : undefined,
+    size: npc.size ? size : undefined,
+  });
 
   const visibleTraits = useMemo(() => {
     if (isActualGm) return orderedTraits;
@@ -1114,6 +1157,19 @@ export const NPCView: React.FC<NPCViewProps> = ({
                           );
                         }}
                       />
+                      {isActualGm && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveTraitFromNpc(trait);
+                          }}
+                          className="p-0.5 rounded hover:bg-rose-900/60 text-zinc-400 hover:text-rose-300 transition-colors cursor-pointer"
+                          title={`Remover traço "${trait}" do NPC`}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
                       {renderEyeToggle(`tag_${trait}`, `Traço ${trait}`, 'all', { compact: true })}
                     </div>
                   );

@@ -667,77 +667,106 @@ export function App() {
   };
 
   const handleCreateNewEntity = (presetCategoryOrSub?: string) => {
-    if (presetCategoryOrSub === 'spell') {
+    const target = (presetCategoryOrSub || effectiveCategoryKey || selectedCategoryKey || '').toLowerCase().trim();
+
+    if (target === 'spell' || target === 'feiticos' || target === 'feitiços') {
       handleCreateSpellDirectly();
       return;
     }
-    if (presetCategoryOrSub === 'item') {
+    if (target === 'item' || target === 'itens') {
       handleCreateItemDirectly();
       return;
     }
-    if (presetCategoryOrSub === 'feat') {
+    if (target === 'feat' || target === 'talento' || target === 'talentos') {
       handleCreateFeatDirectly();
       return;
     }
     if (
-      presetCategoryOrSub === 'peril' ||
-      presetCategoryOrSub === 'creature' ||
-      presetCategoryOrSub === 'perigo' ||
-      presetCategoryOrSub === 'perigos'
+      target === 'peril' ||
+      target === 'creature' ||
+      target === 'perigo' ||
+      target === 'perigos' ||
+      target === 'ameacas' ||
+      target === 'ameaças'
     ) {
       setEditingPerilEntity(null);
       setIsPerilCreateModalOpen(true);
       return;
     }
-    if (presetCategoryOrSub === 'class') {
+    if (target === 'class' || target === 'classes') {
       setClassModalPresetKind('class');
       setIsClassCreateModalOpen(true);
       return;
     }
-    if (presetCategoryOrSub === 'archetype' || presetCategoryOrSub === 'arquetipos' || presetCategoryOrSub === 'vocacao') {
+    if (
+      target === 'archetype' ||
+      target === 'archetypes' ||
+      target === 'arquetipos' ||
+      target === 'arquétipos' ||
+      target === 'arquetipo' ||
+      target === 'arquétipo' ||
+      target === 'vocacao' ||
+      target === 'vocação' ||
+      target === 'vocacoes' ||
+      target === 'vocações' ||
+      target === 'vocation'
+    ) {
       setClassModalPresetKind('archetype');
       setIsClassCreateModalOpen(true);
       return;
     }
-    if (presetCategoryOrSub === 'ancestry') {
+    if (target === 'ancestry' || target === 'ancestralidades' || target === 'ancestralidade') {
       handleCreateEntityOfCategory('ancestry');
       return;
     }
-    if (presetCategoryOrSub === 'npc') {
+    if (target === 'npc') {
       setEditingNpcEntity(null);
       setIsNpcCreateModalOpen(true);
       return;
     }
-    if (presetCategoryOrSub === 'location' || presetCategoryOrSub === 'locais') {
+    if (target === 'location' || target === 'locais' || target === 'local') {
       setEditingLocationEntity(null);
       setIsLocationCreateModalOpen(true);
       return;
     }
-    if (presetCategoryOrSub === 'quest' || presetCategoryOrSub === 'missoes' || presetCategoryOrSub === 'quests') {
+    if (target === 'quest' || target === 'missoes' || target === 'missões' || target === 'quests') {
       setEditingQuestEntity(null);
       setIsQuestCreateModalOpen(true);
       return;
     }
-    if (presetCategoryOrSub === 'organization' || presetCategoryOrSub === 'organizacoes') {
+    if (target === 'organization' || target === 'organizacoes' || target === 'organizações' || target === 'organizacao') {
       setEditingOrganizationEntity(null);
       setIsOrganizationCreateModalOpen(true);
       return;
     }
-    if (presetCategoryOrSub === 'fauna') {
+    if (target === 'fauna') {
       setEditingFaunaEntity(null);
       setIsFaunaCreateModalOpen(true);
       return;
     }
-    if (presetCategoryOrSub === 'flora') {
+    if (target === 'flora') {
       setEditingFloraEntity(null);
       setIsFloraCreateModalOpen(true);
       return;
     }
-    if (presetCategoryOrSub === 'pc') {
+    if (target === 'pc') {
       setEditingPcEntity(null);
       setIsPcCreateModalOpen(true);
       return;
     }
+
+    // Contextual fallback based on current open view
+    if (effectiveCategoryKey === 'class') {
+      setClassModalPresetKind('class');
+      setIsClassCreateModalOpen(true);
+      return;
+    }
+    if (effectiveCategoryKey === 'archetype') {
+      setClassModalPresetKind('archetype');
+      setIsClassCreateModalOpen(true);
+      return;
+    }
+
     // Open Category selector modal so user can choose ANY category from anywhere
     setIsNewArticleModalOpen(true);
   };

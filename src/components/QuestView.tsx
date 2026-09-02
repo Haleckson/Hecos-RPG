@@ -1042,17 +1042,23 @@ export const QuestView: React.FC<QuestViewProps> = ({
                   <div className="prose prose-invert max-w-none text-zinc-300 leading-relaxed text-sm">
                     {(() => {
                       const rawText = (quest.briefing || quest.narrativeLore || currentEntity.content || '').trim();
-                      const isDefaultEmpty = !rawText ||
-                        /^<p>\s*Nenhum detalhe (?:de|da) miss[aã]o registrado\.?\s*<\/p>$/i.test(rawText) ||
-                        /^Nenhum detalhe (?:de|da) miss[aã]o registrado\.?$/i.test(rawText);
+                      // Strip HTML tags and normalize text to test for placeholder variations
+                      const stripped = rawText.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+                      const isDefaultEmpty =
+                        !stripped ||
+                        /^nenhum detalhe (?:de|da|do)?\s*miss[aã]o registrado\.?$/i.test(stripped) ||
+                        /^nenhum texto de briefing.*$/i.test(stripped);
 
                       if (isDefaultEmpty) {
                         return <p className="text-zinc-500 italic">Nenhum texto de briefing ou enredo registrado.</p>;
                       }
 
+                      // Ensure malformed <p> tags do not leak into output as raw text
+                      const cleanContent = rawText.replace(/<\/?p\b[^>]*>/gi, '\n\n').trim();
+
                       return (
                         <RichContentRenderer
-                          content={rawText}
+                          content={cleanContent || rawText}
                           onNavigate={onNavigate}
                           onTagClick={onTagClick}
                         />

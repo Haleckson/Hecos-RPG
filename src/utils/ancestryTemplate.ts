@@ -260,7 +260,7 @@ Quais armas e ferramentas são icônicas para este povo?
 - **Armamentos Tradicionais [Talento 1]:** Você ganha treinamento com todas as armas que possuem o traço da sua ancestralidade.
 
 ### Rank 5
-- **Magia Inata da Penumbra [Talento 5]:** Você pode conjurar *Mãos Mágicas* e *Luz* à vontade como magias inatas de tradição oculta.
+- **Magia Inata da Penumbra [Talento 5]:** Você pode conjurar *Mãos Mágicas* e *Luz* à vontade como magias inatas de tradição Etérea.
 - **Passo Silencioso [Talento 5]:** Você ignora terreno difícil não-mágico de lodo ou vegetação densa.
 
 ### Rank 9

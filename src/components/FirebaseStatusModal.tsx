@@ -95,11 +95,79 @@ const RTDB_RULES_JSON = `{
       ".read": true,
       ".write": true
     },
+    "hecos_peril_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_class_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_archetype_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_vocation_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_ancestry_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_fauna_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_flora_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_location_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_pc_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_npc_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_organization_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_map_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_tag_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_quest_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_configs": {
+      ".read": true,
+      ".write": true
+    },
     "hecos_public_folders": {
       ".read": true,
       ".write": true
     },
     "hecos_secret_folders": {
+      ".read": true,
+      ".write": true
+    },
+    "$other": {
       ".read": true,
       ".write": true
     },
@@ -111,6 +179,10 @@ const RTDB_RULES_JSON = `{
 const FIRESTORE_RULES_TXT = `rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /{collection}/{docId} {
+      allow read, write: if collection.matches('hecos_.*');
+    }
+
     match /hecos_entities/{entityId} {
       allow read, write: if true;
     }
@@ -132,6 +204,10 @@ service cloud.firestore {
     }
 
     match /hecos_configs/{configId} {
+      allow read, write: if true;
+    }
+
+    match /hecos_trash/{trashId} {
       allow read, write: if true;
     }
 
@@ -450,7 +526,7 @@ export function FirebaseStatusModal({ isOpen, onClose }: FirebaseStatusModalProp
                 O Firebase envia esse aviso automático quando o banco de dados está configurado em <em>Modo de Teste</em> com regras abertas (<code>.read: true, .write: true</code> na raiz). Isso permite que qualquer pessoa leia ou apague a raiz inteira.
               </p>
               <div className="p-2.5 rounded-lg bg-black/40 border border-amber-500/20 text-[11px] text-amber-300/90 font-medium">
-                ✅ <strong>Como solucionamos:</strong> Bloqueamos o acesso irrestrito na raiz (<code>.read: false, .write: false</code>), liberamos apenas as 16 tabelas oficiais do Codex (<code>hecos_entities</code>, <code>hecos_maps</code>, etc.) e integramos <strong>Autenticação Anônima Silenciosa</strong> no site para garantir acesso legítimo sem bloquear nenhum usuário!
+                ✅ <strong>Como solucionamos:</strong> Bloqueamos o acesso irrestrito na raiz (<code>.read: false, .write: false</code>), liberamos todas as coleções, tabelas e categorias do Codex (incluindo <code>hecos_entities</code>, <code>hecos_maps</code>, <code>hecos_*_categories</code> e regra curinga para novos módulos) e integramos <strong>Autenticação Anônima Silenciosa e Fallback Local</strong> no site para garantir acesso legítimo a partir de qualquer dispositivo sem bloquear nenhum usuário!
               </div>
             </div>
 

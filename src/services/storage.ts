@@ -267,7 +267,9 @@ export const DEFAULT_CLASS_CATEGORIES_CONFIG: Record<string, string[]> = {
 };
 
 export const DEFAULT_ARCHETYPE_CATEGORIES_CONFIG: Record<string, string[]> = {
-  all: ['Dedicações Marciais', 'Vocações Místicas', 'Vocações de Perícia & Ofício', 'Vocações de Prestígio', 'Vocações de Hecos'],
+  all: ['Arquétipos', 'Vocações', 'Dedicações Marciais', 'Vocações Místicas', 'Vocações de Perícia & Ofício', 'Trilhas de Prestígio', 'Treinamento de Campanha'],
+  archetypes: ['Caminhante da Penumbra', 'Cavaleiro', 'Duelista', 'Mestre de Armas', 'Guerreiro de Obsidiana', 'Assassino da Corte', 'Médico de Batalha'],
+  vocations: ['Guarda de Caravana', 'Acadêmico do Eclipse', 'Caçador de Recompensas', 'Herborista de Ermos', 'Mercador Errante', 'Veterano de Cerco'],
   combat: ['Caminhante da Penumbra', 'Cavaleiro', 'Duelista', 'Mestre de Armas', 'Guerreiro de Obsidiana'],
   mystic: ['Arquimago do Eclipse', 'Oráculo das Estrelas', 'Invocador de Ecos', 'Sentinela do Vazio'],
   specialist: ['Assassino da Corte', 'Médico de Batalha', 'Alquimista do Vidro', 'Explorador dos Ermos']
@@ -714,7 +716,7 @@ export class HecosStorage {
     });
 
     // Start real-time listener for all scope category configurations
-    const scopesToListen = ['item', 'peril', 'class', 'archetype', 'ancestry', 'fauna', 'flora', 'location', 'pc', 'npc', 'organization', 'map', 'tag'];
+    const scopesToListen = ['item', 'peril', 'class', 'archetype', 'ancestry', 'vocation', 'fauna', 'flora', 'location', 'pc', 'npc', 'organization', 'map', 'tag', 'quest'];
     scopesToListen.forEach((sc) => {
       subscribeToScopeCategoriesRealtime(sc, (config) => {
         if (!config || typeof config !== 'object') return;

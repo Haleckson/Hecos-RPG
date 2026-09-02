@@ -924,7 +924,7 @@ export function SpellExplorer({
                   </span>
                 </h1>
                 <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
-                  Catálogo estruturado pelas tradições de Hecos (E. Física, E. Meta, M. Orgânica, M. Inorgânica, Omni), Foco e Rituais.
+                  Catálogo estruturado pelas tradições de Hecos (Cinética, Etérea, Biológica, Abiótica, Omni), Foco e Rituais.
                 </p>
               </div>
             </div>

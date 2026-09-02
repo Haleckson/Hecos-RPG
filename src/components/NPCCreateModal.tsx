@@ -616,6 +616,9 @@ export const NPCCreateModal: React.FC<NPCCreateModalProps> = ({
       subcategories: selectedSubcategories,
       tags: tagsArray,
       traits: finalNpcData.traits || [],
+      statblock: initEntity?.statblock
+        ? { ...initEntity.statblock, traits: finalNpcData.traits || [] }
+        : undefined,
       summary: finalNpcData.concept || subtitle || undefined,
       content: finalContent,
       coverImage: finalNpcData.portraitImage || undefined,

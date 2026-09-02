@@ -35,7 +35,7 @@ export function getEmptySpellData(): PF2eSpellAttributes {
 export function getDefaultSpellData(spellName = 'Lampejo de Obsidiana'): PF2eSpellAttributes {
   return {
     rank: 1,
-    traditions: ['arcano', 'oculto'],
+    traditions: ['Cinética', 'Etérea'],
     spellType: 'spell',
     subcategories: ['1º Círculo', 'Evocação'],
     castTime: '2 ações',
@@ -151,7 +151,7 @@ export function parseSpellFromContent(content: string, defaultSpell?: Partial<PF
         ...fallback,
         ...parsed,
         subcategories: Array.isArray(parsed.subcategories) ? parsed.subcategories : [],
-        traditions: Array.isArray(parsed.traditions) ? parsed.traditions : ['arcano'],
+        traditions: Array.isArray(parsed.traditions) ? parsed.traditions : ['Cinética'],
         traits: Array.isArray(parsed.traits) ? parsed.traits : [],
       };
     } catch (e) {

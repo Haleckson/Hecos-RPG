@@ -219,6 +219,15 @@ export function cleanForFirebase(obj: any): any {
 }
 
 /**
+ * Check if an error is a Firebase permission_denied error
+ */
+export function isPermissionDeniedError(err: any): boolean {
+  if (!err) return false;
+  const msg = String(err?.message || err?.code || err || '').toLowerCase();
+  return msg.includes('permission_denied') || msg.includes('permission denied');
+}
+
+/**
  * Helper to race a promise against a timeout (Aumentado para 20s para evitar falso timeout em redes lentas)
  */
 function withTimeout<T>(promise: Promise<T>, ms: number = 20000): Promise<T> {
@@ -269,7 +278,11 @@ export function subscribeToEntitiesRealtime(
         onUpdate(list);
       },
       (error) => {
-        console.warn("Real-time entities listener error:", error);
+        if (!isPermissionDeniedError(error)) {
+          console.warn("Real-time entities listener error:", error);
+        } else {
+          console.info("[Firebase] Permissão restrita no RTDB para entidades. Operando em cache offline.");
+        }
         updateConnectionState({
           isRealtimeActive: false,
           lastError: error.message || 'Realtime subscription error'
@@ -281,7 +294,9 @@ export function subscribeToEntitiesRealtime(
     updateConnectionState({ isRealtimeActive: true, status: 'connected' });
     return unsubscribe;
   } catch (err: any) {
-    console.warn("Failed to subscribe to realtime entities:", err);
+    if (!isPermissionDeniedError(err)) {
+      console.warn("Failed to subscribe to realtime entities:", err);
+    }
     updateConnectionState({ isRealtimeActive: false, lastError: err?.message || 'Subscription failed' });
     return null;
   }
@@ -312,7 +327,9 @@ export function subscribeToTrashRealtime(
         onUpdate(list);
       },
       (error) => {
-        console.warn("Real-time trash error:", error);
+        if (!isPermissionDeniedError(error)) {
+          console.warn("Real-time trash error:", error);
+        }
       }
     );
   } catch (err) {
@@ -436,7 +453,11 @@ export function subscribeToFeatCategoriesRealtime(
         }
       },
       (error) => {
-        console.warn("Real-time feat categories error:", error);
+        if (!isPermissionDeniedError(error)) {
+          console.warn("Real-time feat categories error:", error);
+        } else {
+          console.info("[Firebase] Categorias de talentos operando em modo local.");
+        }
       }
     );
   } catch (err) {
@@ -455,7 +476,9 @@ export async function syncFeatCategoriesToFirebase(config: Record<string, string
     await withTimeout(set(categoriesRef, payload), 15000);
     return true;
   } catch (err: any) {
-    console.warn("Sync feat categories notice:", err?.message || err);
+    if (!isPermissionDeniedError(err)) {
+      console.warn("Sync feat categories notice:", err?.message || err);
+    }
     return false;
   }
 }
@@ -479,7 +502,11 @@ export function subscribeToSpellCategoriesRealtime(
         }
       },
       (error) => {
-        console.warn("Real-time spell categories error:", error);
+        if (!isPermissionDeniedError(error)) {
+          console.warn("Real-time spell categories error:", error);
+        } else {
+          console.info("[Firebase] Categorias de magias operando em modo local.");
+        }
       }
     );
   } catch (err) {
@@ -498,7 +525,9 @@ export async function syncSpellCategoriesToFirebase(config: Record<string, strin
     await withTimeout(set(categoriesRef, payload), 15000);
     return true;
   } catch (err: any) {
-    console.warn("Sync spell categories notice:", err?.message || err);
+    if (!isPermissionDeniedError(err)) {
+      console.warn("Sync spell categories notice:", err?.message || err);
+    }
     return false;
   }
 }
@@ -523,7 +552,11 @@ export function subscribeToScopeCategoriesRealtime(
         }
       },
       (error) => {
-        console.warn(`Real-time ${scope} categories error:`, error);
+        if (!isPermissionDeniedError(error)) {
+          console.warn(`Real-time ${scope} categories error:`, error);
+        } else {
+          console.info(`[Firebase] Categorias de ${scope} operando em modo local com fallback.`);
+        }
       }
     );
   } catch (err) {
@@ -542,7 +575,9 @@ export async function syncScopeCategoriesToFirebase(scope: string, config: Recor
     await withTimeout(set(categoriesRef, payload), 15000);
     return true;
   } catch (err: any) {
-    console.warn(`Sync ${scope} categories notice:`, err?.message || err);
+    if (!isPermissionDeniedError(err)) {
+      console.warn(`Sync ${scope} categories notice:`, err?.message || err);
+    }
     return false;
   }
 }
@@ -568,7 +603,9 @@ export function subscribeToPublicFoldersRealtime(
         }
       },
       (error) => {
-        console.warn("Real-time public folders error:", error);
+        if (!isPermissionDeniedError(error)) {
+          console.warn("Real-time public folders error:", error);
+        }
       }
     );
   } catch (err) {
@@ -586,7 +623,9 @@ export async function syncPublicFoldersToFirebase(folders: string[]): Promise<bo
     await withTimeout(set(publicRef, folders), 15000);
     return true;
   } catch (err: any) {
-    console.warn("Sync public folders notice:", err?.message || err);
+    if (!isPermissionDeniedError(err)) {
+      console.warn("Sync public folders notice:", err?.message || err);
+    }
     return false;
   }
 }
@@ -612,7 +651,9 @@ export function subscribeToSecretFoldersRealtime(
         }
       },
       (error) => {
-        console.warn("Real-time secret folders error:", error);
+        if (!isPermissionDeniedError(error)) {
+          console.warn("Real-time secret folders error:", error);
+        }
       }
     );
   } catch (err) {
@@ -630,7 +671,9 @@ export async function syncSecretFoldersToFirebase(folders: string[]): Promise<bo
     await withTimeout(set(secretsRef, folders), 15000);
     return true;
   } catch (err: any) {
-    console.warn("Sync secret folders notice:", err?.message || err);
+    if (!isPermissionDeniedError(err)) {
+      console.warn("Sync secret folders notice:", err?.message || err);
+    }
     return false;
   }
 }
@@ -888,7 +931,9 @@ export function subscribeToTracksRealtime(callback: (tracks: any[]) => void): Un
         callback(list);
       }
     }, (error) => {
-      console.warn("Real-time tracks error:", error);
+      if (!isPermissionDeniedError(error)) {
+        console.warn("Real-time tracks error:", error);
+      }
     });
   } catch {
     return () => {};
@@ -906,7 +951,9 @@ export async function deleteTrackFromFirebase(trackId: string): Promise<boolean>
     await withTimeout(remove(trackRef), 15000);
     return true;
   } catch (err: any) {
-    console.warn("Delete track from Firebase notice:", err?.message || err);
+    if (!isPermissionDeniedError(err)) {
+      console.warn("Delete track from Firebase notice:", err?.message || err);
+    }
     return false;
   }
 }
@@ -927,7 +974,9 @@ export async function syncDriveResourcesToFirebase(resources: any[]): Promise<bo
     await withTimeout(set(driveRef, batch), 15000);
     return true;
   } catch (err: any) {
-    console.warn("Sync drive resources to Firebase notice:", err?.message || err);
+    if (!isPermissionDeniedError(err)) {
+      console.warn("Sync drive resources to Firebase notice:", err?.message || err);
+    }
     return false;
   }
 }
@@ -974,7 +1023,9 @@ export function subscribeToDriveResourcesRealtime(callback: (resources: any[]) =
         callback(list);
       }
     }, (error) => {
-      console.warn("Real-time drive resources error:", error);
+      if (!isPermissionDeniedError(error)) {
+        console.warn("Real-time drive resources error:", error);
+      }
     });
   } catch {
     return () => {};
@@ -992,7 +1043,9 @@ export async function deleteDriveResourceFromFirebase(resourceId: string): Promi
     await withTimeout(remove(resourceRef), 15000);
     return true;
   } catch (err: any) {
-    console.warn("Delete drive resource notice:", err?.message || err);
+    if (!isPermissionDeniedError(err)) {
+      console.warn("Delete drive resource notice:", err?.message || err);
+    }
     return false;
   }
 }
@@ -1008,7 +1061,9 @@ export async function deleteUserFromFirebase(userId: string): Promise<boolean> {
     await withTimeout(remove(userRef), 15000);
     return true;
   } catch (err: any) {
-    console.warn("Delete user notice:", err?.message || err);
+    if (!isPermissionDeniedError(err)) {
+      console.warn("Delete user notice:", err?.message || err);
+    }
     return false;
   }
 }
@@ -1029,7 +1084,9 @@ export async function syncUsersToFirebase(users: any[]): Promise<boolean> {
     await withTimeout(set(usersRef, batch), 15000);
     return true;
   } catch (err: any) {
-    console.warn("Sync users notice:", err?.message || err);
+    if (!isPermissionDeniedError(err)) {
+      console.warn("Sync users notice:", err?.message || err);
+    }
     return false;
   }
 }
@@ -1074,7 +1131,9 @@ export function subscribeToUsersRealtime(callback: (users: any[]) => void): Unsu
       }
       callback(list);
     }, (error) => {
-      console.warn("Real-time users error:", error);
+      if (!isPermissionDeniedError(error)) {
+        console.warn("Real-time users error:", error);
+      }
     });
   } catch {
     return () => {};
@@ -1091,7 +1150,9 @@ export async function syncFolderPermissionsToFirebase(permissions: Record<string
     await withTimeout(set(permsRef, cleanForFirebase(permissions)), 15000);
     return true;
   } catch (err: any) {
-    console.warn("Sync folder permissions notice:", err?.message || err);
+    if (!isPermissionDeniedError(err)) {
+      console.warn("Sync folder permissions notice:", err?.message || err);
+    }
     return false;
   }
 }
@@ -1122,7 +1183,9 @@ export function subscribeToFolderPermissionsRealtime(callback: (perms: Record<st
       if (!snap.exists()) return;
       callback(snap.val() || {});
     }, (error) => {
-      console.warn("Real-time folder permissions error:", error);
+      if (!isPermissionDeniedError(error)) {
+        console.warn("Real-time folder permissions error:", error);
+      }
     });
   } catch {
     return () => {};
@@ -1143,7 +1206,9 @@ export async function syncImageAdjustmentsToFirebase(adjustments: Record<string,
     await withTimeout(set(adjRef, safeObj), 15000);
     return true;
   } catch (err: any) {
-    console.warn("Sync image adjustments notice:", err?.message || err);
+    if (!isPermissionDeniedError(err)) {
+      console.warn("Sync image adjustments notice:", err?.message || err);
+    }
     return false;
   }
 }
@@ -1190,7 +1255,9 @@ export function subscribeToImageAdjustmentsRealtime(callback: (adjustments: Reco
       }
       callback(result);
     }, (error) => {
-      console.warn("Real-time image adjustments error:", error);
+      if (!isPermissionDeniedError(error)) {
+        console.warn("Real-time image adjustments error:", error);
+      }
     });
   } catch {
     return () => {};
@@ -1211,7 +1278,9 @@ export async function syncCustomTraitsToFirebase(traits: Record<string, any>): P
     await withTimeout(set(traitsRef, safeObj), 15000);
     return true;
   } catch (err: any) {
-    console.warn("Sync custom traits notice:", err?.message || err);
+    if (!isPermissionDeniedError(err)) {
+      console.warn("Sync custom traits notice:", err?.message || err);
+    }
     return false;
   }
 }
@@ -1258,7 +1327,9 @@ export function subscribeToCustomTraitsRealtime(callback: (traits: Record<string
       }
       callback(result);
     }, (error) => {
-      console.warn("Real-time custom traits error:", error);
+      if (!isPermissionDeniedError(error)) {
+        console.warn("Real-time custom traits error:", error);
+      }
     });
   } catch {
     return () => {};
@@ -1279,7 +1350,9 @@ export async function syncCustomTagsToFirebase(tags: Record<string, any>): Promi
     await withTimeout(set(tagsRef, safeObj), 15000);
     return true;
   } catch (err: any) {
-    console.warn("Sync custom tags notice:", err?.message || err);
+    if (!isPermissionDeniedError(err)) {
+      console.warn("Sync custom tags notice:", err?.message || err);
+    }
     return false;
   }
 }
@@ -1326,7 +1399,9 @@ export function subscribeToCustomTagsRealtime(callback: (tags: Record<string, an
       }
       callback(result);
     }, (error) => {
-      console.warn("Real-time custom tags error:", error);
+      if (!isPermissionDeniedError(error)) {
+        console.warn("Real-time custom tags error:", error);
+      }
     });
   } catch {
     return () => {};

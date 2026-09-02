@@ -124,7 +124,7 @@ export const AccessibleTextarea = forwardRef<HTMLTextAreaElement, AccessibleText
             minHeight: `${currentHeight}px`,
             height: `${currentHeight}px`,
           }}
-          className={`w-full p-3 pr-10 pb-7 bg-zinc-900/90 border border-zinc-700/80 rounded-xl text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-cyan-500/90 focus:ring-1 focus:ring-cyan-500/50 text-sm leading-relaxed resize-y selection:bg-purple-900/50 transition-colors ${className}`}
+          className={`w-full p-3 pr-24 pb-7 bg-zinc-900/90 border border-zinc-700/80 rounded-t-xl rounded-b-none text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-cyan-500/90 focus:ring-1 focus:ring-cyan-500/50 text-sm leading-relaxed resize-y selection:bg-purple-900/50 transition-colors ${className}`}
           {...props}
         />
 
@@ -132,18 +132,66 @@ export const AccessibleTextarea = forwardRef<HTMLTextAreaElement, AccessibleText
         <div
           onMouseDown={handleResizeMouseDown}
           onTouchStart={handleResizeMouseDown}
-          onDoubleClick={() => setCurrentHeight((prev) => (prev > 240 ? defaultHeight : 360))}
-          title="Atalho de Redimensionamento: Arraste para ajustar a altura da caixa de texto (ou duplo clique para expandir/recolher)"
-          className="absolute bottom-2 right-2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#0e0a1c]/95 border border-cyan-500/70 hover:border-cyan-400 active:border-cyan-300 shadow-[0_0_10px_rgba(6,182,212,0.4)] hover:shadow-[0_0_16px_rgba(6,182,212,0.7)] cursor-ns-resize select-none z-10 transition-all hover:scale-105"
+          onDoubleClick={() => setCurrentHeight((prev) => (prev > 240 ? defaultHeight : 380))}
+          title="Atalho de Redimensionamento: Arraste para ajustar a altura da caixa de texto (ou duplo clique para alternar tamanho)"
+          className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-0.5 rounded bg-[#0e0a1c]/95 border border-cyan-500/80 hover:border-cyan-400 active:border-cyan-300 shadow-[0_0_10px_rgba(6,182,212,0.4)] hover:shadow-[0_0_16px_rgba(6,182,212,0.7)] cursor-ns-resize select-none z-10 transition-all hover:scale-105"
         >
-          <span className="text-[8px] font-mono font-bold text-cyan-300 tracking-tighter uppercase mr-0.5 hidden xs:inline">
-            Redimensionar
+          <span className="text-[9px] font-mono font-bold text-cyan-300 tracking-tight uppercase mr-0.5">
+            ⇕ Redimensionar
           </span>
           <div className="flex flex-col gap-0.5 items-end">
-            <div className="w-3.5 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-cyan-300 rounded-full" />
-            <div className="w-2.5 h-0.5 bg-gradient-to-r from-transparent via-purple-400 to-cyan-400 rounded-full" />
-            <div className="w-1.5 h-0.5 bg-cyan-400 rounded-full" />
+            <div className="w-3.5 h-0.5 bg-cyan-300 rounded-full" />
+            <div className="w-2.5 h-0.5 bg-cyan-400 rounded-full" />
+            <div className="w-1.5 h-0.5 bg-purple-400 rounded-full" />
           </div>
+        </div>
+      </div>
+
+      {/* Horizontal Drag Bar & Quick Presets */}
+      <div
+        onMouseDown={handleResizeMouseDown}
+        onTouchStart={handleResizeMouseDown}
+        onDoubleClick={() => setCurrentHeight((prev) => (prev > 240 ? defaultHeight : 380))}
+        title="Barra de Redimensionamento: Arraste para ajustar a altura ou escolha um preset"
+        className="w-full -mt-1.5 py-1 px-2.5 rounded-b-xl bg-zinc-950/90 border-x border-b border-zinc-700/80 hover:border-cyan-500/70 flex items-center justify-between gap-1.5 cursor-ns-resize select-none text-[9px] font-mono text-zinc-400 group transition-all"
+      >
+        <div className="flex items-center gap-1 text-cyan-400/80 group-hover:text-cyan-300">
+          <span className="font-bold">⠿</span>
+          <span className="uppercase text-[8px] tracking-wider">
+            Arraste ({currentHeight}px)
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setCurrentHeight(120);
+            }}
+            className="px-1.5 py-0.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+          >
+            120px
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setCurrentHeight(240);
+            }}
+            className="px-1.5 py-0.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+          >
+            240px
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setCurrentHeight(400);
+            }}
+            className="px-1.5 py-0.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+          >
+            400px
+          </button>
         </div>
       </div>
     </div>

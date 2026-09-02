@@ -112,20 +112,29 @@ export const CATEGORY_OPTIONS: CategoryOption[] = [
   {
     category: 'class',
     name: 'Classes',
-    badge: 'Classe Base',
-    description: 'Classes principais de Hecos, progressão de nível, dados de vida, perícias e proficiências.',
+    badge: 'Disciplinas & Conjuradores',
+    description: 'Classes de personagem completas com tabela de progressão de 1 a 20, perícia conjuradora e proficiências.',
     icon: Swords,
-    color: '#6366f1', // Indigo
-    suggestedTags: ['classe', 'combate', 'evolucao'],
+    color: '#6366f1', // Indigo / Azul-Índigo
+    suggestedTags: ['classe', 'combate', 'disciplina'],
+  },
+  {
+    category: 'archetype',
+    name: 'Arquétipos & Vocações',
+    badge: 'Dedicações & Vocações',
+    description: 'Arquétipos desbloqueados por quests/treinadores e Vocações com progressão linear (Níveis 1, 3, 6, 9, 12, 15, 18).',
+    icon: Layers,
+    color: '#8b5cf6', // Violet / Violeta
+    suggestedTags: ['arquetipo', 'vocacao', 'dedicacao'],
   },
   {
     category: 'spell',
     name: 'Feitiços',
-    badge: 'Tradições Arcanas',
-    description: 'Feitiços arcanos, divinos, ocultos e primais com tempo de conjuração e graus de sucesso.',
+    badge: 'Tradições Mágicas',
+    description: 'Feitiços das tradições Cinética, Etérea, Biológica, Abiótica e Omni com tempo de conjuração e graus de sucesso.',
     icon: Sparkles,
     color: '#ec4899', // Pink
-    suggestedTags: ['magia', 'spell', 'oculto'],
+    suggestedTags: ['magia', 'spell', 'cinetica', 'eterea'],
   },
   {
     category: 'item',
@@ -171,15 +180,6 @@ export const CATEGORY_OPTIONS: CategoryOption[] = [
     icon: Award,
     color: '#d97706', // Amber-Dark
     suggestedTags: ['talento', 'feat'],
-  },
-  {
-    category: 'archetype',
-    name: 'Vocação',
-    badge: 'Dedicação & Prestígio',
-    description: 'Vocações do cenário de Hecos, caminhos arcanos, ordens marciais e dedicações de prestígio.',
-    icon: Layers,
-    color: '#8b5cf6', // Violet
-    suggestedTags: ['vocacao', 'arquetipo', 'dedicacao'],
   },
   {
     category: 'session',
