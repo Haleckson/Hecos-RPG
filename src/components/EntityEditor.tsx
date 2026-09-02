@@ -230,17 +230,18 @@ export const EntityEditor: React.FC<EntityEditorProps> = ({
     const textAfterCursor = content.slice(textareaRef.current.selectionStart);
 
     const atIndex = textBeforeCursor.lastIndexOf('@');
+    const tag = `@[${selectedEntity.title}](${selectedEntity.id || selectedEntity.slug}) `;
     if (atIndex !== -1) {
       const newText =
         textBeforeCursor.slice(0, atIndex) +
-        `@${selectedEntity.slug || selectedEntity.id} ` +
+        tag +
         textAfterCursor;
       setContent(newText);
       setShowMentionMenu(false);
 
       setTimeout(() => {
         if (textareaRef.current) {
-          const nextPos = atIndex + (selectedEntity.slug || selectedEntity.id).length + 2;
+          const nextPos = atIndex + tag.length;
           textareaRef.current.focus();
           textareaRef.current.setSelectionRange(nextPos, nextPos);
         }

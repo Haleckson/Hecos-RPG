@@ -204,7 +204,7 @@ export const TimelineEraModal: React.FC<TimelineEraModalProps> = ({
               placeholder="Descreva o contexto geral, atmosfera e acontecimentos que definiram esta época..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-4 py-2.5 bg-zinc-900/90 border border-zinc-700/80 rounded-xl text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors text-sm resize-none"
+              className="w-full px-4 py-2.5 bg-zinc-900/90 border border-zinc-700/80 rounded-xl text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors text-sm resize-y"
             />
           </div>
 

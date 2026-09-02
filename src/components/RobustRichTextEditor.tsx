@@ -22,7 +22,6 @@ import {
   Edit3,
   Layers,
   AtSign,
-  Table as TableIcon,
   HelpCircle,
   X,
   User,
@@ -40,12 +39,17 @@ import {
   Scroll,
   History,
   Lock,
-  BookOpen
+  BookOpen,
+  Trash2,
+  Plus,
+  FileCode,
+  Check,
+  Copy
 } from 'lucide-react';
 import { entityIndexService, IndexedEntity, CATEGORY_CONFIG } from '../services/entityIndexService';
 import { ColorPickerMenu } from './ColorPickerMenu';
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
-import { renderContentWithMentions } from './MentionBadge';
+import { renderContentWithMentions, MentionBadge } from './MentionBadge';
 import { TraitBadge } from './TraitBadge';
 import { EntityCategory } from '../types';
 
@@ -64,6 +68,7 @@ export interface RobustRichTextEditorProps {
   onNavigate?: (id: string) => void;
   compact?: boolean;
   id?: string;
+  defaultViewMode?: 'visual' | 'code' | 'split' | 'preview';
 }
 
 // Icon resolver helper for mention items
@@ -90,11 +95,76 @@ const getCategoryIconComponent = (cat: EntityCategory) => {
   }
 };
 
+export interface ExtractedMention {
+  raw: string;
+  title: string;
+  idOrSlug: string;
+  type: 'bracket' | 'wikilink' | 'slug';
+}
+
+/**
+ * Extracts all active mentions from markdown/text:
+ * - @[Title](id)
+ * - [[Title]]
+ * - @slug
+ */
+export function extractMentions(text: string): ExtractedMention[] {
+  if (!text) return [];
+  const list: ExtractedMention[] = [];
+  const seenRaws = new Set<string>();
+
+  // 1. @[Title](id)
+  const bracketRegex = /@\[([^\]\n]+)\]\(([^)\n]+)\)/g;
+  let match;
+  while ((match = bracketRegex.exec(text)) !== null) {
+    if (!seenRaws.has(match[0])) {
+      seenRaws.add(match[0]);
+      list.push({
+        raw: match[0],
+        title: match[1],
+        idOrSlug: match[2],
+        type: 'bracket',
+      });
+    }
+  }
+
+  // 2. [[Title]]
+  const wikiRegex = /\[\[(?:trait:|tr:)?([^\]\n]+)\]\]/g;
+  while ((match = wikiRegex.exec(text)) !== null) {
+    if (!seenRaws.has(match[0]) && !match[0].toLowerCase().includes('trait:') && !match[0].toLowerCase().includes('tr:')) {
+      seenRaws.add(match[0]);
+      list.push({
+        raw: match[0],
+        title: match[1],
+        idOrSlug: match[1],
+        type: 'wikilink',
+      });
+    }
+  }
+
+  // 3. @slug (isolated word)
+  const slugRegex = /(?:^|\s)@([a-zA-Z0-9_-]+)(?=[^a-zA-Z0-9_-]|$)/g;
+  while ((match = slugRegex.exec(text)) !== null) {
+    const raw = `@${match[1]}`;
+    if (!seenRaws.has(raw)) {
+      seenRaws.add(raw);
+      list.push({
+        raw: raw,
+        title: match[1],
+        idOrSlug: match[1],
+        type: 'slug',
+      });
+    }
+  }
+
+  return list;
+}
+
 export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
   value,
   onChange,
-  placeholder = 'Escreva o conteúdo do artigo... Digite @ para indexar e linkar qualquer artigo do site.',
-  minHeight = '220px',
+  placeholder = 'Escreva o conteúdo do artigo... Digite @ para indexar e linkar qualquer artigo do site com badges visuais.',
+  minHeight = '280px',
   label,
   description,
   excludeEntityId,
@@ -104,24 +174,122 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
   onNavigate,
   compact = false,
   id,
+  defaultViewMode = 'visual',
 }) => {
-  const [viewMode, setViewMode] = useState<'edit' | 'split' | 'preview'>('edit');
+  const [viewMode, setViewMode] = useState<'visual' | 'code' | 'split' | 'preview'>(defaultViewMode);
   const [isColorMenuOpen, setIsColorMenuOpen] = useState(false);
+
+  // Dynamic Editor Height & Interactive Resizing for Entire Outer Container
+  const parsedMinHeight = parseInt(minHeight, 10) || 280;
+  const [editorHeight, setEditorHeight] = useState<number>(parsedMinHeight);
+  const isResizingRef = useRef(false);
+  const startYRef = useRef(0);
+  const startHeightRef = useRef(0);
+
+  // Dynamic Input Box Height (The interactive typing textarea where the user writes and types text)
+  const defaultInputBoxHeight = compact ? 130 : 200;
+  const [inputBoxHeight, setInputBoxHeight] = useState<number>(defaultInputBoxHeight);
+  const isResizingInputRef = useRef(false);
+  const startInputYRef = useRef(0);
+  const startInputHeightRef = useRef(0);
+
+  useEffect(() => {
+    const parsed = parseInt(minHeight, 10);
+    if (parsed && parsed > 0) {
+      setEditorHeight((prev) => Math.max(prev, parsed));
+    }
+  }, [minHeight]);
+
+  const handleResizeMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    isResizingRef.current = true;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    startYRef.current = clientY;
+    startHeightRef.current = editorHeight;
+
+    const handleMouseMove = (moveEvent: MouseEvent | TouchEvent) => {
+      if (!isResizingRef.current) return;
+      const currentY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : moveEvent.clientY;
+      const deltaY = currentY - startYRef.current;
+      const newH = Math.max(140, Math.min(1600, startHeightRef.current + deltaY));
+      setEditorHeight(newH);
+    };
+
+    const handleMouseUp = () => {
+      isResizingRef.current = false;
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('touchmove', handleMouseMove);
+      window.removeEventListener('touchend', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('touchmove', handleMouseMove, { passive: false });
+    window.addEventListener('touchend', handleMouseUp);
+  };
+
+  const handleInputResizeMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    isResizingInputRef.current = true;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    startInputYRef.current = clientY;
+    startInputHeightRef.current = inputBoxHeight;
+
+    const handleMouseMove = (moveEvent: MouseEvent | TouchEvent) => {
+      if (!isResizingInputRef.current) return;
+      const currentY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : moveEvent.clientY;
+      const deltaY = currentY - startInputYRef.current;
+      const newH = Math.max(90, Math.min(1000, startInputHeightRef.current + deltaY));
+      setInputBoxHeight(newH);
+    };
+
+    const handleMouseUp = () => {
+      isResizingInputRef.current = false;
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('touchmove', handleMouseMove);
+      window.removeEventListener('touchend', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('touchmove', handleMouseMove, { passive: false });
+    window.addEventListener('touchend', handleMouseUp);
+  };
+
+  const handleExpandHeight = () => {
+    setEditorHeight((prev) => Math.min(1600, prev + 120));
+  };
+
+  const handleShrinkHeight = () => {
+    setEditorHeight((prev) => Math.max(140, prev - 120));
+  };
+
+  const handleResetHeight = () => {
+    setEditorHeight(parsedMinHeight);
+  };
 
   // @ Mention auto-complete state
   const [showMentionMenu, setShowMentionMenu] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
   const [mentionResults, setMentionResults] = useState<IndexedEntity[]>([]);
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
-  const [mentionCursorPos, setMentionCursorPos] = useState<number | null>(null);
+  const [mentionTriggerType, setMentionTriggerType] = useState<'@' | '[['>('@');
 
   // Manual Mention Picker Modal state
   const [isMentionPickerModalOpen, setIsMentionPickerModalOpen] = useState(false);
   const [pickerSearchQuery, setPickerSearchQuery] = useState('');
   const [pickerSelectedCat, setPickerSelectedCat] = useState<string>('all');
+  const [insertionFormat, setInsertionFormat] = useState<'bracket' | 'wikilink'>('bracket');
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Extracted mentions in current content
+  const activeMentions = extractMentions(value);
 
   // Update mention query results instantly via indexed service
   useEffect(() => {
@@ -208,7 +376,7 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
     setIsColorMenuOpen(false);
   };
 
-  // Text Change detection for @
+  // Text Change detection for @ and [[
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     const pos = e.target.selectionStart;
@@ -216,28 +384,52 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
 
     const textBeforeCursor = val.slice(0, pos);
 
-    // Look for @ followed by any word characters before cursor
+    // 1. Look for @ followed by any word characters before cursor
     const atMatch = textBeforeCursor.match(/@([a-zA-Z0-9_\u00C0-\u00FF-]*)$/);
     if (atMatch && atMatch[1] !== undefined) {
+      setMentionTriggerType('@');
       setMentionQuery(atMatch[1]);
       setShowMentionMenu(true);
-      setMentionCursorPos(pos);
-    } else {
-      setShowMentionMenu(false);
-      setMentionCursorPos(null);
+      return;
     }
+
+    // 2. Look for [[ followed by any characters before cursor
+    const wikiMatch = textBeforeCursor.match(/\[\[([^\]\n]*)$/);
+    if (wikiMatch && wikiMatch[1] !== undefined) {
+      setMentionTriggerType('[[');
+      setMentionQuery(wikiMatch[1]);
+      setShowMentionMenu(true);
+      return;
+    }
+
+    setShowMentionMenu(false);
   };
 
-  // Insert a selected entity mention
+  // Remove a specific mention raw tag from the text
+  const handleRemoveMention = useCallback(
+    (rawTag: string) => {
+      const escaped = rawTag.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const regex = new RegExp(escaped, 'g');
+      const newText = value.replace(regex, '').replace(/[ ]{2,}/g, ' ');
+      onChange(newText);
+    },
+    [value, onChange]
+  );
+
+  // Insert a selected entity mention as @[Title](id) or [[Title]]
   const insertMentionEntity = useCallback(
-    (entity: IndexedEntity) => {
+    (entity: IndexedEntity, formatOverride?: 'bracket' | 'wikilink') => {
       const el = textareaRef.current;
-      const slugToUse = entity.slug || entity.id;
-      const mentionTag = `@${slugToUse} `;
+      const targetFormat = formatOverride || (mentionTriggerType === '[[' ? 'wikilink' : 'bracket');
+      
+      const mentionTag = targetFormat === 'wikilink'
+        ? `[[${entity.title}]] `
+        : `@[${entity.title}](${entity.id || entity.slug}) `;
 
       if (!el) {
-        onChange(value + ` ${mentionTag}`);
+        onChange(value + (value.endsWith(' ') || value.length === 0 ? '' : ' ') + mentionTag);
         setShowMentionMenu(false);
+        setIsMentionPickerModalOpen(false);
         return;
       }
 
@@ -245,14 +437,20 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
       const textBefore = value.slice(0, curPos);
       const textAfter = value.slice(curPos);
 
-      // Find the last @ index before the cursor
-      const atIndex = textBefore.lastIndexOf('@');
+      // Find trigger pos
+      let triggerIndex = -1;
+      if (mentionTriggerType === '[[') {
+        triggerIndex = textBefore.lastIndexOf('[[');
+      } else {
+        triggerIndex = textBefore.lastIndexOf('@');
+      }
+
       let newText = '';
       let targetPos = curPos;
 
-      if (atIndex !== -1) {
-        newText = textBefore.slice(0, atIndex) + mentionTag + textAfter;
-        targetPos = atIndex + mentionTag.length;
+      if (triggerIndex !== -1) {
+        newText = textBefore.slice(0, triggerIndex) + mentionTag + textAfter;
+        targetPos = triggerIndex + mentionTag.length;
       } else {
         newText = textBefore + mentionTag + textAfter;
         targetPos = curPos + mentionTag.length;
@@ -267,7 +465,7 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
         el.setSelectionRange(targetPos, targetPos);
       }, 30);
     },
-    [value, onChange]
+    [value, onChange, mentionTriggerType]
   );
 
   // Keyboard navigation for dropdown & shortcuts
@@ -275,7 +473,7 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
     const el = textareaRef.current;
     if (!el) return;
 
-    // Handle @ Mention menu navigation
+    // Handle @ / [[ Mention menu navigation
     if (showMentionMenu && mentionResults.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -360,24 +558,41 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
             {description && <span className="text-zinc-500 text-[11px] hidden sm:inline">• {description}</span>}
           </div>
 
-          {/* View Mode Toggle: Edit / Split / Preview */}
+          {/* View Mode Toggle: Visual Badges / Code / Split / Preview */}
           {showPreviewToggle && (
             <div className="flex items-center gap-1 bg-zinc-900/90 border border-zinc-800 p-0.5 rounded-lg text-[11px]">
               <button
                 type="button"
-                onClick={() => setViewMode('edit')}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-colors ${
-                  viewMode === 'edit'
-                    ? 'bg-purple-950 text-purple-300 font-semibold shadow-sm border border-purple-800/70'
+                onClick={() => setViewMode('visual')}
+                title="Editor Visual com Badges & Menções Interativas"
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-all ${
+                  viewMode === 'visual'
+                    ? 'bg-gradient-to-r from-purple-950 to-cyan-950 text-cyan-300 font-semibold shadow-sm border border-cyan-700/60'
                     : 'text-zinc-400 hover:text-zinc-200'
                 }`}
               >
-                <Edit3 className="w-3 h-3" />
-                <span>Editor</span>
+                <Sparkles className="w-3 h-3 text-cyan-400" />
+                <span>Visual (Badges)</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => setViewMode('code')}
+                title="Editor de Código Markdown Bruto"
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-colors ${
+                  viewMode === 'code'
+                    ? 'bg-zinc-800 text-zinc-200 font-semibold shadow-sm border border-zinc-700'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <FileCode className="w-3 h-3" />
+                <span>Markdown</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setViewMode('split')}
+                title="Visualização Dividida (Editor + Prévia)"
                 className={`hidden md:flex items-center gap-1 px-2.5 py-1 rounded-md transition-colors ${
                   viewMode === 'split'
                     ? 'bg-purple-950 text-purple-300 font-semibold shadow-sm border border-purple-800/70'
@@ -387,9 +602,11 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
                 <Columns className="w-3 h-3" />
                 <span>Dividido</span>
               </button>
+
               <button
                 type="button"
                 onClick={() => setViewMode('preview')}
+                title="Prévia do Conteúdo Renderizado"
                 className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-colors ${
                   viewMode === 'preview'
                     ? 'bg-purple-950 text-purple-300 font-semibold shadow-sm border border-purple-800/70'
@@ -589,11 +806,11 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
             <button
               type="button"
               onClick={() => setIsMentionPickerModalOpen(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-purple-950/80 to-cyan-950/80 hover:from-purple-900/90 hover:to-cyan-900/90 text-cyan-300 border border-cyan-700/60 text-xs font-semibold shadow-sm transition-all hover:scale-105 active:scale-95"
-              title="Indexar & Linkar Artigo do Site (@)"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-purple-950/90 to-cyan-950/90 hover:from-purple-900 hover:to-cyan-900 text-cyan-300 border border-cyan-500/60 text-xs font-semibold shadow-sm transition-all hover:scale-105 active:scale-95"
+              title="Indexar & Linkar Artigo com Badge Visual (@)"
             >
               <AtSign className="w-3.5 h-3.5 text-cyan-400" />
-              <span>@ Menção</span>
+              <span>@ Menção Badge</span>
             </button>
 
             {/* Trait snippet */}
@@ -609,31 +826,162 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
         </div>
       )}
 
-      {/* Editor Body: Edit Mode / Split View / Preview Mode */}
-      <div className="relative flex-1 flex flex-col md:flex-row" style={{ minHeight }}>
-        {/* TEXTAREA WRAPPER (Hidden in preview mode) */}
-        {viewMode !== 'preview' && (
-          <div className={`relative flex-1 flex flex-col ${viewMode === 'split' ? 'md:w-1/2 border-r border-zinc-800/80' : 'w-full'}`}>
-            <textarea
-              id={id}
-              ref={textareaRef}
-              value={value}
-              onChange={handleTextChange}
-              onKeyDown={handleKeyDown}
-              placeholder={placeholder}
-              className="w-full flex-1 p-4 bg-transparent text-zinc-100 placeholder-zinc-500 focus:outline-none font-mono text-sm leading-relaxed resize-none selection:bg-purple-900/50"
-              style={{ minHeight }}
-            />
+      {/* ACTIVE MENTIONS PILL BAR (Displays interactive pills directly on top of the editor) */}
+      {activeMentions.length > 0 && viewMode !== 'preview' && (
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0b0817] border-b border-zinc-800/80 overflow-x-auto text-xs">
+          <div className="flex items-center gap-1 text-[11px] font-bold text-zinc-400 uppercase tracking-wider shrink-0 mr-1">
+            <AtSign className="w-3 h-3 text-cyan-400" />
+            <span>Menções no Artigo ({activeMentions.length}):</span>
+          </div>
 
-            {/* ============================================================ */}
-            {/* FLOATING @ MENTION AUTOCOMPLETE DROPDOWN                     */}
-            {/* ============================================================ */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {activeMentions.map((m, idx) => (
+              <MentionBadge
+                key={`${m.raw}-${idx}`}
+                entityIdOrSlug={m.idOrSlug}
+                displayText={m.title}
+                onNavigate={onNavigate}
+                inEditor={true}
+                onRemove={() => handleRemoveMention(m.raw)}
+                className="text-xs"
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Editor Body: Visual Mode / Code Mode / Split View / Preview Mode */}
+      <div
+        className="relative flex-1 flex flex-col md:flex-row transition-[height] duration-75"
+        style={{ minHeight: `${editorHeight}px` }}
+      >
+        {/* ============================================================ */}
+        {/* VISUAL MODE WITH LIVE BADGES DIRECTLY IN EDITOR             */}
+        {/* ============================================================ */}
+        {viewMode === 'visual' && (
+          <div className="relative flex-1 flex flex-col w-full">
+            {/* Visual Live Interactive Editing Area */}
+            <div className="relative flex-1 flex flex-col">
+              {/* Backing Visual Badges Rendering Layer */}
+              <div
+                className="p-4 overflow-y-auto bg-transparent text-zinc-100 font-sans text-sm leading-relaxed"
+                style={{ minHeight: `${Math.max(120, editorHeight - 170)}px` }}
+              >
+                {value.trim() ? (
+                  <div className="space-y-3">
+                    <div className="text-zinc-200">
+                      {renderContentWithMentions(value, onNavigate, {
+                        inEditor: true,
+                        onRemoveMention: handleRemoveMention,
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-zinc-500 italic text-xs py-2">
+                    {placeholder}
+                  </div>
+                )}
+              </div>
+
+              {/* Direct Quick Input Bar with Autocomplete */}
+              <div className="p-3 bg-zinc-950/95 border-t border-zinc-800/80 flex flex-col gap-2">
+                {/* Header of Interactive Typing Area */}
+                <div className="flex items-center justify-between text-xs text-zinc-400">
+                  <div className="flex items-center gap-2">
+                    <span className="flex items-center gap-1.5 font-semibold text-zinc-200 text-xs">
+                      <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
+                      Caixa de Digitação Interativa
+                    </span>
+                    <span className="hidden sm:inline text-[11px] text-zinc-500">
+                      (digite <strong className="text-cyan-300 font-mono">@</strong> ou <strong className="text-purple-300 font-mono">[[</strong> para menções com badges)
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1 bg-zinc-900/90 border border-zinc-800 rounded-lg p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setInputBoxHeight((prev) => Math.max(90, prev - 80))}
+                      title="Diminuir altura da caixa de digitação (-80px)"
+                      className="px-1.5 py-0.5 rounded hover:bg-zinc-800 hover:text-white text-zinc-400 transition-colors text-[10px] font-mono font-bold"
+                    >
+                      -80px
+                    </button>
+                    <span className="text-zinc-600 text-[9px]">•</span>
+                    <button
+                      type="button"
+                      onClick={() => setInputBoxHeight((prev) => Math.min(1000, prev + 100))}
+                      title="Aumentar altura da caixa de digitação (+100px)"
+                      className="px-1.5 py-0.5 rounded hover:bg-cyan-950 hover:text-cyan-300 text-cyan-400 transition-colors text-[10px] font-mono font-bold"
+                    >
+                      +100px
+                    </button>
+                    <span className="text-zinc-600 text-[9px]">•</span>
+                    <button
+                      type="button"
+                      onClick={() => setInputBoxHeight(defaultInputBoxHeight)}
+                      title="Redefinir altura padrão da caixa de digitação"
+                      className="px-1.5 py-0.5 rounded hover:bg-zinc-800 hover:text-zinc-200 text-zinc-500 transition-colors text-[10px]"
+                    >
+                      Padrão
+                    </button>
+                  </div>
+                </div>
+
+                {/* Textarea container with prominent corner drag handle */}
+                <div className="relative group">
+                  <textarea
+                    id={id}
+                    ref={textareaRef}
+                    value={value}
+                    onChange={handleTextChange}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Digite aqui para editar texto ou digite @ ou [[ para inserir novas menções com badges..."
+                    style={{ minHeight: `${inputBoxHeight}px`, height: `${inputBoxHeight}px` }}
+                    className="w-full p-3.5 pr-12 pb-8 bg-zinc-900/95 border-2 border-zinc-700/80 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 rounded-xl text-zinc-100 placeholder-zinc-500 font-mono text-xs leading-relaxed resize-y selection:bg-purple-900/50 shadow-inner transition-colors"
+                  />
+
+                  {/* Accessible prominent corner drag handle right on the interactive typing box */}
+                  <div
+                    onMouseDown={handleInputResizeMouseDown}
+                    onTouchStart={handleInputResizeMouseDown}
+                    onDoubleClick={() => setInputBoxHeight((prev) => (prev > 260 ? defaultInputBoxHeight : 380))}
+                    title="Atalho de Redimensionamento: Arraste para ajustar a altura da caixa de digitação (ou duplo clique para expandir/recolher)"
+                    className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg bg-[#0e0a1c] border-2 border-cyan-500/80 hover:border-cyan-300 active:border-cyan-200 shadow-[0_0_12px_rgba(6,182,212,0.5)] hover:shadow-[0_0_20px_rgba(6,182,212,0.8)] cursor-ns-resize select-none z-10 transition-all hover:scale-105"
+                  >
+                    <span className="text-[9px] font-mono font-bold text-cyan-300 tracking-tighter uppercase mr-0.5">
+                      Redimensionar
+                    </span>
+                    <div className="flex flex-col gap-0.5 items-end">
+                      <div className="w-3.5 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-cyan-300 rounded-full" />
+                      <div className="w-2.5 h-0.5 bg-gradient-to-r from-transparent via-purple-400 to-cyan-400 rounded-full" />
+                      <div className="w-1.5 h-0.5 bg-cyan-400 rounded-full" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                    <span>Modo Visual: As menções <strong className="text-cyan-300">@[Nome](id)</strong> e <strong className="text-purple-300">[[Nome]]</strong> viram badges interativos automaticamente.</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsMentionPickerModalOpen(true)}
+                    className="px-2.5 py-1 rounded-lg bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-700/60 font-medium flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Adicionar Menção</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* FLOATING @ MENTION AUTOCOMPLETE DROPDOWN */}
             {showMentionMenu && (
               <div
                 ref={dropdownRef}
-                className="absolute left-4 top-3 z-[99999] w-88 sm:w-96 max-h-80 bg-[#0c0919]/98 border-2 border-cyan-400/90 rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.95),0_0_40px_rgba(6,182,212,0.45)] overflow-hidden flex flex-col backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-150 ring-2 ring-cyan-500/30"
+                className="absolute left-4 bottom-24 z-[99999] w-88 sm:w-96 max-h-80 bg-[#0c0919]/98 border-2 border-cyan-400/90 rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.95),0_0_40px_rgba(6,182,212,0.45)] overflow-hidden flex flex-col backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-150 ring-2 ring-cyan-500/30"
               >
-                {/* Dropdown Header */}
                 <div className="flex items-center justify-between px-3.5 py-2 bg-gradient-to-r from-cyan-950/90 via-purple-950/90 to-zinc-950 border-b border-zinc-800">
                   <div className="flex items-center gap-1.5">
                     <AtSign className="w-3.5 h-3.5 text-cyan-400" />
@@ -646,7 +994,6 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
                   </span>
                 </div>
 
-                {/* Dropdown Results List */}
                 <div className="p-1.5 overflow-y-auto max-h-60 space-y-1 divide-y divide-zinc-900">
                   {mentionResults.length === 0 ? (
                     <div className="p-4 text-center text-xs text-zinc-500">
@@ -669,7 +1016,6 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
                               : 'hover:bg-zinc-900/60 border border-transparent'
                           }`}
                         >
-                          {/* Category Icon */}
                           <div
                             className="p-1.5 rounded-lg shrink-0 mt-0.5 border shadow-inner"
                             style={{
@@ -680,21 +1026,18 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
                             <CatIcon className="w-3.5 h-3.5" style={{ color: entity.categoryColor }} />
                           </div>
 
-                          {/* Entity Info */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="text-xs font-bold text-zinc-100 truncate">
                                 {entity.title}
                               </span>
 
-                              {/* Category Badge */}
                               <span
                                 className={`px-1.5 py-0.2 rounded text-[9px] font-semibold uppercase tracking-wider border ${catConf?.bgClass || 'bg-zinc-800'} ${catConf?.textClass || 'text-zinc-300'} ${catConf?.borderClass || 'border-zinc-700'}`}
                               >
                                 {entity.categoryLabel}
                               </span>
 
-                              {/* Level or Rank Badge */}
                               {entity.levelOrRank && (
                                 <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-zinc-900 text-cyan-300 border border-zinc-700">
                                   {entity.levelOrRank}
@@ -702,13 +1045,8 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
                               )}
                             </div>
 
-                            {/* Subtitle or Tag line */}
                             {entity.subtitle ? (
                               <p className="text-[11px] text-zinc-400 truncate mt-0.5">{entity.subtitle}</p>
-                            ) : entity.tags && entity.tags.length > 0 ? (
-                              <p className="text-[10px] text-zinc-500 truncate mt-0.5">
-                                #{entity.tags.slice(0, 3).join(' #')}
-                              </p>
                             ) : (
                               <p className="text-[10px] text-zinc-500 font-mono truncate mt-0.5">
                                 @{entity.slug}
@@ -721,10 +1059,138 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
                   )}
                 </div>
 
-                {/* Dropdown Footer Shortcuts */}
                 <div className="px-3 py-1.5 bg-zinc-950 border-t border-zinc-900 flex items-center justify-between text-[10px] text-zinc-500 font-mono">
                   <span>↑↓ navegar</span>
-                  <span>ENTER / TAB para inserir</span>
+                  <span>ENTER / TAB para inserir Badge</span>
+                  <span>ESC fechar</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ============================================================ */}
+        {/* CODE / MARKDOWN & SPLIT TEXTAREA MODE                        */}
+        {/* ============================================================ */}
+        {(viewMode === 'code' || viewMode === 'split') && (
+          <div className={`relative flex-1 flex flex-col ${viewMode === 'split' ? 'md:w-1/2 border-r border-zinc-800/80' : 'w-full'}`}>
+            <div className="relative flex-1 flex flex-col">
+              <textarea
+                id={id}
+                ref={textareaRef}
+                value={value}
+                onChange={handleTextChange}
+                onKeyDown={handleKeyDown}
+                placeholder={placeholder}
+                className="w-full flex-1 p-4 pr-12 pb-9 bg-transparent text-zinc-100 placeholder-zinc-500 focus:outline-none font-mono text-sm leading-relaxed resize-y selection:bg-purple-900/50"
+                style={{ minHeight: `${editorHeight}px` }}
+              />
+
+              {/* Accessible corner drag handle on code editor */}
+              <div
+                onMouseDown={handleResizeMouseDown}
+                onTouchStart={handleResizeMouseDown}
+                onDoubleClick={() => setEditorHeight((prev) => (prev > 380 ? parsedMinHeight : 540))}
+                title="Atalho de Redimensionamento: Arraste para ajustar a altura do editor (ou duplo clique para expandir/recolher)"
+                className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg bg-[#0e0a1c] border-2 border-cyan-500/80 hover:border-cyan-300 active:border-cyan-200 shadow-[0_0_12px_rgba(6,182,212,0.5)] hover:shadow-[0_0_20px_rgba(6,182,212,0.8)] cursor-ns-resize select-none z-10 transition-all hover:scale-105"
+              >
+                <span className="text-[9px] font-mono font-bold text-cyan-300 tracking-tighter uppercase mr-0.5">
+                  Redimensionar
+                </span>
+                <div className="flex flex-col gap-0.5 items-end">
+                  <div className="w-3.5 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-cyan-300 rounded-full" />
+                  <div className="w-2.5 h-0.5 bg-gradient-to-r from-transparent via-purple-400 to-cyan-400 rounded-full" />
+                  <div className="w-1.5 h-0.5 bg-cyan-400 rounded-full" />
+                </div>
+              </div>
+            </div>
+
+            {/* FLOATING @ MENTION AUTOCOMPLETE DROPDOWN */}
+            {showMentionMenu && (
+              <div
+                ref={dropdownRef}
+                className="absolute left-4 top-3 z-[99999] w-88 sm:w-96 max-h-80 bg-[#0c0919]/98 border-2 border-cyan-400/90 rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.95),0_0_40px_rgba(6,182,212,0.45)] overflow-hidden flex flex-col backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-150 ring-2 ring-cyan-500/30"
+              >
+                <div className="flex items-center justify-between px-3.5 py-2 bg-gradient-to-r from-cyan-950/90 via-purple-950/90 to-zinc-950 border-b border-zinc-800">
+                  <div className="flex items-center gap-1.5">
+                    <AtSign className="w-3.5 h-3.5 text-cyan-400" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-cyan-200">
+                      Indexador de Artigos Hecos
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-zinc-400 font-mono">
+                    {mentionResults.length} {mentionResults.length === 1 ? 'resultado' : 'resultados'}
+                  </span>
+                </div>
+
+                <div className="p-1.5 overflow-y-auto max-h-60 space-y-1 divide-y divide-zinc-900">
+                  {mentionResults.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-zinc-500">
+                      Nenhum artigo encontrado para "<span className="text-cyan-400 font-semibold">{mentionQuery}</span>".
+                    </div>
+                  ) : (
+                    mentionResults.map((entity, idx) => {
+                      const isSelected = idx === selectedMentionIndex;
+                      const CatIcon = getCategoryIconComponent(entity.category);
+                      const catConf = CATEGORY_CONFIG[entity.category];
+
+                      return (
+                        <div
+                          key={entity.id}
+                          onClick={() => insertMentionEntity(entity)}
+                          onMouseEnter={() => setSelectedMentionIndex(idx)}
+                          className={`flex items-start gap-2.5 p-2 rounded-xl cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-gradient-to-r from-purple-950/90 to-cyan-950/90 border border-cyan-500/70 shadow-md ring-1 ring-cyan-500/30'
+                              : 'hover:bg-zinc-900/60 border border-transparent'
+                          }`}
+                        >
+                          <div
+                            className="p-1.5 rounded-lg shrink-0 mt-0.5 border shadow-inner"
+                            style={{
+                              backgroundColor: `${entity.categoryColor}25`,
+                              borderColor: `${entity.categoryColor}70`,
+                            }}
+                          >
+                            <CatIcon className="w-3.5 h-3.5" style={{ color: entity.categoryColor }} />
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs font-bold text-zinc-100 truncate">
+                                {entity.title}
+                              </span>
+
+                              <span
+                                className={`px-1.5 py-0.2 rounded text-[9px] font-semibold uppercase tracking-wider border ${catConf?.bgClass || 'bg-zinc-800'} ${catConf?.textClass || 'text-zinc-300'} ${catConf?.borderClass || 'border-zinc-700'}`}
+                              >
+                                {entity.categoryLabel}
+                              </span>
+
+                              {entity.levelOrRank && (
+                                <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-zinc-900 text-cyan-300 border border-zinc-700">
+                                  {entity.levelOrRank}
+                                </span>
+                              )}
+                            </div>
+
+                            {entity.subtitle ? (
+                              <p className="text-[11px] text-zinc-400 truncate mt-0.5">{entity.subtitle}</p>
+                            ) : (
+                              <p className="text-[10px] text-zinc-500 font-mono truncate mt-0.5">
+                                @{entity.slug}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                <div className="px-3 py-1.5 bg-zinc-950 border-t border-zinc-900 flex items-center justify-between text-[10px] text-zinc-500 font-mono">
+                  <span>↑↓ navegar</span>
+                  <span>ENTER / TAB para inserir Badge</span>
                   <span>ESC fechar</span>
                 </div>
               </div>
@@ -738,11 +1204,11 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
             className={`flex-1 p-5 overflow-y-auto bg-[#07050f]/80 ${
               viewMode === 'split' ? 'md:w-1/2' : 'w-full'
             }`}
-            style={{ minHeight }}
+            style={{ minHeight: `${editorHeight}px` }}
           >
             {value.trim() ? (
               <div className="prose prose-invert prose-purple max-w-none text-zinc-200 text-sm leading-relaxed">
-                {renderContentWithMentions(value, onNavigate || (() => {}))}
+                {renderContentWithMentions(value, onNavigate || (() => {}), { inEditor: false })}
               </div>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-zinc-600 text-xs italic p-8 text-center">
@@ -754,8 +1220,8 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
         )}
       </div>
 
-      {/* Editor Bottom Bar: Word Count & Help Hint */}
-      <div className="px-4 py-1.5 bg-zinc-950/90 border-t border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-500 font-mono">
+      {/* Editor Bottom Bar: Word Count, Height Adjusters & Accessible Resize Handle */}
+      <div className="px-3 sm:px-4 py-1.5 bg-zinc-950/95 border-t border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-500 font-mono select-none">
         <div className="flex items-center gap-2">
           <span>
             {wordsCount} {wordsCount === 1 ? 'palavra' : 'palavras'}
@@ -765,14 +1231,57 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
         </div>
 
         <div className="flex items-center gap-2 text-zinc-400">
-          <span className="hidden sm:inline">Dica: Digite <strong className="text-cyan-300">@nome</strong> para indexar qualquer artigo</span>
+          <div className="flex items-center gap-1 bg-zinc-900/90 border border-zinc-800 rounded-lg p-0.5">
+            <button
+              type="button"
+              onClick={handleShrinkHeight}
+              title="Diminuir altura da caixa de texto (-120px)"
+              className="px-1.5 py-0.5 rounded hover:bg-zinc-800 hover:text-white text-zinc-400 transition-colors text-[10px] font-bold"
+            >
+              -120px
+            </button>
+            <span className="text-zinc-600 text-[9px]">•</span>
+            <button
+              type="button"
+              onClick={handleExpandHeight}
+              title="Aumentar altura da caixa de texto (+120px)"
+              className="px-1.5 py-0.5 rounded hover:bg-cyan-950 hover:text-cyan-300 text-zinc-300 transition-colors text-[10px] font-bold"
+            >
+              +120px
+            </button>
+            <span className="text-zinc-600 text-[9px]">•</span>
+            <button
+              type="button"
+              onClick={handleResetHeight}
+              title="Redefinir altura padrão da caixa de texto"
+              className="px-1.5 py-0.5 rounded hover:bg-zinc-800 hover:text-zinc-200 text-zinc-500 transition-colors text-[10px]"
+            >
+              Padrão
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={() => setIsMentionPickerModalOpen(true)}
-            className="hover:text-cyan-300 underline transition-colors"
+            className="hidden sm:inline hover:text-cyan-300 underline transition-colors ml-1"
           >
             Explorar Artigos
           </button>
+
+          {/* Accessible Direct Corner Drag Handle */}
+          <div
+            onMouseDown={handleResizeMouseDown}
+            onTouchStart={handleResizeMouseDown}
+            onDoubleClick={() => setEditorHeight((prev) => (prev > 450 ? parsedMinHeight : 560))}
+            title="Atalho de Redimensionamento: Clique e arraste para redimensionar a altura da caixa de texto (ou duplo-clique para expandir/recolher)"
+            className="hecos-resize-handle group flex items-center justify-center p-1.5 -mr-1.5 rounded-md hover:bg-cyan-950/80 active:bg-cyan-900 border border-transparent hover:border-cyan-500/60 transition-all cursor-ns-resize"
+          >
+            <div className="flex flex-col gap-0.5 items-end opacity-75 group-hover:opacity-100 group-hover:scale-110 transition-all">
+              <div className="w-4 h-0.5 bg-gradient-to-r from-transparent via-purple-400 to-cyan-400 rounded-full shadow-[0_0_6px_rgba(6,182,212,0.8)]" />
+              <div className="w-3 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-cyan-300 rounded-full shadow-[0_0_6px_rgba(6,182,212,0.8)]" />
+              <div className="w-1.5 h-0.5 bg-cyan-400 rounded-full shadow-[0_0_6px_rgba(6,182,212,0.8)]" />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -796,7 +1305,7 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
                     Indexador Universal de Artigos Hecos
                   </h3>
                   <p className="text-xs text-zinc-400">
-                    Selecione qualquer artigo para inserir a @menção vinculada interativa
+                    Selecione qualquer artigo para inserir a menção com Badge/Pill visual interativo
                   </p>
                 </div>
               </div>
@@ -810,16 +1319,44 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
 
             {/* Search and Category Filter Header */}
             <div className="p-4 bg-zinc-950/80 border-b border-zinc-800/80 space-y-3">
-              <div className="relative">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-cyan-400" />
-                <input
-                  type="text"
-                  autoFocus
-                  placeholder="Buscar pelo nome do NPC, feitiço, item, local, perigo, criatura..."
-                  value={pickerSearchQuery}
-                  onChange={(e) => setPickerSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 bg-zinc-900/90 border border-zinc-700/80 rounded-xl text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors"
-                />
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-cyan-400" />
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="Buscar pelo nome do NPC, feitiço, item, local, perigo, criatura..."
+                    value={pickerSearchQuery}
+                    onChange={(e) => setPickerSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2.5 bg-zinc-900/90 border border-zinc-700/80 rounded-xl text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors"
+                  />
+                </div>
+
+                {/* Format selection */}
+                <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-0.5 text-[11px] shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setInsertionFormat('bracket')}
+                    className={`px-2.5 py-1.5 rounded-lg font-medium transition-all ${
+                      insertionFormat === 'bracket'
+                        ? 'bg-cyan-950 text-cyan-300 border border-cyan-700/60 font-semibold'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    @[Nome](id)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInsertionFormat('wikilink')}
+                    className={`px-2.5 py-1.5 rounded-lg font-medium transition-all ${
+                      insertionFormat === 'wikilink'
+                        ? 'bg-purple-950 text-purple-300 border border-purple-700/60 font-semibold'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    [[Nome]]
+                  </button>
+                </div>
               </div>
 
               {/* Category Filter Pills */}
@@ -866,7 +1403,7 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
                   return (
                     <div
                       key={entity.id}
-                      onClick={() => insertMentionEntity(entity)}
+                      onClick={() => insertMentionEntity(entity, insertionFormat)}
                       className="flex items-start gap-3 p-3 rounded-xl bg-zinc-900/50 hover:bg-zinc-800/80 border border-zinc-800 hover:border-cyan-500/70 shadow-sm hover:shadow-cyan-950/40 transition-all cursor-pointer group"
                     >
                       <div
@@ -909,7 +1446,7 @@ export const RobustRichTextEditor: React.FC<RobustRichTextEditorProps> = ({
 
             {/* Modal Footer */}
             <div className="px-6 py-3 bg-zinc-950 border-t border-zinc-800/80 flex items-center justify-between text-xs text-zinc-400">
-              <span>Clique em qualquer artigo para inserir `@slug` automaticamente.</span>
+              <span>Clique no artigo para inserir como badge visual interativo.</span>
               <button
                 type="button"
                 onClick={() => setIsMentionPickerModalOpen(false)}

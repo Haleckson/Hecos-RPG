@@ -1,47 +1,72 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { HecosEntity } from '../types';
 import { HecosStorage } from '../services/storage';
-import { Skull, Sparkles, Gem, Compass, User, Users, Lock, BookOpen, ExternalLink, Shield } from 'lucide-react';
+import { entityIndexService } from '../services/entityIndexService';
+import { Skull, Sparkles, Gem, Compass, User, Users, Lock, BookOpen, ExternalLink, Shield, Trash2, Check, Copy } from 'lucide-react';
 import { PF2eActionGlyph, ActionGlyphType } from './PF2eActionGlyph';
 import { Tooltip } from './Tooltip';
 import { PerilTooltipCard } from './PerilTooltipCard';
+import { TraitBadge } from './TraitBadge';
 
-interface MentionBadgeProps {
+export interface MentionBadgeProps {
   entityIdOrSlug: string;
-  onNavigate: (entityId: string) => void;
+  onNavigate?: (entityId: string) => void;
   displayText?: string;
+  onRemove?: () => void;
+  inEditor?: boolean;
+  className?: string;
 }
 
-export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNavigate, displayText }) => {
-  const cleanSlug = String(entityIdOrSlug || '').replace(/^@/, '').toLowerCase().trim();
+export const MentionBadge: React.FC<MentionBadgeProps> = ({
+  entityIdOrSlug,
+  onNavigate,
+  displayText,
+  onRemove,
+  inEditor = false,
+  className = '',
+}) => {
+  const [copied, setCopied] = useState(false);
+  const cleanIdOrSlug = String(entityIdOrSlug || '').replace(/^@/, '').trim();
+  const cleanSlugLower = cleanIdOrSlug.toLowerCase();
   const allEntities = HecosStorage.getEntities();
   
   // Match by id, slug, or title
-  const entity = allEntities.find(
-    e => (e.id || '').toLowerCase() === cleanSlug ||
-         (e.slug || '').toLowerCase() === cleanSlug ||
-         (e.title || '').toLowerCase() === cleanSlug ||
-         (e.title || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') === cleanSlug
+  let entity = allEntities.find(
+    e => (e.id || '').toLowerCase() === cleanSlugLower ||
+         (e.slug || '').toLowerCase() === cleanSlugLower ||
+         (e.title || '').toLowerCase() === cleanSlugLower ||
+         (e.title || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') === cleanSlugLower
   );
 
+  // Fallback to indexed search
   if (!entity) {
-    return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 text-sm font-medium">
-        @{displayText || entityIdOrSlug}
-      </span>
-    );
+    const indexed = entityIndexService.findBySlugOrTitle(cleanIdOrSlug) || (displayText ? entityIndexService.findBySlugOrTitle(displayText) : undefined);
+    if (indexed) {
+      entity = allEntities.find(e => e.id === indexed.id) || {
+        id: indexed.id,
+        slug: indexed.slug,
+        title: indexed.title,
+        category: indexed.category,
+        subtitle: indexed.subtitle,
+        summary: indexed.summary,
+        tags: indexed.tags,
+        icon: indexed.icon,
+        isSecret: indexed.isSecret,
+      } as HecosEntity;
+    }
   }
 
   // Category styling
-  const isCiano = ['pc', 'spell', 'ancestry', 'rule'].includes(entity.category);
-  const isMalva = ['npc', 'item', 'flora', 'class', 'feat', 'timeline'].includes(entity.category);
-  const isBordo = ['creature', 'fauna', 'organization', 'gm_note', 'archetype', 'session', 'peril'].includes(entity.category);
+  const category = entity?.category || 'rule';
+  const isCiano = ['pc', 'spell', 'ancestry', 'rule'].includes(category);
+  const isMalva = ['npc', 'item', 'flora', 'class', 'feat', 'timeline'].includes(category);
+  const isBordo = ['creature', 'fauna', 'organization', 'gm_note', 'archetype', 'session', 'peril'].includes(category);
 
   const themeClasses = isCiano
-    ? 'bg-cyan-950/40 text-cyan-300 border-cyan-500/40 hover:bg-cyan-900/60 hover:border-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.15)]'
+    ? 'bg-cyan-950/60 text-cyan-300 border-cyan-500/50 hover:bg-cyan-900/70 hover:border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.18)]'
     : isMalva
-    ? 'bg-purple-950/40 text-purple-300 border-purple-500/40 hover:bg-purple-900/60 hover:border-purple-400 shadow-[0_0_8px_rgba(184,119,219,0.15)]'
-    : 'bg-rose-950/40 text-rose-300 border-rose-600/40 hover:bg-rose-900/60 hover:border-rose-500 shadow-[0_0_8px_rgba(190,18,60,0.15)]';
+    ? 'bg-purple-950/60 text-purple-300 border-purple-500/50 hover:bg-purple-900/70 hover:border-purple-400 shadow-[0_0_10px_rgba(184,119,219,0.18)]'
+    : 'bg-rose-950/60 text-rose-300 border-rose-600/50 hover:bg-rose-900/70 hover:border-rose-500 shadow-[0_0_10px_rgba(190,18,60,0.18)]';
 
   const getEntityIcon = (cat: string) => {
     switch (cat) {
@@ -52,6 +77,7 @@ export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNa
       case 'location': return <Compass className="w-3.5 h-3.5" />;
       case 'pc': return <Users className="w-3.5 h-3.5" />;
       case 'npc': return <User className="w-3.5 h-3.5" />;
+      case 'organization': return <Shield className="w-3.5 h-3.5" />;
       case 'gm_note': return <Lock className="w-3.5 h-3.5" />;
       default: return <BookOpen className="w-3.5 h-3.5" />;
     }
@@ -68,7 +94,44 @@ export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNa
         })
       );
     }
+    if (onNavigate && entity?.id) {
+      onNavigate(entity.id);
+    }
   };
+
+  const handleCopyLink = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const tag = entity ? `@[${entity.title}](${entity.id})` : `@[${displayText || cleanIdOrSlug}](${cleanIdOrSlug})`;
+    navigator.clipboard.writeText(tag);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const titleToShow = displayText || entity?.title || cleanIdOrSlug;
+
+  if (!entity) {
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 my-0.5 rounded-md bg-zinc-900/90 border border-zinc-700/80 text-zinc-300 text-xs sm:text-sm font-medium ${className}`}>
+        <span className="text-cyan-400 font-bold text-xs">@</span>
+        <span>{titleToShow}</span>
+        {onRemove && inEditor && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRemove();
+            }}
+            title="Remover menção"
+            className="ml-1 p-0.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-rose-400 transition-colors"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        )}
+      </span>
+    );
+  }
 
   const badgeTrigger = (
     <span
@@ -81,11 +144,25 @@ export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNa
           handleBadgeClick(e as unknown as React.MouseEvent);
         }
       }}
-      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border font-medium text-xs sm:text-sm transition-all duration-150 cursor-pointer select-none ${themeClasses}`}
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 my-0.5 rounded-md border font-medium text-xs sm:text-sm transition-all duration-150 cursor-pointer select-none group/badge ${themeClasses} ${className}`}
     >
-      <span className="opacity-80">{getEntityIcon(entity.category)}</span>
-      <span>{displayText || entity.title}</span>
-      <ExternalLink className="w-3 h-3 opacity-60 ml-0.5" />
+      <span className="opacity-80 shrink-0">{getEntityIcon(entity.category)}</span>
+      <span className="truncate max-w-[220px]">{titleToShow}</span>
+      <ExternalLink className="w-3 h-3 opacity-60 ml-0.5 shrink-0 group-hover/badge:opacity-100 transition-opacity" />
+      {onRemove && inEditor && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onRemove();
+          }}
+          title="Remover menção"
+          className="ml-0.5 p-0.5 hover:bg-black/40 rounded text-zinc-400 hover:text-rose-300 transition-colors"
+        >
+          <Trash2 className="w-3 h-3" />
+        </button>
+      )}
     </span>
   );
 
@@ -94,7 +171,7 @@ export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNa
     return (
       <Tooltip
         as="span"
-        content={<PerilTooltipCard peril={entity} onSelectEntity={onNavigate} />}
+        content={<PerilTooltipCard peril={entity} onSelectEntity={onNavigate || (() => {})} />}
         placement="top"
         delay={160}
       >
@@ -168,14 +245,38 @@ export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNa
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={handleBadgeClick}
-        className="w-full mt-3 py-1.5 px-2.5 text-xs font-semibold text-center rounded-lg bg-zinc-800 hover:bg-cyan-950 hover:text-cyan-200 border border-zinc-700 hover:border-cyan-500/50 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-      >
-        <span>Ver Artigo Completo no Painel</span>
-        <ExternalLink className="w-3.5 h-3.5 text-cyan-400" />
-      </button>
+      <div className="flex items-center gap-2 mt-3 pt-2 border-t border-zinc-800/80">
+        <button
+          type="button"
+          onClick={handleBadgeClick}
+          className="flex-1 py-1.5 px-2.5 text-xs font-semibold text-center rounded-lg bg-zinc-800 hover:bg-cyan-950 hover:text-cyan-200 border border-zinc-700 hover:border-cyan-500/50 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+        >
+          <span>Abrir Painel Lateral</span>
+          <ExternalLink className="w-3.5 h-3.5 text-cyan-400" />
+        </button>
+        <button
+          type="button"
+          onClick={handleCopyLink}
+          title="Copiar tag de menção"
+          className="p-1.5 text-xs rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition-colors"
+        >
+          {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-zinc-400" />}
+        </button>
+        {onRemove && inEditor && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRemove();
+            }}
+            title="Remover menção do texto"
+            className="p-1.5 text-xs rounded-lg bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-800 transition-colors"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        )}
+      </div>
     </div>
   );
 
@@ -192,30 +293,26 @@ export const MentionBadge: React.FC<MentionBadgeProps> = ({ entityIdOrSlug, onNa
 };
 
 /**
- * Helper to parse inline markdown formatting (**bold**, *italic*, ~~strike~~, `code`, <tag>)
- */
-/**
  * Robust inline formatting parser for Markdown (**bold**, *italic*, ~~strike~~, ++underline++, `code`),
- * HTML tags (<span>, <mark>, <b>, <i>, <u>, <strong>, <em>, <font>), colors, traits, and action glyphs.
+ * HTML tags (<span>, <mark>, <b>, <i>, <u>, <strong>, <em>, <font>), colors, traits, action glyphs,
+ * and mentions ( @[Title](id), [[Title]], and @slug ).
  */
-function parseInlineFormatting(
+export function parseInlineFormatting(
   text: string,
-  onNavigate?: (entityId: string) => void
+  onNavigate?: (entityId: string) => void,
+  options?: { inEditor?: boolean; onRemoveMention?: (rawMatch: string) => void }
 ): React.ReactNode {
   if (!text) return null;
 
   // Unified inline token regex covering:
-  // 1. Action glyphs: [1-action], [2-actions], [3-actions], [free-action], [reaction], [1-acao], [2-acoes], etc.
-  // 2. Wikilinks/traits: [[trait:Name]] or [[Article Name]]
-  // 3. Trait shortcuts: [trait:Name] or [tr:Name]
-  // 4. Mentions: @slug
-  // 5. HTML tags: <p class="...">...</p>, <span style="...">...</span>, <mark>...</mark>, <b/i/u/strong/em/del/code>...
-  // 6. Markdown bold: **...** or __...__
-  // 7. Markdown underline: ++...++
-  // 8. Markdown strikethrough: ~~...~~
-  // 9. Markdown inline code: `...`
-  // 10. Markdown italic: *...* or _..._
-  const tokenRegex = /(<p\b[^>]*>[\s\S]*?<\/p>|<div\b[^>]*>[\s\S]*?<\/div>|<span[^>]*>[\s\S]*?<\/span>|<mark[^>]*>[\s\S]*?<\/mark>|<(?:b|strong|i|em|u|del|s|code|font)[^>]*>[\s\S]*?<\/(?:b|strong|i|em|u|del|s|code|font)>|<br\s*\/?>|<\/p>|<p\b[^>]*>|\[(?:1-action|2-actions|3-actions|1-to-2-actions|1-to-3-actions|one-action|two-actions|three-actions|one-to-two-actions|one-to-three-actions|free-action|reaction|1-acao|2-acoes|3-acoes|acao-livre|reacao|1|2|3|r|f)\]|\[\[(?:trait:|tr:)?[\s\S]+?\]\]|\[(?:trait:|tr:)[\s\S]+?\]|@[a-zA-Z0-9_-]+|\*\*(?:[^*]|\*(?!\*))+\*\*|__(?:[^_]|_(?!_))+__|(?:\+\+(?:[^+]|\+(?!\+))+\+\+)|~~(?:[^~]|~(?!~))+~~|`[^`]+`|\*(?:[^*\n])+\*|_(?:[^_\n])+_)/gi;
+  // 1. Action glyphs: [1-action], [2-actions], [3-actions], etc.
+  // 2. Mention markdown: @[Title](id) -> @\[[^\]\n]+\]\([^)\n]+\)
+  // 3. Wikilinks/traits: [[trait:Name]] or [[Article Name]]
+  // 4. Trait shortcuts: [trait:Name] or [tr:Name]
+  // 5. Short mentions: @slug
+  // 6. HTML tags
+  // 7. Markdown bold, underline, strikethrough, code, italic
+  const tokenRegex = /(<p\b[^>]*>[\s\S]*?<\/p>|<div\b[^>]*>[\s\S]*?<\/div>|<span[^>]*>[\s\S]*?<\/span>|<mark[^>]*>[\s\S]*?<\/mark>|<(?:b|strong|i|em|u|del|s|code|font)[^>]*>[\s\S]*?<\/(?:b|strong|i|em|u|del|s|code|font)>|<br\s*\/?>|<\/p>|<p\b[^>]*>|\[(?:1-action|2-actions|3-actions|1-to-2-actions|1-to-3-actions|one-action|two-actions|three-actions|one-to-two-actions|one-to-three-actions|free-action|reaction|1-acao|2-acoes|3-acoes|acao-livre|reacao|1|2|3|r|f)\]|@\[[^\]\n]+\]\([^)\n]+\)|\[\[(?:trait:|tr:)?[\s\S]+?\]\]|\[(?:trait:|tr:)[\s\S]+?\]|@[a-zA-Z0-9_-]+|\*\*(?:[^*]|\*(?!\*))+\*\*|__(?:[^_]|_(?!_))+__|(?:\+\+(?:[^+]|\+(?!\+))+\+\+)|~~(?:[^~]|~(?!~))+~~|`[^`]+`|\*(?:[^*\n])+\*|_(?:[^_\n])+_)/gi;
 
   const parts = text.split(tokenRegex);
 
@@ -230,8 +327,25 @@ function parseInlineFormatting(
       return null;
     }
 
-    // 1. PF2e Action Glyphs [1-action], [2-actions], etc.
-    if (part.startsWith('[') && part.endsWith(']')) {
+    // 1. Explicit mention format: @[Nome do Artigo](id_do_artigo)
+    const atBracketMatch = part.match(/^@\[([^\]]+)\]\(([^)]+)\)$/);
+    if (atBracketMatch) {
+      const displayText = atBracketMatch[1];
+      const entityIdOrSlug = atBracketMatch[2];
+      return (
+        <MentionBadge
+          key={idx}
+          entityIdOrSlug={entityIdOrSlug}
+          displayText={displayText}
+          onNavigate={onNavigate}
+          inEditor={options?.inEditor}
+          onRemove={options?.onRemoveMention ? () => options.onRemoveMention!(part) : undefined}
+        />
+      );
+    }
+
+    // 2. PF2e Action Glyphs [1-action], [2-actions], etc.
+    if (part.startsWith('[') && part.endsWith(']') && !part.startsWith('[[')) {
       const inner = part.slice(1, -1).trim().toLowerCase();
       
       let actionType: ActionGlyphType | null = null;
@@ -262,7 +376,7 @@ function parseInlineFormatting(
       }
     }
 
-    // 2. Wikilinks [[Article Name]] or [[trait:Name]]
+    // 3. Wikilinks [[Article Name]] or [[trait:Name]]
     if (part.startsWith('[[') && part.endsWith(']]')) {
       const inner = part.slice(2, -2).trim();
       if (inner.toLowerCase().startsWith('trait:') || inner.toLowerCase().startsWith('tr:')) {
@@ -273,35 +387,38 @@ function parseInlineFormatting(
           </span>
         );
       }
-      if (onNavigate) {
-        return <MentionBadge key={idx} entityIdOrSlug={inner} onNavigate={onNavigate} displayText={inner} />;
-      }
       return (
-        <span key={idx} className="font-semibold text-cyan-300 underline decoration-cyan-500/40">
-          {inner}
-        </span>
+        <MentionBadge
+          key={idx}
+          entityIdOrSlug={inner}
+          displayText={inner}
+          onNavigate={onNavigate}
+          inEditor={options?.inEditor}
+          onRemove={options?.onRemoveMention ? () => options.onRemoveMention!(part) : undefined}
+        />
       );
     }
 
-    // 3. Mentions @slug
-    if (part.startsWith('@') && part.length > 1) {
+    // 4. Short Mentions: @slug
+    if (part.startsWith('@') && part.length > 1 && !part.startsWith('@[') && !part.includes('(')) {
       const slug = part.substring(1);
-      if (onNavigate) {
-        return <MentionBadge key={idx} entityIdOrSlug={slug} onNavigate={onNavigate} />;
-      }
       return (
-        <span key={idx} className="font-semibold text-cyan-300">
-          @{slug}
-        </span>
+        <MentionBadge
+          key={idx}
+          entityIdOrSlug={slug}
+          onNavigate={onNavigate}
+          inEditor={options?.inEditor}
+          onRemove={options?.onRemoveMention ? () => options.onRemoveMention!(part) : undefined}
+        />
       );
     }
 
-    // 4. HTML tags (p, div, span with style, mark, u, b, strong, i, em, del, code, font)
+    // 5. HTML tags (p, div, span with style, mark, u, b, strong, i, em, del, code, font)
     if (/^<(p|div|span|mark|b|strong|i|em|u|del|s|code|font)[^>]*>[\s\S]*<\/\1>$/i.test(part)) {
       return <span key={idx} dangerouslySetInnerHTML={{ __html: part }} />;
     }
 
-    // 5. Markdown Bold: **text** or __text__
+    // 6. Markdown Bold: **text** or __text__
     if (
       (part.startsWith('**') && part.endsWith('**') && part.length >= 4) ||
       (part.startsWith('__') && part.endsWith('__') && part.length >= 4)
@@ -309,32 +426,32 @@ function parseInlineFormatting(
       const inner = part.slice(2, -2);
       return (
         <strong key={idx} className="font-bold text-zinc-100 drop-shadow-sm">
-          {parseInlineFormatting(inner, onNavigate)}
+          {parseInlineFormatting(inner, onNavigate, options)}
         </strong>
       );
     }
 
-    // 6. Markdown Underline: ++text++
+    // 7. Markdown Underline: ++text++
     if (part.startsWith('++') && part.endsWith('++') && part.length >= 4) {
       const inner = part.slice(2, -2);
       return (
         <u key={idx} className="underline decoration-zinc-400 decoration-1 underline-offset-2">
-          {parseInlineFormatting(inner, onNavigate)}
+          {parseInlineFormatting(inner, onNavigate, options)}
         </u>
       );
     }
 
-    // 7. Markdown Strikethrough: ~~text~~
+    // 8. Markdown Strikethrough: ~~text~~
     if (part.startsWith('~~') && part.endsWith('~~') && part.length >= 4) {
       const inner = part.slice(2, -2);
       return (
         <del key={idx} className="line-through text-zinc-500">
-          {parseInlineFormatting(inner, onNavigate)}
+          {parseInlineFormatting(inner, onNavigate, options)}
         </del>
       );
     }
 
-    // 8. Markdown Inline Code: `text`
+    // 9. Markdown Inline Code: `text`
     if (part.startsWith('`') && part.endsWith('`') && part.length >= 2) {
       const inner = part.slice(1, -1);
       return (
@@ -347,7 +464,7 @@ function parseInlineFormatting(
       );
     }
 
-    // 9. Markdown Italic: *text* or _text_
+    // 10. Markdown Italic: *text* or _text_
     if (
       (part.startsWith('*') && part.endsWith('*') && part.length >= 2) ||
       (part.startsWith('_') && part.endsWith('_') && part.length >= 2)
@@ -355,7 +472,7 @@ function parseInlineFormatting(
       const inner = part.slice(1, -1);
       return (
         <em key={idx} className="italic text-zinc-300">
-          {parseInlineFormatting(inner, onNavigate)}
+          {parseInlineFormatting(inner, onNavigate, options)}
         </em>
       );
     }
@@ -364,15 +481,14 @@ function parseInlineFormatting(
   });
 }
 
-import { TraitBadge } from './TraitBadge';
-
 /**
- * Parser that formats markdown, @slug, [[slug]], [trait:Nome], HTML blocks, and [action] glyphs in text
+ * Parser that formats markdown, @[Title](id), [[slug]], @slug, [trait:Nome], HTML blocks, and [action] glyphs in text
  */
 export function renderContentWithMentions(
   content: string,
-  onNavigate: (entityId: string) => void
+  onNavigate?: (entityId: string) => void,
+  options?: { inEditor?: boolean; onRemoveMention?: (rawMatch: string) => void }
 ): React.ReactNode {
   if (!content) return null;
-  return <>{parseInlineFormatting(content, onNavigate)}</>;
+  return <>{parseInlineFormatting(content, onNavigate, options)}</>;
 }

@@ -1245,7 +1245,7 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                   value={spellData.description}
                   onChange={(val) => setSpellData({ ...spellData, description: val })}
                   placeholder="Descreva o efeito mágico detalhado... Digite @ para buscar e linkar outros feitiços, regras, itens ou artigos."
-                  minHeight="180px"
+                  minHeight="340px"
                   compact={false}
                   showPreviewToggle={true}
                   excludeEntityId={entityToEdit?.id}
@@ -1313,7 +1313,7 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                     value={spellData.heightened || ''}
                     onChange={(val) => setSpellData({ ...spellData, heightened: val })}
                     placeholder="Ex: (+1) O dano aumenta em 1d6... (suporta @menção)"
-                    minHeight="100px"
+                    minHeight="150px"
                     compact={true}
                     showPreviewToggle={false}
                     excludeEntityId={entityToEdit?.id}
@@ -1328,7 +1328,7 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                     value={spellData.hecosLore || ''}
                     onChange={(val) => setSpellData({ ...spellData, hecosLore: val })}
                     placeholder="Histórico deste feitiço em Hecos... (suporta @menção)"
-                    minHeight="100px"
+                    minHeight="150px"
                     compact={true}
                     showPreviewToggle={false}
                     excludeEntityId={entityToEdit?.id}

@@ -355,10 +355,44 @@ export const RichTextBar: React.FC<RichTextBarProps> = ({
         type="button"
         onClick={() => insertText('\n---\n')}
         title="Divisor de Linha"
-        className="p-1 rounded hover:bg-purple-950/60 hover:text-purple-300 transition-colors text-zinc-400 ml-auto"
+        className="p-1 rounded hover:bg-purple-950/60 hover:text-purple-300 transition-colors text-zinc-400"
       >
         <Minus className="w-3.5 h-3.5" />
       </button>
+
+      {/* Quick Textarea Height Adjuster Shortcut */}
+      {textareaRef && (
+        <div className="ml-auto flex items-center gap-1 pl-1.5 border-l border-zinc-800 text-[10px] text-zinc-400">
+          <button
+            type="button"
+            onClick={() => {
+              const el = textareaRef.current;
+              if (el) {
+                const cur = el.clientHeight || 120;
+                el.style.height = `${Math.max(80, cur - 100)}px`;
+              }
+            }}
+            title="Diminuir altura da caixa de texto (-100px)"
+            className="px-1.5 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 hover:text-zinc-200 text-zinc-400 font-mono transition-colors"
+          >
+            -100px
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const el = textareaRef.current;
+              if (el) {
+                const cur = el.clientHeight || 120;
+                el.style.height = `${cur + 120}px`;
+              }
+            }}
+            title="Aumentar altura da caixa de texto (+120px)"
+            className="px-1.5 py-0.5 rounded bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 font-mono font-bold border border-cyan-800/40 transition-colors"
+          >
+            +120px
+          </button>
+        </div>
+      )}
     </div>
   );
 };

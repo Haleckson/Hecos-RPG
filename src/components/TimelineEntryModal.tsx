@@ -290,7 +290,7 @@ export const TimelineEntryModal: React.FC<TimelineEntryModalProps> = ({
               placeholder="Resumo de 1 a 2 frases para leitura rápida na timeline..."
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
-              className="w-full px-4 py-2 bg-zinc-900/90 border border-zinc-700/80 rounded-xl text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors text-sm resize-none"
+              className="w-full px-4 py-2 bg-zinc-900/90 border border-zinc-700/80 rounded-xl text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors text-sm resize-y"
             />
           </div>
 
