@@ -15,6 +15,8 @@ import { ColorPickerMenu } from './ColorPickerMenu';
 import { TraitInputCombobox } from './TraitInputCombobox';
 import { TraitBadge } from './TraitBadge';
 import { sortTraitsHierarchically } from '../utils/traitUtils';
+import { RobustRichTextEditor } from './RobustRichTextEditor';
+import { RichContentRenderer } from './RichContentRenderer';
 import {
   X,
   Sparkles,
@@ -1229,21 +1231,24 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                 </div>
               </div>
 
-              {/* Rich Description */}
+              {/* Rich Description with @ Mentions, Markdown, and PF2e Tooling */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-zinc-300">
                     Descrição & Efeitos da Magia <span className="text-rose-400">*</span>
                   </label>
-                  {renderRichToolbar('description', descRef)}
+                  <span className="text-[11px] text-cyan-400/90 font-mono">
+                    Dica: Digite <strong className="text-cyan-300">@</strong> para autocompletar e linkar artigos/magias/efeitos
+                  </span>
                 </div>
-                <textarea
-                  ref={descRef}
+                <RobustRichTextEditor
                   value={spellData.description}
-                  onChange={(e) => setSpellData({ ...spellData, description: e.target.value })}
-                  placeholder="Descreva o efeito mágico detalhado..."
-                  rows={6}
-                  className="w-full px-3.5 py-2.5 text-xs font-mono rounded-xl bg-zinc-900/90 border border-zinc-700/80 text-zinc-100 placeholder-zinc-500 outline-none focus:border-cyan-400 leading-relaxed shadow-inner"
+                  onChange={(val) => setSpellData({ ...spellData, description: val })}
+                  placeholder="Descreva o efeito mágico detalhado... Digite @ para buscar e linkar outros feitiços, regras, itens ou artigos."
+                  minHeight="180px"
+                  compact={false}
+                  showPreviewToggle={true}
+                  excludeEntityId={entityToEdit?.id}
                 />
               </div>
 
@@ -1261,7 +1266,7 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                       type="text"
                       value={spellData.criticalSuccess || ''}
                       onChange={(e) => setSpellData({ ...spellData, criticalSuccess: e.target.value })}
-                      placeholder="Efeito no sucesso crítico..."
+                      placeholder="Efeito no sucesso crítico... (suporta @menção)"
                       className="w-full px-3 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 outline-none focus:border-emerald-400"
                     />
                   </div>
@@ -1271,7 +1276,7 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                       type="text"
                       value={spellData.success || ''}
                       onChange={(e) => setSpellData({ ...spellData, success: e.target.value })}
-                      placeholder="Efeito no sucesso regular..."
+                      placeholder="Efeito no sucesso regular... (suporta @menção)"
                       className="w-full px-3 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 outline-none focus:border-cyan-400"
                     />
                   </div>
@@ -1281,7 +1286,7 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                       type="text"
                       value={spellData.failure || ''}
                       onChange={(e) => setSpellData({ ...spellData, failure: e.target.value })}
-                      placeholder="Efeito na falha..."
+                      placeholder="Efeito na falha... (suporta @menção)"
                       className="w-full px-3 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 outline-none focus:border-amber-400"
                     />
                   </div>
@@ -1291,46 +1296,42 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                       type="text"
                       value={spellData.criticalFailure || ''}
                       onChange={(e) => setSpellData({ ...spellData, criticalFailure: e.target.value })}
-                      placeholder="Efeito na falha crítica..."
+                      placeholder="Efeito na falha crítica... (suporta @menção)"
                       className="w-full px-3 py-1.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 outline-none focus:border-rose-400"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Heightened & Lore */}
+              {/* Heightened & Lore with RobustRichTextEditor */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-zinc-300">
-                      Intensificado (Heightened)
-                    </label>
-                    {renderRichToolbar('heightened', heightenedRef)}
-                  </div>
-                  <textarea
-                    ref={heightenedRef}
+                  <label className="text-xs font-bold text-zinc-300">
+                    Intensificado (Heightened)
+                  </label>
+                  <RobustRichTextEditor
                     value={spellData.heightened || ''}
-                    onChange={(e) => setSpellData({ ...spellData, heightened: e.target.value })}
-                    placeholder="Ex: (+1) O dano aumenta em 1d6..."
-                    rows={3}
-                    className="w-full px-3 py-2 text-xs font-mono rounded-xl bg-zinc-900 border border-zinc-700 text-zinc-200 outline-none focus:border-cyan-400"
+                    onChange={(val) => setSpellData({ ...spellData, heightened: val })}
+                    placeholder="Ex: (+1) O dano aumenta em 1d6... (suporta @menção)"
+                    minHeight="100px"
+                    compact={true}
+                    showPreviewToggle={false}
+                    excludeEntityId={entityToEdit?.id}
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-zinc-300">
-                      Origem & Lore de Hecos
-                    </label>
-                    {renderRichToolbar('hecosLore', loreRef)}
-                  </div>
-                  <textarea
-                    ref={loreRef}
+                  <label className="text-xs font-bold text-zinc-300">
+                    Origem & Lore de Hecos
+                  </label>
+                  <RobustRichTextEditor
                     value={spellData.hecosLore || ''}
-                    onChange={(e) => setSpellData({ ...spellData, hecosLore: e.target.value })}
-                    placeholder="Histórico deste feitiço em Hecos..."
-                    rows={3}
-                    className="w-full px-3 py-2 text-xs font-mono rounded-xl bg-zinc-900 border border-zinc-700 text-zinc-200 outline-none focus:border-cyan-400"
+                    onChange={(val) => setSpellData({ ...spellData, hecosLore: val })}
+                    placeholder="Histórico deste feitiço em Hecos... (suporta @menção)"
+                    minHeight="100px"
+                    compact={true}
+                    showPreviewToggle={false}
+                    excludeEntityId={entityToEdit?.id}
                   />
                 </div>
               </div>
@@ -1392,12 +1393,49 @@ export const SpellCreateModal: React.FC<SpellCreateModalProps> = ({
                 )}
               </div>
 
-              {/* Description preview */}
-              <div className="pt-3 border-t border-zinc-800/80 text-xs text-zinc-200 whitespace-pre-wrap font-sans leading-relaxed">
-                {spellData.description || (
+              {/* Description preview with full RichContentRenderer */}
+              <div className="pt-3 border-t border-zinc-800/80 text-xs sm:text-sm text-zinc-200 font-sans leading-relaxed">
+                {spellData.description ? (
+                  <RichContentRenderer content={spellData.description} />
+                ) : (
                   <span className="italic text-zinc-600">Nenhuma descrição informada.</span>
                 )}
               </div>
+
+              {/* Degrees of Success preview */}
+              {(spellData.criticalSuccess || spellData.success || spellData.failure || spellData.criticalFailure) && (
+                <div className="p-3 rounded-xl bg-black/40 border border-zinc-800 space-y-1.5 text-xs">
+                  <h4 className="font-bold text-cyan-300 uppercase tracking-wider text-[11px]">Graus de Sucesso:</h4>
+                  {spellData.criticalSuccess && (
+                    <div><strong className="text-emerald-400">Sucesso Crítico:</strong> <RichContentRenderer content={spellData.criticalSuccess} /></div>
+                  )}
+                  {spellData.success && (
+                    <div><strong className="text-cyan-400">Sucesso:</strong> <RichContentRenderer content={spellData.success} /></div>
+                  )}
+                  {spellData.failure && (
+                    <div><strong className="text-amber-400">Falha:</strong> <RichContentRenderer content={spellData.failure} /></div>
+                  )}
+                  {spellData.criticalFailure && (
+                    <div><strong className="text-rose-400">Falha Crítica:</strong> <RichContentRenderer content={spellData.criticalFailure} /></div>
+                  )}
+                </div>
+              )}
+
+              {/* Heightened preview */}
+              {spellData.heightened && (
+                <div className="p-3 rounded-xl bg-pink-950/30 border border-pink-700/40 text-xs space-y-1">
+                  <strong className="text-pink-300 font-bold uppercase tracking-wider text-[11px]">Intensificado:</strong>
+                  <RichContentRenderer content={spellData.heightened} />
+                </div>
+              )}
+
+              {/* Lore preview */}
+              {spellData.hecosLore && (
+                <div className="p-3 rounded-xl bg-purple-950/30 border border-purple-700/40 text-xs space-y-1">
+                  <strong className="text-purple-300 font-bold uppercase tracking-wider text-[11px]">Origem & Lore de Hecos:</strong>
+                  <RichContentRenderer content={spellData.hecosLore} />
+                </div>
+              )}
             </div>
           )}
         </div>

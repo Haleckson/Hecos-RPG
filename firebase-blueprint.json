@@ -1,0 +1,72 @@
+{
+  "entities": {
+    "Entity": {
+      "title": "Entity",
+      "description": "A core entity in Hecos Codex (Lore, NPC, PC, Spell, Item, Monster, Peril, etc.)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier" },
+        "title": { "type": "string", "description": "Display name" },
+        "category": { "type": "string", "description": "Entity category" },
+        "folder": { "type": "string", "description": "Folder / Path hierarchy" },
+        "content": { "type": "string", "description": "Markdown body content" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp of last update" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of creation" }
+      },
+      "required": ["id", "title", "category"]
+    },
+    "InteractiveMap": {
+      "title": "InteractiveMap",
+      "description": "Interactive map with pins, layers, and fog of war",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Map ID" },
+        "title": { "type": "string", "description": "Map title" },
+        "imageUrl": { "type": "string", "description": "Map image URL" },
+        "updatedAt": { "type": "string", "description": "Last update timestamp" }
+      },
+      "required": ["id", "title", "imageUrl"]
+    },
+    "TrashedEntity": {
+      "title": "TrashedEntity",
+      "description": "Entity moved to recycle bin / trash",
+      "type": "object",
+      "properties": {
+        "entity": { "$ref": "Entity", "description": "Original entity" },
+        "deletedAt": { "type": "string", "description": "Deletion timestamp" },
+        "deletedBy": { "type": "string", "description": "User who deleted" },
+        "originalCategory": { "type": "string", "description": "Original entity category" }
+      },
+      "required": ["entity", "deletedAt"]
+    },
+    "AmbianceTrack": {
+      "title": "AmbianceTrack",
+      "description": "Background music or ambient track",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Track ID" },
+        "title": { "type": "string", "description": "Track title" },
+        "youtubeUrl": { "type": "string", "description": "YouTube URL" }
+      },
+      "required": ["id", "title", "youtubeUrl"]
+    }
+  },
+  "firestore": {
+    "/hecos_entities/{entityId}": {
+      "schema": "Entity",
+      "description": "All campaign lore and game entities"
+    },
+    "/hecos_maps/{mapId}": {
+      "schema": "InteractiveMap",
+      "description": "Interactive maps and tactical pins"
+    },
+    "/hecos_youtube_tracks/{trackId}": {
+      "schema": "AmbianceTrack",
+      "description": "Ambiance and combat music tracks"
+    },
+    "/hecos_trash/{entityId}": {
+      "schema": "TrashedEntity",
+      "description": "Recycle bin items"
+    }
+  }
+}

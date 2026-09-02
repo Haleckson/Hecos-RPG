@@ -1,0 +1,74 @@
+{
+  "rules": {
+    "hecos_entities": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["type", "folder", "subCategory", "level", "name", "title"],
+      "$entity_id": {
+        ".validate": "!newData.exists() || newData.hasChildren(['id'])"
+      }
+    },
+    "hecos_deleted_entities": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_trash": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_maps": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_youtube_tracks": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_drive_resources": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_users": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_folder_permissions": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_image_adjustments": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_custom_traits": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_custom_tags": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_feat_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_spell_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_item_categories": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_public_folders": {
+      ".read": true,
+      ".write": true
+    },
+    "hecos_secret_folders": {
+      ".read": true,
+      ".write": true
+    },
+    ".read": false,
+    ".write": false
+  }
+}

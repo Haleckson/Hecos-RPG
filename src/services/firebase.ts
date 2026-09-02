@@ -1,6 +1,13 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
 import {
+  getAuth,
+  signInAnonymously,
+  onAuthStateChanged,
+  User,
+  Auth
+} from 'firebase/auth';
+import {
   getDatabase,
   ref,
   set,
@@ -26,10 +33,12 @@ export const firebaseConfig = {
 
 let app: any = null;
 let db: Database | null = null;
+let auth: Auth | null = null;
 let analytics: Analytics | null = null;
 let isFirebaseAvailable = false;
 
 export type FirebaseConnectionStatus = 'connected' | 'connecting' | 'offline' | 'error';
+export type FirebaseAuthStatus = 'authenticated' | 'anonymous' | 'unauthenticated' | 'error' | 'initializing';
 
 export interface ConnectionState {
   status: FirebaseConnectionStatus;
@@ -38,6 +47,9 @@ export interface ConnectionState {
   lastError: string | null;
   projectId?: string;
   databaseURL?: string;
+  authStatus: FirebaseAuthStatus;
+  authUid: string | null;
+  isAnonymous: boolean;
 }
 
 const connectionState: ConnectionState = {
@@ -46,7 +58,10 @@ const connectionState: ConnectionState = {
   lastSyncedAt: null,
   lastError: null,
   projectId: firebaseConfig.projectId,
-  databaseURL: firebaseConfig.databaseURL
+  databaseURL: firebaseConfig.databaseURL,
+  authStatus: 'initializing',
+  authUid: null,
+  isAnonymous: false
 };
 
 const statusListeners = new Set<(state: ConnectionState) => void>();
@@ -75,7 +90,7 @@ export function getFirebaseConnectionState(): ConnectionState {
 }
 
 /**
- * Initialize Firebase Realtime Database
+ * Initialize Firebase Realtime Database & Authentication
  */
 try {
   if (!getApps().length) {
@@ -87,6 +102,42 @@ try {
   // Initialize Realtime Database with explicit database URL
   db = getDatabase(app, firebaseConfig.databaseURL);
   isFirebaseAvailable = true;
+
+  // Initialize Auth
+  try {
+    auth = getAuth(app);
+    let isSigningIn = false;
+    onAuthStateChanged(auth, (user: User | null) => {
+      if (user) {
+        updateConnectionState({
+          authStatus: user.isAnonymous ? 'anonymous' : 'authenticated',
+          authUid: user.uid,
+          isAnonymous: user.isAnonymous
+        });
+      } else {
+        updateConnectionState({
+          authStatus: 'unauthenticated',
+          authUid: null,
+          isAnonymous: false
+        });
+        // Auto sign-in anonymously in the background so that security rules requiring `auth != null` succeed seamlessly
+        if (auth && !isSigningIn) {
+          isSigningIn = true;
+          signInAnonymously(auth)
+            .catch(() => {
+              updateConnectionState({
+                authStatus: 'unauthenticated'
+              });
+            })
+            .finally(() => {
+              isSigningIn = false;
+            });
+        }
+      }
+    });
+  } catch (_authErr) {
+    // Auth initialization fallback
+  }
 
   // Initialize Analytics if running in supported browser environment
   if (typeof window !== 'undefined') {
@@ -125,14 +176,16 @@ try {
   console.warn("Firebase RTDB initialization fallback to local-first mode:", error);
   isFirebaseAvailable = false;
   db = null;
+  auth = null;
   updateConnectionState({
     status: 'offline',
     isRealtimeActive: false,
-    lastError: error?.message || 'Realtime Database initialization failed'
+    lastError: error?.message || 'Realtime Database initialization failed',
+    authStatus: 'error'
   });
 }
 
-export { app, db, analytics, isFirebaseAvailable };
+export { app, db, auth, analytics, isFirebaseAvailable };
 
 /**
  * Convert any string key to a safe Firebase Realtime Database key.
@@ -277,8 +330,8 @@ export async function syncTrashToFirebase(trash: any[]): Promise<boolean> {
     const payload = cleanForFirebase(trash);
     await withTimeout(set(trashRef, payload), 15000);
     return true;
-  } catch (err) {
-    console.error("Error syncing trash to Firebase:", err);
+  } catch (err: any) {
+    console.warn("Sync trash to Firebase notice:", err?.message || err);
     return false;
   }
 }
@@ -300,8 +353,8 @@ export async function loadTrashFromFirebase(): Promise<any[] | null> {
       Object.values(val).forEach((t: any) => { if (t && t.entity && t.entity.id) list.push(t); });
     }
     return list;
-  } catch (err) {
-    console.error("Error loading trash from Firebase:", err);
+  } catch (err: any) {
+    console.warn("Load trash from Firebase notice:", err?.message || err);
     return null;
   }
 }
@@ -401,8 +454,8 @@ export async function syncFeatCategoriesToFirebase(config: Record<string, string
     const payload = cleanForFirebase(config);
     await withTimeout(set(categoriesRef, payload), 15000);
     return true;
-  } catch (err) {
-    console.error("Error syncing feat categories to Firebase:", err);
+  } catch (err: any) {
+    console.warn("Sync feat categories notice:", err?.message || err);
     return false;
   }
 }
@@ -444,8 +497,8 @@ export async function syncSpellCategoriesToFirebase(config: Record<string, strin
     const payload = cleanForFirebase(config);
     await withTimeout(set(categoriesRef, payload), 15000);
     return true;
-  } catch (err) {
-    console.error("Error syncing spell categories to Firebase:", err);
+  } catch (err: any) {
+    console.warn("Sync spell categories notice:", err?.message || err);
     return false;
   }
 }
@@ -488,8 +541,8 @@ export async function syncScopeCategoriesToFirebase(scope: string, config: Recor
     const payload = cleanForFirebase(config);
     await withTimeout(set(categoriesRef, payload), 15000);
     return true;
-  } catch (err) {
-    console.error(`Error syncing ${scope} categories to Firebase:`, err);
+  } catch (err: any) {
+    console.warn(`Sync ${scope} categories notice:`, err?.message || err);
     return false;
   }
 }
@@ -532,8 +585,8 @@ export async function syncPublicFoldersToFirebase(folders: string[]): Promise<bo
     const publicRef = ref(db, 'hecos_public_folders');
     await withTimeout(set(publicRef, folders), 15000);
     return true;
-  } catch (err) {
-    console.error("Error syncing public folders to Firebase:", err);
+  } catch (err: any) {
+    console.warn("Sync public folders notice:", err?.message || err);
     return false;
   }
 }
@@ -576,8 +629,8 @@ export async function syncSecretFoldersToFirebase(folders: string[]): Promise<bo
     const secretsRef = ref(db, 'hecos_secret_folders');
     await withTimeout(set(secretsRef, folders), 15000);
     return true;
-  } catch (err) {
-    console.error("Error syncing secret folders to Firebase:", err);
+  } catch (err: any) {
+    console.warn("Sync secret folders notice:", err?.message || err);
     return false;
   }
 }
@@ -614,7 +667,7 @@ export async function syncEntityToFirebase(entity: any): Promise<boolean> {
     });
     return true;
   } catch (err: any) {
-    console.error("Sync entity to Realtime Database error:", err?.message || err);
+    console.warn("Sync entity to Realtime Database notice:", err?.message || err);
     updateConnectionState({
       lastError: err?.message || 'Sync failed'
     });
@@ -636,10 +689,14 @@ export async function deleteEntityFromFirebase(entityId: string): Promise<boolea
     await withTimeout(remove(entityRef), 20000);
 
     // Record in deleted entities so other clients stay in sync
-    await set(deletedRef, {
-      id: entityId,
-      deletedAt: new Date().toISOString()
-    });
+    try {
+      await set(deletedRef, {
+        id: entityId,
+        deletedAt: new Date().toISOString()
+      });
+    } catch {
+      // ignore
+    }
 
     updateConnectionState({
       status: 'connected',
@@ -647,7 +704,7 @@ export async function deleteEntityFromFirebase(entityId: string): Promise<boolea
     });
     return true;
   } catch (err: any) {
-    console.error("Delete entity from RTDB error:", err?.message || err);
+    console.warn("Delete entity from RTDB notice:", err?.message || err);
     return false;
   }
 }
@@ -703,8 +760,8 @@ export async function syncMapToFirebase(mapData: any): Promise<boolean> {
     const payload = cleanForFirebase(mapData);
     await withTimeout(set(mapRef, payload), 15000);
     return true;
-  } catch (err) {
-    console.error("Error syncing map to Firebase:", err);
+  } catch (err: any) {
+    console.warn("Sync map to Firebase notice:", err?.message || err);
     return false;
   }
 }
@@ -719,8 +776,8 @@ export async function deleteMapFromFirebase(mapId: string): Promise<boolean> {
     const mapRef = ref(db, `hecos_maps/${safeKey}`);
     await withTimeout(remove(mapRef), 15000);
     return true;
-  } catch (err) {
-    console.error("Error deleting map from Firebase:", err);
+  } catch (err: any) {
+    console.warn("Delete map from Firebase notice:", err?.message || err);
     return false;
   }
 }
@@ -740,8 +797,8 @@ export async function syncAllMapsToFirebase(maps: any[]): Promise<boolean> {
     });
     await withTimeout(set(mapsRef, batch), 15000);
     return true;
-  } catch (err) {
-    console.error("Error syncing all maps to Firebase:", err);
+  } catch (err: any) {
+    console.warn("Sync all maps to Firebase notice:", err?.message || err);
     return false;
   }
 }
@@ -783,8 +840,8 @@ export async function syncTracksToFirebase(tracks: any[]): Promise<boolean> {
     });
     await withTimeout(set(tracksRef, batch), 15000);
     return true;
-  } catch (err) {
-    console.error("Error syncing tracks to Firebase:", err);
+  } catch (err: any) {
+    console.warn("Sync tracks to Firebase notice:", err?.message || err);
     return false;
   }
 }
@@ -848,8 +905,8 @@ export async function deleteTrackFromFirebase(trackId: string): Promise<boolean>
     const trackRef = ref(db, `hecos_youtube_tracks/${safeKey}`);
     await withTimeout(remove(trackRef), 15000);
     return true;
-  } catch (err) {
-    console.error("Error deleting track from Firebase:", err);
+  } catch (err: any) {
+    console.warn("Delete track from Firebase notice:", err?.message || err);
     return false;
   }
 }
@@ -869,8 +926,8 @@ export async function syncDriveResourcesToFirebase(resources: any[]): Promise<bo
     });
     await withTimeout(set(driveRef, batch), 15000);
     return true;
-  } catch (err) {
-    console.error("Error syncing drive resources to Firebase:", err);
+  } catch (err: any) {
+    console.warn("Sync drive resources to Firebase notice:", err?.message || err);
     return false;
   }
 }
@@ -934,8 +991,8 @@ export async function deleteDriveResourceFromFirebase(resourceId: string): Promi
     const resourceRef = ref(db, `hecos_drive_resources/${safeKey}`);
     await withTimeout(remove(resourceRef), 15000);
     return true;
-  } catch (err) {
-    console.error("Error deleting drive resource from Firebase:", err);
+  } catch (err: any) {
+    console.warn("Delete drive resource notice:", err?.message || err);
     return false;
   }
 }
@@ -950,8 +1007,8 @@ export async function deleteUserFromFirebase(userId: string): Promise<boolean> {
     const userRef = ref(db, `hecos_users/${safeKey}`);
     await withTimeout(remove(userRef), 15000);
     return true;
-  } catch (err) {
-    console.error("Error deleting user from Firebase:", err);
+  } catch (err: any) {
+    console.warn("Delete user notice:", err?.message || err);
     return false;
   }
 }
@@ -971,8 +1028,8 @@ export async function syncUsersToFirebase(users: any[]): Promise<boolean> {
     });
     await withTimeout(set(usersRef, batch), 15000);
     return true;
-  } catch (err) {
-    console.error("Error syncing users to Firebase:", err);
+  } catch (err: any) {
+    console.warn("Sync users notice:", err?.message || err);
     return false;
   }
 }
@@ -1033,8 +1090,8 @@ export async function syncFolderPermissionsToFirebase(permissions: Record<string
     const permsRef = ref(db, 'hecos_folder_permissions');
     await withTimeout(set(permsRef, cleanForFirebase(permissions)), 15000);
     return true;
-  } catch (err) {
-    console.error("Error syncing folder permissions to Firebase:", err);
+  } catch (err: any) {
+    console.warn("Sync folder permissions notice:", err?.message || err);
     return false;
   }
 }
@@ -1085,8 +1142,8 @@ export async function syncImageAdjustmentsToFirebase(adjustments: Record<string,
     }
     await withTimeout(set(adjRef, safeObj), 15000);
     return true;
-  } catch (err) {
-    console.error("Error syncing image adjustments to Firebase:", err);
+  } catch (err: any) {
+    console.warn("Sync image adjustments notice:", err?.message || err);
     return false;
   }
 }
@@ -1153,8 +1210,8 @@ export async function syncCustomTraitsToFirebase(traits: Record<string, any>): P
     }
     await withTimeout(set(traitsRef, safeObj), 15000);
     return true;
-  } catch (err) {
-    console.error("Error syncing custom traits to Firebase:", err);
+  } catch (err: any) {
+    console.warn("Sync custom traits notice:", err?.message || err);
     return false;
   }
 }
@@ -1221,8 +1278,8 @@ export async function syncCustomTagsToFirebase(tags: Record<string, any>): Promi
     }
     await withTimeout(set(tagsRef, safeObj), 15000);
     return true;
-  } catch (err) {
-    console.error("Error syncing custom tags to Firebase:", err);
+  } catch (err: any) {
+    console.warn("Sync custom tags notice:", err?.message || err);
     return false;
   }
 }
@@ -1337,3 +1394,64 @@ export async function seedDatabaseIfEmpty(
     return false;
   }
 }
+
+/**
+ * Diagnostic helper to test read and write permissions against current security rules
+ */
+export async function testRealtimeDatabasePermissions(): Promise<{
+  readOk: boolean;
+  writeOk: boolean;
+  latencyMs: number;
+  authUid: string | null;
+  message: string;
+}> {
+  if (!isFirebaseAvailable || !db) {
+    return {
+      readOk: false,
+      writeOk: false,
+      latencyMs: 0,
+      authUid: null,
+      message: 'Firebase Database não está inicializado no momento.'
+    };
+  }
+
+  const startTime = performance.now();
+  let readOk = false;
+  let writeOk = false;
+
+  try {
+    // 1. Test Read
+    const entitiesRef = ref(db, 'hecos_entities');
+    await withTimeout(get(entitiesRef), 10000);
+    readOk = true;
+
+    // 2. Test Write on test path
+    const testKey = `test_perm_${Date.now()}`;
+    const testRef = ref(db, `hecos_custom_tags/${testKey}`);
+    await withTimeout(set(testRef, { key: testKey, label: 'Teste de Permissão', test: true, timestamp: Date.now() }), 10000);
+    writeOk = true;
+
+    // Clean up test entry
+    await remove(testRef).catch(() => {});
+
+    const latency = Math.round(performance.now() - startTime);
+
+    return {
+      readOk: true,
+      writeOk: true,
+      latencyMs: latency,
+      authUid: connectionState.authUid,
+      message: 'Acesso de Leitura e Gravação 100% autorizado pelas Regras do Firebase!'
+    };
+  } catch (err: any) {
+    const latency = Math.round(performance.now() - startTime);
+    return {
+      readOk,
+      writeOk,
+      latencyMs: latency,
+      authUid: connectionState.authUid,
+      message: err?.message || 'Erro ao validar regras de segurança.'
+    };
+  }
+}
+
