@@ -1520,7 +1520,7 @@ export const ItemExplorer: React.FC<ItemExplorerProps> = ({
           }))}
           entities={itemEntities}
           initialCategoryId={activeCategory}
-          themeColor="purple"
+          themeColor="amber"
           onClose={() => {
             setIsFolderManagerOpen(false);
             refreshConfig();

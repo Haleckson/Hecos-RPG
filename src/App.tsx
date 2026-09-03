@@ -12,7 +12,7 @@ import {
   DrawerType,
 } from './types';
 import { HecosStorage } from './services/storage';
-import { CATEGORY_DEFINITIONS, CategoryDefinition, getCategoryMeta } from './utils/categories';
+import { CATEGORY_DEFINITIONS, CategoryDefinition, getCategoryMeta, getCategoryTheme } from './utils/categories';
 import { EntityView } from './components/EntityView';
 import { EntityEditor } from './components/EntityEditor';
 import { CommandPalette } from './components/CommandPalette';
@@ -1410,6 +1410,7 @@ export function App() {
                 const effectiveCatKey = currentEntity ? currentEntity.category : effectiveCategoryKey;
                 if (effectiveCatKey === 'codex' && !currentEntity) return null;
                 const catMeta = getCategoryMeta(effectiveCatKey);
+                const catTheme = getCategoryTheme(effectiveCatKey);
                 return (
                   <>
                     <span className="text-zinc-700 select-none">/</span>
@@ -1424,8 +1425,8 @@ export function App() {
                       }}
                       className={`font-bold transition-all hover:underline cursor-pointer px-1 py-0.5 rounded hover:bg-zinc-800/60 ${
                         !activeSubcategory && !selectedEntityId && !editingEntity
-                          ? 'text-cyan-300'
-                          : 'text-zinc-300 hover:text-cyan-300'
+                          ? catTheme.textAccent
+                          : 'text-zinc-300 hover:' + catTheme.textAccent
                       }`}
                       title={`Navegar para a categoria ${catMeta.name}`}
                     >
@@ -1466,24 +1467,27 @@ export function App() {
               })()}
 
               {/* Entity Level */}
-              {selectedEntityId && currentEntity && (
-                <>
-                  <span className="text-zinc-700 select-none">/</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingEntity(null);
-                      setActiveView('view');
-                    }}
-                    className={`font-bold truncate max-w-[150px] sm:max-w-[280px] hover:text-cyan-300 transition-colors cursor-pointer px-1 py-0.5 rounded hover:bg-zinc-800/60 ${
-                      !editingEntity ? 'text-cyan-200' : 'text-zinc-400'
-                    }`}
-                    title={`Visualizar ${currentEntity.title}`}
-                  >
-                    {currentEntity.title}
-                  </button>
-                </>
-              )}
+              {selectedEntityId && currentEntity && (() => {
+                const entTheme = getCategoryTheme(currentEntity.category);
+                return (
+                  <>
+                    <span className="text-zinc-700 select-none">/</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingEntity(null);
+                        setActiveView('view');
+                      }}
+                      className={`font-bold truncate max-w-[150px] sm:max-w-[280px] hover:${entTheme.textAccent} transition-colors cursor-pointer px-1 py-0.5 rounded hover:bg-zinc-800/60 ${
+                        !editingEntity ? entTheme.textAccent : 'text-zinc-400'
+                      }`}
+                      title={`Visualizar ${currentEntity.title}`}
+                    >
+                      {currentEntity.title}
+                    </button>
+                  </>
+                );
+              })()}
 
               {/* Special Views or Editing Level */}
               {editingEntity && (
@@ -1878,8 +1882,7 @@ export function App() {
                         </thead>
                         <tbody className="divide-y divide-zinc-800/60">
                           {sortedCategoryEntities.map((item) => {
-                            const isCiano = ['pc', 'spell', 'ancestry', 'rule'].includes(item.category);
-                            const isMalva = ['npc', 'item', 'flora', 'class', 'feat', 'timeline'].includes(item.category);
+                            const itemCatTheme = getCategoryTheme(item.category);
 
                             return (
                               <tr
@@ -1887,7 +1890,7 @@ export function App() {
                                 onClick={() => handleNavigateEntity(item.id)}
                                 className="hover:bg-zinc-900/50 transition-colors cursor-pointer group"
                               >
-                                <td className="py-2.5 px-4 font-bold text-zinc-200 group-hover:text-cyan-300 transition-colors">
+                                <td className={`py-2.5 px-4 font-bold text-zinc-200 group-hover:${itemCatTheme.textAccent} transition-colors`}>
                                   <div className="flex items-center gap-2">
                                     <span>{item.title}</span>
                                     {item.subtitle && (
@@ -1904,13 +1907,7 @@ export function App() {
                                 </td>
                                 <td className="py-2.5 px-3 text-zinc-400 font-mono text-[11px]">
                                   <span
-                                    className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded border ${
-                                      isCiano
-                                        ? 'bg-cyan-950 text-cyan-300 border-cyan-800'
-                                        : isMalva
-                                        ? 'bg-purple-950 text-purple-300 border-purple-800'
-                                        : 'bg-rose-950 text-rose-300 border-rose-800'
-                                    }`}
+                                    className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded border ${itemCatTheme.badgeBg} ${itemCatTheme.badgeText} ${itemCatTheme.badgeBorder}`}
                                   >
                                     {getCategoryMeta(item.category).name}
                                   </span>

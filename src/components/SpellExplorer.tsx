@@ -908,18 +908,18 @@ export function SpellExplorer({
     <div className="space-y-6 pb-12">
       {/* 1. Header Banner & Actions */}
       <div className="bg-[#09080e] p-6 rounded-2xl border border-zinc-800/80 shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-900/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-pink-900/15 rounded-full blur-3xl pointer-events-none" />
 
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
           <div>
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-cyan-950/60 border border-cyan-500/40 text-cyan-300">
+              <div className="p-2.5 rounded-xl bg-pink-950/60 border border-pink-500/40 text-pink-300">
                 <Sparkles className="w-6 h-6" />
               </div>
               <div>
                 <h1 className="text-2xl font-black text-zinc-100 flex items-center gap-2">
                   <span>Grimório de Feitiços & Rituais</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-950/80 text-cyan-300 border border-cyan-700/60 font-mono">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-pink-950/80 text-pink-300 border border-pink-700/60 font-mono">
                     {filteredSpells.length} {filteredSpells.length === 1 ? 'feitiço' : 'feitiços'}
                   </span>
                 </h1>
@@ -937,17 +937,17 @@ export function SpellExplorer({
                 <button
                   type="button"
                   onClick={() => setIsFolderManagerOpen(true)}
-                  className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-300 hover:text-cyan-300 text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-300 hover:text-pink-300 text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
                   title="Gerenciar estrutura de pastas e subcategorias"
                 >
-                  <Settings className="w-3.5 h-3.5 text-cyan-400" />
+                  <Settings className="w-3.5 h-3.5 text-pink-400" />
                   <span>Gerenciar Pastas</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setIsSpellCreateModalOpen(true)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-zinc-950 text-xs font-extrabold shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 text-zinc-950 text-xs font-extrabold shadow-[0_0_20px_rgba(236,72,153,0.3)] transition-all cursor-pointer"
                 >
                   <Plus className="w-4 h-4 stroke-[3]" />
                   <span>Novo Feitiço</span>
@@ -981,15 +981,15 @@ export function SpellExplorer({
                     }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                       isSelected
-                        ? 'bg-cyan-500 text-black shadow-md'
+                        ? 'bg-pink-500 text-zinc-950 shadow-md font-black'
                         : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/80'
                     }`}
                   >
-                    <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-black' : 'text-zinc-400'}`} />
+                    <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-zinc-950' : 'text-zinc-400'}`} />
                     <span>{cat.name}</span>
                     <span
                       className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
-                        isSelected ? 'bg-black text-cyan-300 font-bold' : 'bg-zinc-800 text-zinc-400'
+                        isSelected ? 'bg-black text-pink-300 font-bold' : 'bg-zinc-800 text-zinc-400'
                       }`}
                     >
                       {count}
@@ -1010,7 +1010,7 @@ export function SpellExplorer({
             {/* Quick Sort Icon-Only Button at Start */}
             <div className="relative shrink-0 flex items-center">
               <div
-                className="w-9 h-9 flex items-center justify-center rounded-xl bg-zinc-900/90 border border-zinc-800 hover:border-cyan-500/80 hover:bg-cyan-950/40 text-cyan-400 hover:text-cyan-200 transition-all cursor-pointer shadow-sm relative group/sort"
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-zinc-900/90 border border-zinc-800 hover:border-pink-500/80 hover:bg-pink-950/40 text-pink-400 hover:text-pink-200 transition-all cursor-pointer shadow-sm relative group/sort"
                 title={`Ordenar Feitiços (Ativo: ${
                   sortBy === 'recent-desc' || sortBy === 'recent'
                     ? 'Mais recente para o mais antigo'
@@ -1059,7 +1059,7 @@ export function SpellExplorer({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Buscar por nome, traço (Fogo, Mental), círculo, efeito..."
-                className="w-full bg-black/40 border border-zinc-800 focus:border-cyan-500 rounded-xl pl-10 pr-9 py-2 text-xs text-zinc-200 placeholder-zinc-500 outline-none transition-all"
+                className="w-full bg-black/40 border border-zinc-800 focus:border-pink-500 rounded-xl pl-10 pr-9 py-2 text-xs text-zinc-200 placeholder-zinc-500 outline-none transition-all"
               />
               {searchQuery && (
                 <button
@@ -1080,12 +1080,12 @@ export function SpellExplorer({
                   onClick={() => setIsFolderDropdownOpen(!isFolderDropdownOpen)}
                   className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                     activeSubcategory !== null
-                      ? 'bg-purple-950/70 border-purple-500/80 text-purple-200 shadow-sm'
+                      ? 'bg-pink-950/70 border-pink-500/80 text-pink-200 shadow-sm'
                       : 'bg-zinc-900/90 border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100'
                   }`}
                 >
                   <div className="flex items-center gap-2 truncate">
-                    <Folder className={`w-3.5 h-3.5 shrink-0 ${activeSubcategory ? 'text-purple-400' : 'text-zinc-400'}`} />
+                    <Folder className={`w-3.5 h-3.5 shrink-0 ${activeSubcategory ? 'text-pink-400' : 'text-zinc-400'}`} />
                     <span className="truncate">
                       {activeSubcategory === null
                         ? 'Todas as Pastas'
@@ -1147,12 +1147,12 @@ export function SpellExplorer({
                           }}
                           className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left ${
                             activeSubcategory === null
-                              ? 'bg-purple-950/80 text-purple-200 border border-purple-500/50'
+                              ? 'bg-pink-950/80 text-pink-200 border border-pink-500/50'
                               : 'text-zinc-300 hover:bg-zinc-900/90'
                           }`}
                         >
                           <div className="flex items-center gap-2">
-                            <Folder className="w-3.5 h-3.5 text-cyan-400" />
+                            <Folder className="w-3.5 h-3.5 text-pink-400" />
                             <span>Todas as Pastas</span>
                           </div>
                           <span className="text-[10px] font-mono text-zinc-400">
@@ -1169,7 +1169,7 @@ export function SpellExplorer({
                           }}
                           className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left ${
                             activeSubcategory === '__none__'
-                              ? 'bg-purple-950/80 text-purple-200 border border-purple-500/50'
+                              ? 'bg-pink-950/80 text-pink-200 border border-pink-500/50'
                               : 'text-zinc-400 hover:bg-zinc-900/90'
                           }`}
                         >
@@ -1203,12 +1203,12 @@ export function SpellExplorer({
                                 }}
                                 className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left ${
                                   isSelected
-                                    ? 'bg-purple-950/80 text-purple-200 border border-purple-500/50'
+                                    ? 'bg-pink-950/80 text-pink-200 border border-pink-500/50'
                                     : 'text-zinc-300 hover:bg-zinc-900/90'
                                 }`}
                               >
                                 <div className="flex items-center gap-2 truncate">
-                                  <Folder className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                                  <Folder className="w-3.5 h-3.5 text-pink-400 shrink-0" />
                                   <span className="truncate">{subcat}</span>
                                 </div>
                                 <span className="text-[10px] font-mono text-zinc-400 shrink-0 ml-1">
@@ -1236,7 +1236,7 @@ export function SpellExplorer({
                               setIsFolderDropdownOpen(false);
                               setIsFolderManagerOpen(true);
                             }}
-                            className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-950/60 hover:bg-purple-900/70 border border-purple-600/40 text-purple-300 text-xs font-bold transition-all cursor-pointer"
+                            className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-pink-950/60 hover:bg-pink-900/70 border border-pink-600/40 text-pink-300 text-xs font-bold transition-all cursor-pointer"
                           >
                             <FolderPlus className="w-3.5 h-3.5" />
                             <span>Gerenciar Pastas</span>
@@ -1258,7 +1258,7 @@ export function SpellExplorer({
               onChange={(e) => setFilterRank(e.target.value)}
               className={`bg-zinc-900/90 border rounded-xl px-2.5 py-2 text-xs font-semibold outline-none transition-all cursor-pointer ${
                 filterRank !== 'all'
-                  ? 'border-cyan-500/80 text-cyan-200 bg-cyan-950/40'
+                  ? 'border-pink-500/80 text-pink-200 bg-pink-950/40'
                   : 'border-zinc-800 text-zinc-300 hover:border-zinc-700'
               }`}
             >
@@ -1277,7 +1277,7 @@ export function SpellExplorer({
               onChange={(e) => setFilterTradition(e.target.value)}
               className={`bg-zinc-900/90 border rounded-xl px-2.5 py-2 text-xs font-semibold outline-none transition-all cursor-pointer ${
                 filterTradition !== 'all'
-                  ? 'border-cyan-500/80 text-cyan-200 bg-cyan-950/40'
+                  ? 'border-pink-500/80 text-pink-200 bg-pink-950/40'
                   : 'border-zinc-800 text-zinc-300 hover:border-zinc-700'
               }`}
             >
@@ -1295,14 +1295,14 @@ export function SpellExplorer({
               onClick={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                 isFilterPanelOpen || activeFiltersCount > 0
-                  ? 'bg-purple-950/60 border-purple-500/50 text-purple-200'
+                  ? 'bg-pink-950/60 border-pink-500/50 text-pink-200'
                   : 'bg-zinc-900/80 border-zinc-800 text-zinc-400 hover:text-zinc-200'
               }`}
             >
-              <SlidersHorizontal className="w-4 h-4 text-purple-400" />
+              <SlidersHorizontal className="w-4 h-4 text-pink-400" />
               <span className="hidden sm:inline">Mais Filtros</span>
               {activeFiltersCount > 0 && (
-                <span className="w-5 h-5 rounded-full bg-purple-500 text-zinc-950 font-bold text-[10px] flex items-center justify-center">
+                <span className="w-5 h-5 rounded-full bg-pink-500 text-zinc-950 font-bold text-[10px] flex items-center justify-center">
                   {activeFiltersCount}
                 </span>
               )}
@@ -1327,7 +1327,7 @@ export function SpellExplorer({
                 onClick={() => setViewMode('grid')}
                 className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
                   viewMode === 'grid'
-                    ? 'bg-cyan-500 text-black font-bold shadow-sm'
+                    ? 'bg-pink-500 text-zinc-950 font-bold shadow-sm'
                     : 'text-zinc-400 hover:text-zinc-200'
                 }`}
                 title="Visualização em Grade (Cards)"
@@ -1339,7 +1339,7 @@ export function SpellExplorer({
                 onClick={() => setViewMode('list')}
                 className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
                   viewMode === 'list'
-                    ? 'bg-cyan-500 text-black font-bold shadow-sm'
+                    ? 'bg-pink-500 text-zinc-950 font-bold shadow-sm'
                     : 'text-zinc-400 hover:text-zinc-200'
                 }`}
                 title="Visualização em Lista / Tabela"
@@ -1352,7 +1352,7 @@ export function SpellExplorer({
                   onClick={() => setViewMode('folders')}
                   className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
                     viewMode === 'folders'
-                      ? 'bg-cyan-500 text-black font-bold shadow-sm'
+                      ? 'bg-pink-500 text-zinc-950 font-bold shadow-sm'
                       : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                   title="Visualização em Árvore de Pastas (Exclusivo GM)"
@@ -1442,7 +1442,7 @@ export function SpellExplorer({
                   activeSubcategory || undefined
                 )
               }
-              className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-zinc-950 text-xs font-bold transition-colors cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-pink-600 hover:bg-pink-500 text-zinc-950 text-xs font-bold transition-colors cursor-pointer"
             >
               + Criar Feitiço
             </button>
@@ -1460,7 +1460,7 @@ export function SpellExplorer({
             return (
               <div
                 key={sp.id}
-                className="group/card bg-[#0e0c15] hover:bg-[#13101c] border border-zinc-800/80 hover:border-cyan-500/50 rounded-2xl p-5 transition-all shadow-md hover:shadow-[0_0_24px_rgba(6,182,212,0.15)] flex flex-col justify-between relative"
+                className="group/card bg-[#0e0c15] hover:bg-[#13101c] border border-zinc-800/80 hover:border-pink-500/50 rounded-2xl p-5 transition-all shadow-md hover:shadow-[0_0_24px_rgba(236,72,153,0.15)] flex flex-col justify-between relative"
               >
                 <div>
                   {/* Top Bar: Title, Action Glyph, Cast Time, Visibility */}
@@ -1478,19 +1478,19 @@ export function SpellExplorer({
                           className="text-left group/title focus:outline-none cursor-pointer block w-full"
                           title={`Abrir feitiço ${sp.title}`}
                         >
-                          <h3 className="text-base font-bold text-zinc-100 group-hover/title:text-cyan-300 transition-all flex items-center gap-2 group-hover/title:drop-shadow-[0_0_12px_rgba(6,182,212,0.85)]">
-                            <span className="group-hover/title:underline decoration-cyan-400/80 decoration-2 underline-offset-2 truncate">
+                          <h3 className="text-base font-bold text-zinc-100 group-hover/title:text-pink-300 transition-all flex items-center gap-2 group-hover/title:drop-shadow-[0_0_12px_rgba(236,72,153,0.85)]">
+                            <span className="group-hover/title:underline decoration-pink-400/80 decoration-2 underline-offset-2 truncate">
                               {sp.title}
                             </span>
                             {actionGlyph.show && (
                               <PF2eActionGlyph type={actionGlyph.type} size="sm" />
                             )}
                             {data.castTime && !actionGlyph.show && (
-                              <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700/80 text-cyan-300 font-mono shrink-0">
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700/80 text-pink-300 font-mono shrink-0">
                                 {data.castTime}
                               </span>
                             )}
-                            <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover/title:opacity-100 text-cyan-400 group-hover/title:translate-x-0.5 transition-all shrink-0 ml-auto" />
+                            <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover/title:opacity-100 text-pink-400 group-hover/title:translate-x-0.5 transition-all shrink-0 ml-auto" />
                           </h3>
                         </button>
                       </Tooltip>
@@ -1583,7 +1583,7 @@ export function SpellExplorer({
                           setManagingSpellFolders(sp);
                           setSelectedSpellSubcats(data.subcategories || []);
                         }}
-                        className="p-1 rounded text-zinc-500 hover:text-cyan-300 hover:bg-zinc-900 transition-colors cursor-pointer"
+                        className="p-1 rounded text-zinc-500 hover:text-pink-300 hover:bg-zinc-900 transition-colors cursor-pointer"
                         title="Organizar nas Pastas"
                       >
                         <FolderPlus className="w-3 h-3" />
@@ -1598,7 +1598,7 @@ export function SpellExplorer({
                         <button
                           type="button"
                           onClick={() => handleStartEditSpell(sp)}
-                          className="p-1.5 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 hover:border-cyan-500/50 text-zinc-400 hover:text-cyan-300 transition-colors cursor-pointer"
+                          className="p-1.5 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 hover:border-pink-500/50 text-zinc-400 hover:text-pink-300 transition-colors cursor-pointer"
                         >
                           <Edit className="w-3.5 h-3.5" />
                         </button>
@@ -1630,12 +1630,12 @@ export function SpellExplorer({
                     <button
                       type="button"
                       onClick={() => setSortBy(sortBy === 'name-asc' ? 'name-desc' : 'name-asc')}
-                      className="flex items-center gap-1.5 hover:text-cyan-300 transition-colors uppercase font-mono font-bold cursor-pointer"
+                      className="flex items-center gap-1.5 hover:text-pink-300 transition-colors uppercase font-mono font-bold cursor-pointer"
                       title="Ordenar por Nome"
                     >
                       <span>Nome do Feitiço</span>
-                      {sortBy === 'name-asc' && <ArrowUp className="w-3 h-3 text-cyan-400" />}
-                      {sortBy === 'name-desc' && <ArrowDown className="w-3 h-3 text-cyan-400" />}
+                      {sortBy === 'name-asc' && <ArrowUp className="w-3 h-3 text-pink-400" />}
+                      {sortBy === 'name-desc' && <ArrowDown className="w-3 h-3 text-pink-400" />}
                       {sortBy !== 'name-asc' && sortBy !== 'name-desc' && <ArrowUpDown className="w-3 h-3 opacity-40 hover:opacity-100" />}
                     </button>
                   </th>
@@ -1643,12 +1643,12 @@ export function SpellExplorer({
                     <button
                       type="button"
                       onClick={() => setSortBy(sortBy === 'rank-asc' ? 'rank-desc' : 'rank-asc')}
-                      className="flex items-center gap-1.5 hover:text-cyan-300 transition-colors uppercase font-mono font-bold cursor-pointer"
+                      className="flex items-center gap-1.5 hover:text-pink-300 transition-colors uppercase font-mono font-bold cursor-pointer"
                       title="Ordenar por Círculo"
                     >
                       <span>Círculo</span>
-                      {sortBy === 'rank-asc' && <ArrowUp className="w-3 h-3 text-cyan-400" />}
-                      {sortBy === 'rank-desc' && <ArrowDown className="w-3 h-3 text-cyan-400" />}
+                      {sortBy === 'rank-asc' && <ArrowUp className="w-3 h-3 text-pink-400" />}
+                      {sortBy === 'rank-desc' && <ArrowDown className="w-3 h-3 text-pink-400" />}
                       {sortBy !== 'rank-asc' && sortBy !== 'rank-desc' && <ArrowUpDown className="w-3 h-3 opacity-40 hover:opacity-100" />}
                     </button>
                   </th>
@@ -1656,26 +1656,26 @@ export function SpellExplorer({
                     <button
                       type="button"
                       onClick={() => setSortBy('tradition')}
-                      className={`flex items-center gap-1.5 hover:text-cyan-300 transition-colors uppercase font-mono font-bold cursor-pointer ${
-                        sortBy === 'tradition' ? 'text-cyan-300' : ''
+                      className={`flex items-center gap-1.5 hover:text-pink-300 transition-colors uppercase font-mono font-bold cursor-pointer ${
+                        sortBy === 'tradition' ? 'text-pink-300' : ''
                       }`}
                       title="Ordenar por Tradições"
                     >
                       <span>Tradições</span>
-                      {sortBy === 'tradition' ? <ArrowDown className="w-3 h-3 text-cyan-400" /> : <ArrowUpDown className="w-3 h-3 opacity-40 hover:opacity-100" />}
+                      {sortBy === 'tradition' ? <ArrowDown className="w-3 h-3 text-pink-400" /> : <ArrowUpDown className="w-3 h-3 opacity-40 hover:opacity-100" />}
                     </button>
                   </th>
                   <th className="py-3 px-3">
                     <button
                       type="button"
                       onClick={() => setSortBy('actions')}
-                      className={`flex items-center gap-1.5 hover:text-cyan-300 transition-colors uppercase font-mono font-bold cursor-pointer ${
-                        sortBy === 'actions' ? 'text-cyan-300' : ''
+                      className={`flex items-center gap-1.5 hover:text-pink-300 transition-colors uppercase font-mono font-bold cursor-pointer ${
+                        sortBy === 'actions' ? 'text-pink-300' : ''
                       }`}
                       title="Ordenar por Ações"
                     >
                       <span>Conjuração</span>
-                      {sortBy === 'actions' ? <ArrowDown className="w-3 h-3 text-cyan-400" /> : <ArrowUpDown className="w-3 h-3 opacity-40 hover:opacity-100" />}
+                      {sortBy === 'actions' ? <ArrowDown className="w-3 h-3 text-pink-400" /> : <ArrowUpDown className="w-3 h-3 opacity-40 hover:opacity-100" />}
                     </button>
                   </th>
                   <th className="py-3 px-3">Alcance / Área</th>
@@ -1683,13 +1683,13 @@ export function SpellExplorer({
                     <button
                       type="button"
                       onClick={() => setSortBy('rarity')}
-                      className={`flex items-center gap-1.5 hover:text-cyan-300 transition-colors uppercase font-mono font-bold cursor-pointer ${
-                        sortBy === 'rarity' ? 'text-cyan-300' : ''
+                      className={`flex items-center gap-1.5 hover:text-pink-300 transition-colors uppercase font-mono font-bold cursor-pointer ${
+                        sortBy === 'rarity' ? 'text-pink-300' : ''
                       }`}
                       title="Ordenar por Raridade"
                     >
                       <span>Raridade</span>
-                      {sortBy === 'rarity' ? <ArrowDown className="w-3 h-3 text-cyan-400" /> : <ArrowUpDown className="w-3 h-3 opacity-40 hover:opacity-100" />}
+                      {sortBy === 'rarity' ? <ArrowDown className="w-3 h-3 text-pink-400" /> : <ArrowUpDown className="w-3 h-3 opacity-40 hover:opacity-100" />}
                     </button>
                   </th>
                   {isActualGm && <th className="py-3 px-3">Pastas</th>}
@@ -1713,9 +1713,9 @@ export function SpellExplorer({
                           <button
                             type="button"
                             onClick={() => handleOpenSpellInDrawer(sp.id)}
-                            className="text-left font-bold text-zinc-200 group-hover:text-cyan-300 hover:drop-shadow-[0_0_10px_rgba(6,182,212,0.8)] transition-all flex items-center gap-2 cursor-pointer focus:outline-none"
+                            className="text-left font-bold text-zinc-200 group-hover:text-pink-300 hover:drop-shadow-[0_0_10px_rgba(236,72,153,0.8)] transition-all flex items-center gap-2 cursor-pointer focus:outline-none"
                           >
-                            <span className="hover:underline decoration-cyan-400/80 decoration-2 underline-offset-2">
+                            <span className="hover:underline decoration-pink-400/80 decoration-2 underline-offset-2">
                               {sp.title}
                             </span>
                             {perm.visibility === 'gm' && <EyeOff className="w-3.5 h-3.5 text-rose-400" />}
@@ -1781,7 +1781,7 @@ export function SpellExplorer({
                               <button
                                 type="button"
                                 onClick={() => handleStartEditSpell(sp)}
-                                className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-cyan-300 cursor-pointer"
+                                className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-pink-300 cursor-pointer"
                               >
                                 <Edit className="w-3.5 h-3.5" />
                               </button>
@@ -1871,7 +1871,7 @@ export function SpellExplorer({
                             <button
                               type="button"
                               onClick={() => setManagingFolderForSpells(folderName)}
-                              className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-cyan-300 transition-colors cursor-pointer"
+                              className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-pink-300 transition-colors cursor-pointer"
                               title="Organizar feitiços"
                             >
                               <Layers className="w-3.5 h-3.5" />
@@ -1903,7 +1903,7 @@ export function SpellExplorer({
                             <button
                               type="button"
                               onClick={() => setManagingFolderForSpells(folderName)}
-                              className="text-[11px] font-bold text-cyan-400 hover:text-cyan-300 hover:underline cursor-pointer inline-flex items-center gap-1"
+                              className="text-[11px] font-bold text-pink-400 hover:text-pink-300 hover:underline cursor-pointer inline-flex items-center gap-1"
                             >
                               <Plus className="w-3 h-3" />
                               <span>Adicionar Feitiços</span>
@@ -1916,10 +1916,10 @@ export function SpellExplorer({
                             <div
                               key={sp.id}
                               onClick={() => handleOpenSpellInDrawer(sp.id)}
-                              className="flex items-center justify-between p-2 rounded-xl bg-zinc-900/40 hover:bg-cyan-950/30 border border-zinc-800/40 hover:border-cyan-500/40 cursor-pointer transition-all group"
+                              className="flex items-center justify-between p-2 rounded-xl bg-zinc-900/40 hover:bg-pink-950/30 border border-zinc-800/40 hover:border-pink-500/40 cursor-pointer transition-all group"
                             >
                               <div className="min-w-0 flex-1 pr-2">
-                                <div className="text-xs font-semibold text-zinc-200 group-hover:text-cyan-300 truncate">
+                                <div className="text-xs font-semibold text-zinc-200 group-hover:text-pink-300 truncate">
                                   {sp.title}
                                 </div>
                                 <div className="text-[10px] text-zinc-400 font-mono flex items-center gap-1.5 truncate">
@@ -1935,7 +1935,7 @@ export function SpellExplorer({
                                       e.stopPropagation();
                                       handleStartEditSpell(sp);
                                     }}
-                                    className="p-1 rounded text-zinc-500 hover:text-cyan-300"
+                                    className="p-1 rounded text-zinc-500 hover:text-pink-300"
                                     title="Editar Feitiço"
                                   >
                                     <Edit className="w-3.5 h-3.5" />
@@ -1955,7 +1955,7 @@ export function SpellExplorer({
                             onClick={() => {
                               onCreateSpell(activeCategory !== 'all' ? activeCategory : undefined, folderName);
                             }}
-                            className="text-[11px] font-bold text-zinc-400 hover:text-cyan-300 transition-colors flex items-center gap-1 cursor-pointer"
+                            className="text-[11px] font-bold text-zinc-400 hover:text-pink-300 transition-colors flex items-center gap-1 cursor-pointer"
                           >
                             <Plus className="w-3 h-3" />
                             <span>Novo Feitiço</span>
@@ -1966,7 +1966,7 @@ export function SpellExplorer({
                             onClick={() => setManagingFolderForSpells(folderName)}
                             className="text-[11px] font-bold text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1 cursor-pointer"
                           >
-                            <Layers className="w-3 h-3" />
+                            <Layers className="w-3.5 h-3.5" />
                             <span>Organizar</span>
                           </button>
                         </div>
@@ -1980,7 +1980,7 @@ export function SpellExplorer({
         </div>
       )}
 
-      {/* 6. Folder Management Modal (Standardized 90% Screen Width Modal) */}
+      {/* 6. Folder Management Modal (Standardized 85% Screen Width Modal) */}
       {isFolderManagerOpen && (
         <FolderManagerModal
           isOpen={isFolderManagerOpen}
@@ -1994,7 +1994,7 @@ export function SpellExplorer({
           }))}
           entities={spellEntities}
           initialCategoryId={activeCategory}
-          themeColor="cyan"
+          themeColor="pink"
           onClose={() => {
             setIsFolderManagerOpen(false);
             refreshConfig();
@@ -2010,7 +2010,7 @@ export function SpellExplorer({
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
               <div>
                 <h3 className="text-base font-bold text-zinc-100">Organizar em Pastas</h3>
-                <p className="text-xs text-cyan-400 font-medium truncate">{managingSpellFolders.title}</p>
+                <p className="text-xs text-pink-400 font-medium truncate">{managingSpellFolders.title}</p>
               </div>
               <button
                 onClick={() => setManagingSpellFolders(null)}
@@ -2037,17 +2037,17 @@ export function SpellExplorer({
                     }}
                     className={`flex items-center justify-between p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
                       isChecked
-                        ? 'bg-cyan-950/80 border-cyan-500/50 text-cyan-200 font-semibold'
+                        ? 'bg-pink-950/80 border-pink-500/50 text-pink-200 font-semibold'
                         : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:text-zinc-200'
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <Folder className="w-3.5 h-3.5 text-cyan-400" />
+                      <Folder className="w-3.5 h-3.5 text-pink-400" />
                       <span>{subcat}</span>
                     </div>
                     <div
                       className={`w-4 h-4 rounded flex items-center justify-center border ${
-                        isChecked ? 'bg-cyan-500 border-cyan-400 text-zinc-950' : 'border-zinc-700 bg-zinc-800'
+                        isChecked ? 'bg-pink-500 border-pink-400 text-zinc-950' : 'border-zinc-700 bg-zinc-800'
                       }`}
                     >
                       {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
@@ -2066,7 +2066,7 @@ export function SpellExplorer({
               </button>
               <button
                 onClick={handleSaveSpellFolders}
-                className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-zinc-950 font-bold text-xs transition-colors cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-pink-600 hover:bg-pink-500 text-zinc-950 font-bold text-xs transition-colors cursor-pointer"
               >
                 Salvar Alterações
               </button>
@@ -2086,7 +2086,7 @@ export function SpellExplorer({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-zinc-100">Organizar Feitiços na Pasta</h3>
-                  <p className="text-xs text-cyan-400 font-medium">Pasta: "{managingFolderForSpells}"</p>
+                  <p className="text-xs text-pink-400 font-medium">Pasta: "{managingFolderForSpells}"</p>
                 </div>
               </div>
               <button
@@ -2113,7 +2113,7 @@ export function SpellExplorer({
                 value={searchSpellsInFolderModal}
                 onChange={(e) => setSearchSpellsInFolderModal(e.target.value)}
                 placeholder="Buscar feitiço para incluir..."
-                className="w-full pl-8 pr-3 py-1.5 bg-zinc-900/90 border border-zinc-800 focus:border-cyan-500 rounded-xl text-xs text-zinc-200 placeholder-zinc-500 outline-none"
+                className="w-full pl-8 pr-3 py-1.5 bg-zinc-900/90 border border-zinc-800 focus:border-pink-500 rounded-xl text-xs text-zinc-200 placeholder-zinc-500 outline-none"
               />
             </div>
 
@@ -2177,7 +2177,7 @@ export function SpellExplorer({
                   setSearchSpellsInFolderModal('');
                   refreshConfig();
                 }}
-                className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-zinc-950 font-bold text-xs transition-colors cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-pink-600 hover:bg-pink-500 text-zinc-950 font-bold text-xs transition-colors cursor-pointer"
               >
                 Concluir
               </button>

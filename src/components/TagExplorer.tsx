@@ -980,7 +980,7 @@ export const TagExplorer: React.FC<TagExplorerProps> = ({
           scope="tag"
           categories={tagFolderOptions}
           entities={accessibleEntities}
-          themeColor="cyan"
+          themeColor="purple"
           onRefresh={() => setRefreshKey((k) => k + 1)}
         />
       )}
