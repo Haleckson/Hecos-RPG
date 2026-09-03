@@ -4,17 +4,11 @@
     <meta charset="utf-8">
     <title>Hecos - RPG Campaign & World Codex</title>
     <script>
-      // Redirecionador SPA para GitHub Pages: redireciona caminhos desconhecidos de volta para o index.html mantendo a rota e hash
-      var pathSegmentsToKeep = 1;
-      var l = window.location;
-      var repoPath = l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/');
-      var subPath = l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~');
-      var queryString = l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '';
-      
-      l.replace(
-        l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
-        repoPath + '/?/' + subPath + queryString + l.hash
-      );
+      // Fallback para GitHub Pages: redireciona para a raiz do repositório
+      var path = window.location.pathname;
+      var segments = path.split('/').filter(Boolean);
+      var base = segments.length > 0 ? '/' + segments[0] + '/' : '/';
+      window.location.replace(base + window.location.hash);
     </script>
   </head>
   <body style="background:#09090b;color:#a1a1aa;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">

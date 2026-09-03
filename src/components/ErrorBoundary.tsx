@@ -1,36 +1,45 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
-  fallback?: ReactNode;
   name?: string;
+  fallback?: ReactNode;
 }
 
 interface State {
   hasError: boolean;
   error: Error | null;
+  errorInfo: ErrorInfo | null;
 }
 
-export class ErrorBoundary extends React.Component<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    this.state = {
-      hasError: false,
-      error: null,
-    };
-  }
+export class ErrorBoundary extends Component<Props, State> {
+  public state: State = {
+    hasError: false,
+    error: null,
+    errorInfo: null,
+  };
 
   public static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+    return { hasError: true, error, errorInfo: null };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error(`ErrorBoundary caught an error in [${this.props.name || 'Component'}]:`, error, errorInfo);
+    console.error('[ErrorBoundary caught error]:', error, errorInfo);
+    this.setState({ errorInfo });
   }
 
-  private handleReset = () => {
-    this.setState({ hasError: false, error: null });
+  private handleReload = () => {
+    window.location.reload();
+  };
+
+  private handleResetLocal = () => {
+    try {
+      // Clear potentially corrupt storage keys while keeping backups
+      sessionStorage.clear();
+      window.location.reload();
+    } catch {
+      window.location.reload();
+    }
   };
 
   public render() {
@@ -39,23 +48,99 @@ export class ErrorBoundary extends React.Component<Props, State> {
         return this.props.fallback;
       }
 
-      return (
-        <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-800/80 text-rose-200 text-xs space-y-2 my-2">
-          <div className="flex items-center gap-2 font-bold text-rose-300">
-            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-            <span>Ocorreu um erro ao carregar esta seção ({this.props.name || 'Componente'})</span>
+      // If it's a sub-component with a name (not root App), show a localized subtle warning instead of taking over the full page
+      if (this.props.name) {
+        return (
+          <div className="p-2 border border-red-500/30 bg-red-950/30 rounded text-xs text-red-300 flex items-center justify-between">
+            <span>Erro ao carregar componente ({this.props.name})</span>
+            <button
+              onClick={() => this.setState({ hasError: false, error: null })}
+              className="text-red-400 hover:text-red-200 underline text-xs ml-2"
+            >
+              Tentar novamente
+            </button>
           </div>
-          <p className="text-rose-400/90 text-[11px] font-mono break-all">
-            {this.state.error?.message || 'Erro inesperado de renderização.'}
-          </p>
-          <button
-            type="button"
-            onClick={this.handleReset}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-rose-900/60 hover:bg-rose-900 border border-rose-700/60 text-rose-200 text-xs font-semibold cursor-pointer transition-colors"
-          >
-            <RefreshCw className="w-3 h-3" />
-            <span>Tentar novamente</span>
-          </button>
+        );
+      }
+
+      return (
+        <div style={{
+          minHeight: '100vh',
+          backgroundColor: '#09090b',
+          color: '#f4f4f5',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px',
+          fontFamily: 'system-ui, -apple-system, sans-serif'
+        }}>
+          <div style={{
+            maxWidth: '640px',
+            width: '100%',
+            backgroundColor: '#18181b',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            borderRadius: '16px',
+            padding: '32px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <span style={{ fontSize: '28px' }}>⚠️</span>
+              <h1 style={{ fontSize: '20px', fontWeight: 700, margin: 0, color: '#fca5a5' }}>
+                Falha na Inicialização do Codex
+              </h1>
+            </div>
+            
+            <p style={{ color: '#a1a1aa', fontSize: '14px', lineHeight: 1.6, marginBottom: '20px' }}>
+              O aplicativo encontrou um erro inesperado ao carregar os dados. Seus dados estão seguros na nuvem/armazenamento.
+            </p>
+
+            <div style={{
+              backgroundColor: '#09090b',
+              padding: '16px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontFamily: 'monospace',
+              color: '#ef4444',
+              overflowX: 'auto',
+              marginBottom: '24px',
+              maxHeight: '180px'
+            }}>
+              {this.state.error?.message || 'Erro desconhecido durante a renderização inicial.'}
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <button
+                onClick={this.handleReload}
+                style={{
+                  backgroundColor: '#dc2626',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                Recarregar Página
+              </button>
+              <button
+                onClick={this.handleResetLocal}
+                style={{
+                  backgroundColor: '#27272a',
+                  color: '#d4d4d8',
+                  border: '1px solid #3f3f46',
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                Limpar Sessão e Recarregar
+              </button>
+            </div>
+          </div>
         </div>
       );
     }

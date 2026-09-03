@@ -4,8 +4,21 @@ import path from 'path';
 import { defineConfig } from 'vite';
 
 export default defineConfig(() => {
+  const rawBase = process.env.VITE_BASE_PATH || '';
+  const cleanBase = rawBase.trim().replace(/^['"]+|['"]+$/g, '').trim();
+
+  let base = './';
+  if (cleanBase && cleanBase !== '.' && cleanBase !== './') {
+    if (cleanBase === '/') {
+      base = '/';
+    } else {
+      const withLeading = cleanBase.startsWith('/') || cleanBase.startsWith('.') ? cleanBase : '/' + cleanBase;
+      base = withLeading.endsWith('/') ? withLeading : withLeading + '/';
+    }
+  }
+
   return {
-    base: process.env.VITE_BASE_PATH || './',
+    base,
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
