@@ -167,6 +167,10 @@ const RTDB_RULES_JSON = `{
       ".read": true,
       ".write": true
     },
+    "hecos_deleted_folders": {
+      ".read": true,
+      ".write": true
+    },
     "$other": {
       ".read": true,
       ".write": true

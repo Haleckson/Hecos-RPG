@@ -36,6 +36,10 @@ import {
   syncSecretFoldersToFirebase,
   subscribeToPublicFoldersRealtime,
   syncPublicFoldersToFirebase,
+  subscribeToDeletedFoldersRealtime,
+  syncDeletedFolderToFirebase,
+  deleteDeletedFolderFromFirebase,
+  loadDeletedFoldersFromFirebase,
   syncUsersToFirebase,
   loadUsersFromFirebase,
   subscribeToUsersRealtime,
@@ -252,6 +256,7 @@ export class HecosStorage {
   private static currentUserCache: HecosUser | null = null;
   private static folderPermissionsCache: Record<string, FolderPermission> | null = null;
   private static trashCache: TrashedEntity[] | null = null;
+  private static deletedFoldersCache: Set<string> | null = null;
 
   private static entitySubscribers = new Set<EntitySubscriber>();
   private static mapSubscribers = new Set<MapSubscriber>();
@@ -487,6 +492,78 @@ export class HecosStorage {
       this.notifyMapSubscribers();
     });
 
+    // Start real-time listener for deleted folders across all devices
+    subscribeToDeletedFoldersRealtime((deletedMap) => {
+      if (!deletedMap || typeof deletedMap !== 'object') return;
+      const set = this.getDeletedFolders();
+      let changed = false;
+      Object.entries(deletedMap).forEach(([safeKey, info]) => {
+        const name = (typeof info === 'object' && info && 'name' in info) ? (info as any).name : safeKey;
+        if (name && typeof name === 'string' && name.trim()) {
+          const cleanName = name.trim();
+          if (!set.has(cleanName)) {
+            set.add(cleanName);
+            changed = true;
+          }
+        }
+      });
+      if (changed) {
+        this.deletedFoldersCache = set;
+        try {
+          localStorage.setItem(STORAGE_KEYS.DELETED_FOLDERS, JSON.stringify(Array.from(set)));
+        } catch (e) {
+          console.warn("Error saving deleted folders locally:", e);
+        }
+        if (this.spellCategoriesCache) {
+          this.spellCategoriesCache = this.cleanDeletedFromConfig(this.spellCategoriesCache);
+          this.notifySpellCategoriesSubscribers();
+        }
+        if (this.featCategoriesCache) {
+          this.featCategoriesCache = this.cleanDeletedFromConfig(this.featCategoriesCache);
+          this.notifyFeatCategoriesSubscribers();
+        }
+        if (this.itemCategoriesCache) {
+          this.itemCategoriesCache = this.cleanDeletedFromConfig(this.itemCategoriesCache);
+          this.notifyItemCategoriesSubscribers();
+        }
+        this.notifyEntitySubscribers();
+      }
+    });
+
+    // Also fetch initial deleted folders from Firebase RTDB
+    loadDeletedFoldersFromFirebase().then((remoteDeleted) => {
+      if (Array.isArray(remoteDeleted) && remoteDeleted.length > 0) {
+        const set = this.getDeletedFolders();
+        let changed = false;
+        remoteDeleted.forEach((f) => {
+          const trimmed = f.trim();
+          if (trimmed && !set.has(trimmed)) {
+            set.add(trimmed);
+            changed = true;
+          }
+        });
+        if (changed) {
+          this.deletedFoldersCache = set;
+          try {
+            localStorage.setItem(STORAGE_KEYS.DELETED_FOLDERS, JSON.stringify(Array.from(set)));
+          } catch {}
+          if (this.spellCategoriesCache) {
+            this.spellCategoriesCache = this.cleanDeletedFromConfig(this.spellCategoriesCache);
+            this.notifySpellCategoriesSubscribers();
+          }
+          if (this.featCategoriesCache) {
+            this.featCategoriesCache = this.cleanDeletedFromConfig(this.featCategoriesCache);
+            this.notifyFeatCategoriesSubscribers();
+          }
+          if (this.itemCategoriesCache) {
+            this.itemCategoriesCache = this.cleanDeletedFromConfig(this.itemCategoriesCache);
+            this.notifyItemCategoriesSubscribers();
+          }
+          this.notifyEntitySubscribers();
+        }
+      }
+    }).catch(() => {});
+
     // Start real-time listener for feat categories & subcategories
     subscribeToFeatCategoriesRealtime((categoriesConfig) => {
       if (!categoriesConfig || typeof categoriesConfig !== 'object') return;
@@ -511,6 +588,28 @@ export class HecosStorage {
         console.warn("Error saving spell categories to local:", e);
       }
       this.notifySpellCategoriesSubscribers();
+    });
+
+    // Start real-time listeners for all other category scopes
+    const allScopes = [
+      'item', 'peril', 'class', 'archetype', 'ancestry',
+      'fauna', 'flora', 'location', 'pc', 'npc',
+      'organization', 'quest', 'map', 'tag', 'general'
+    ];
+    allScopes.forEach((scope) => {
+      subscribeToScopeCategoriesRealtime(scope, (remoteConfig) => {
+        if (!remoteConfig || typeof remoteConfig !== 'object') return;
+        const cleaned = this.cleanDeletedFromConfig(remoteConfig);
+        const key = `hecos_${scope}_categories_v1`;
+        try {
+          localStorage.setItem(key, JSON.stringify(cleaned));
+        } catch {}
+        if (scope === 'item') {
+          this.itemCategoriesCache = cleaned;
+          this.notifyItemCategoriesSubscribers();
+        }
+        this.notifyEntitySubscribers();
+      });
     });
 
     // Start real-time listener for public (revealed) folders
@@ -631,32 +730,15 @@ export class HecosStorage {
         console.warn("Error saving drive resources to localStorage:", e);
       }
     });
-
-    // Start real-time listener for all scope category configurations
-    const scopesToListen = ['item', 'peril', 'class', 'archetype', 'ancestry', 'vocation', 'fauna', 'flora', 'location', 'pc', 'npc', 'organization', 'map', 'tag', 'quest'];
-    scopesToListen.forEach((sc) => {
-      subscribeToScopeCategoriesRealtime(sc, (config) => {
-        if (!config || typeof config !== 'object') return;
-        const cleaned = this.cleanDeletedFromConfig(config);
-        const key = sc === 'item' ? STORAGE_KEYS.ITEM_CATEGORIES : `hecos_${sc}_categories_v1`;
-        try {
-          localStorage.setItem(key, JSON.stringify(cleaned));
-        } catch (e) {
-          console.warn(`Error saving ${sc} categories to localStorage:`, e);
-        }
-        if (sc === 'item') {
-          this.itemCategoriesCache = cleaned;
-          this.notifyItemCategoriesSubscribers();
-        }
-        this.notifyEntitySubscribers();
-      });
-    });
   }
 
   /**
    * Retrieves the set of deleted folders across all categories
    */
   static getDeletedFolders(): Set<string> {
+    if (this.deletedFoldersCache) {
+      return this.deletedFoldersCache;
+    }
     const set = new Set<string>();
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.DELETED_FOLDERS);
@@ -673,6 +755,7 @@ export class HecosStorage {
     } catch (e) {
       console.warn("Error reading deleted folders:", e);
     }
+    this.deletedFoldersCache = set;
     return set;
   }
 
@@ -682,11 +765,14 @@ export class HecosStorage {
     if (!trimmed) return;
     const set = this.getDeletedFolders();
     set.add(trimmed);
+    this.deletedFoldersCache = set;
     try {
       localStorage.setItem(STORAGE_KEYS.DELETED_FOLDERS, JSON.stringify(Array.from(set)));
     } catch (e) {
       console.warn("Error saving deleted folder:", e);
     }
+    // Sync to Firebase Realtime Database
+    syncDeletedFolderToFirebase(trimmed).catch((err) => console.warn(err));
   }
 
   static removeDeletedFolder(folderName: string): void {
@@ -695,11 +781,14 @@ export class HecosStorage {
     const set = this.getDeletedFolders();
     if (set.has(trimmed)) {
       set.delete(trimmed);
+      this.deletedFoldersCache = set;
       try {
         localStorage.setItem(STORAGE_KEYS.DELETED_FOLDERS, JSON.stringify(Array.from(set)));
       } catch (e) {
         console.warn("Error saving deleted folders:", e);
       }
+      // Remove from Firebase Realtime Database
+      deleteDeletedFolderFromFirebase(trimmed).catch((err) => console.warn(err));
     }
   }
 
@@ -961,6 +1050,33 @@ export class HecosStorage {
             changed = true;
           }
         }
+
+        // Sanitize any deleted folders from active entities
+        const deletedFolders = this.getDeletedFolders();
+        activeEntities.forEach((e) => {
+          let updated = false;
+          if (e.subcategories && e.subcategories.some((s) => deletedFolders.has(s))) {
+            e.subcategories = e.subcategories.filter((s) => !deletedFolders.has(s));
+            updated = true;
+          }
+          if (e.subcategory && deletedFolders.has(e.subcategory)) {
+            e.subcategory = (e.subcategories && e.subcategories[0]) || '';
+            updated = true;
+          }
+          if (e.spellData?.subcategories && e.spellData.subcategories.some((s) => deletedFolders.has(s))) {
+            e.spellData.subcategories = e.spellData.subcategories.filter((s) => !deletedFolders.has(s));
+            updated = true;
+          }
+          if (e.featData?.subcategories && e.featData.subcategories.some((s) => deletedFolders.has(s))) {
+            e.featData.subcategories = e.featData.subcategories.filter((s) => !deletedFolders.has(s));
+            updated = true;
+          }
+          if (e.itemData?.subcategories && e.itemData.subcategories.some((s) => deletedFolders.has(s))) {
+            e.itemData.subcategories = e.itemData.subcategories.filter((s) => !deletedFolders.has(s));
+            updated = true;
+          }
+          if (updated) changed = true;
+        });
 
         // Automatic spell traditions & traits migration
         const { entities: migratedEntities, hasAnyChange: spellMigrationOccurred } = migrateAllSpellEntities(activeEntities);
@@ -2197,11 +2313,24 @@ export class HecosStorage {
     }
     this.saveDeletedEntityIds(deletedIds);
 
-    // Add back to active entities
+    // Add back to active entities, ensuring any deleted folders are stripped
+    const deletedFolders = this.getDeletedFolders();
+    const cleanSubcategories = (trashed.entity.subcategories || []).filter((s) => !deletedFolders.has(s));
     const restoredEntity: HecosEntity = {
       ...trashed.entity,
+      subcategories: cleanSubcategories,
+      subcategory: (cleanSubcategories && cleanSubcategories[0]) || (deletedFolders.has(trashed.entity.subcategory || '') ? '' : trashed.entity.subcategory || ''),
       updatedAt: new Date().toISOString(),
     };
+    if (restoredEntity.spellData?.subcategories) {
+      restoredEntity.spellData.subcategories = restoredEntity.spellData.subcategories.filter((s) => !deletedFolders.has(s));
+    }
+    if (restoredEntity.featData?.subcategories) {
+      restoredEntity.featData.subcategories = restoredEntity.featData.subcategories.filter((s) => !deletedFolders.has(s));
+    }
+    if (restoredEntity.itemData?.subcategories) {
+      restoredEntity.itemData.subcategories = restoredEntity.itemData.subcategories.filter((s) => !deletedFolders.has(s));
+    }
     this.saveEntity(restoredEntity);
 
     return restoredEntity;
@@ -2469,17 +2598,14 @@ export class HecosStorage {
 
   static deleteFeatSubcategory(categoryKey: string, subcategoryName: string): boolean {
     if (!subcategoryName) return false;
-    this.addDeletedFolder(subcategoryName);
+    const trimmed = subcategoryName.trim();
+    if (!trimmed) return false;
+    this.addDeletedFolder(trimmed);
     const config = { ...this.getAllFeatSubcategoriesConfig() };
 
-    if (categoryKey && categoryKey !== 'all' && config[categoryKey]) {
-      config[categoryKey] = config[categoryKey].filter((s) => s !== subcategoryName);
-    }
     Object.keys(config).forEach((cat) => {
-      if (categoryKey === 'all' || !categoryKey) {
-        if (config[cat]?.includes(subcategoryName)) {
-          config[cat] = config[cat].filter((s) => s !== subcategoryName);
-        }
+      if (config[cat]?.includes(trimmed)) {
+        config[cat] = config[cat].filter((s) => s !== trimmed);
       }
     });
 
@@ -2487,36 +2613,62 @@ export class HecosStorage {
 
     // Also remove from affected entities thoroughly
     const entities = this.getEntities();
+    let entitiesModified = false;
     entities.forEach((ent) => {
       let updated = false;
-      if (ent.featData?.subcategories?.includes(subcategoryName)) {
-        ent.featData.subcategories = ent.featData.subcategories.filter((s) => s !== subcategoryName);
+      if (ent.featData?.subcategories?.includes(trimmed)) {
+        ent.featData.subcategories = ent.featData.subcategories.filter((s) => s !== trimmed);
         updated = true;
       }
-      if (ent.subcategories?.includes(subcategoryName)) {
-        ent.subcategories = ent.subcategories.filter((s) => s !== subcategoryName);
+      if (ent.subcategories?.includes(trimmed)) {
+        ent.subcategories = ent.subcategories.filter((s) => s !== trimmed);
         updated = true;
       }
-      if (ent.subcategory === subcategoryName) {
+      if (ent.subcategory === trimmed) {
         ent.subcategory = (ent.featData?.subcategories && ent.featData.subcategories[0]) || (ent.subcategories && ent.subcategories[0]) || '';
         updated = true;
       }
-      if (ent.tags?.includes(subcategoryName)) {
-        ent.tags = ent.tags.filter((t) => t !== subcategoryName);
+      if (ent.tags?.includes(trimmed)) {
+        ent.tags = ent.tags.filter((t) => t !== trimmed);
         updated = true;
       }
       if (updated) {
+        entitiesModified = true;
         HecosStorage.saveEntity(ent);
       }
     });
 
+    // Also clean from Trash
+    const trash = this.getTrashedEntities();
+    let trashChanged = false;
+    trash.forEach((t) => {
+      const ent = t.entity;
+      if (ent.featData?.subcategories?.includes(trimmed)) {
+        ent.featData.subcategories = ent.featData.subcategories.filter((s) => s !== trimmed);
+        trashChanged = true;
+      }
+      if (ent.subcategories?.includes(trimmed)) {
+        ent.subcategories = ent.subcategories.filter((s) => s !== trimmed);
+        trashChanged = true;
+      }
+      if (ent.subcategory === trimmed) {
+        ent.subcategory = (ent.subcategories && ent.subcategories[0]) || '';
+        trashChanged = true;
+      }
+    });
+    if (trashChanged) {
+      this.saveTrashLocal(trash);
+    }
+
     // Remove folder secret flag if no longer present in any category
     const allRemaining = new Set<string>();
     Object.values(config).forEach((list) => (list || []).forEach((s) => allRemaining.add(s)));
-    if (!allRemaining.has(subcategoryName)) {
-      HecosStorage.setFolderSecret(subcategoryName, false);
+    if (!allRemaining.has(trimmed)) {
+      HecosStorage.setFolderSecret(trimmed, false);
     }
 
+    this.notifyFeatCategoriesSubscribers();
+    this.notifyEntitySubscribers();
     return true;
   }
 
@@ -2673,17 +2825,14 @@ export class HecosStorage {
 
   static deleteSpellSubcategory(categoryKey: string, subcategoryName: string): boolean {
     if (!subcategoryName) return false;
-    this.addDeletedFolder(subcategoryName);
+    const trimmed = subcategoryName.trim();
+    if (!trimmed) return false;
+    this.addDeletedFolder(trimmed);
     const config = { ...this.getAllSpellSubcategoriesConfig() };
 
-    if (categoryKey && categoryKey !== 'all' && config[categoryKey]) {
-      config[categoryKey] = config[categoryKey].filter((s) => s !== subcategoryName);
-    }
     Object.keys(config).forEach((cat) => {
-      if (categoryKey === 'all' || !categoryKey) {
-        if (config[cat]?.includes(subcategoryName)) {
-          config[cat] = config[cat].filter((s) => s !== subcategoryName);
-        }
+      if (config[cat]?.includes(trimmed)) {
+        config[cat] = config[cat].filter((s) => s !== trimmed);
       }
     });
 
@@ -2692,30 +2841,30 @@ export class HecosStorage {
     // Unlink the deleted folder from ALL spell entities thoroughly
     const entities = this.getEntities();
     entities.forEach((ent) => {
-      if (ent.category === 'spell' || ent.spellData || ent.tags?.includes('spell') || ent.tags?.includes('magia') || ent.tags?.includes(subcategoryName) || ent.subcategories?.includes(subcategoryName)) {
+      if (ent.category === 'spell' || ent.spellData || ent.tags?.includes('spell') || ent.tags?.includes('magia') || ent.tags?.includes(trimmed) || ent.subcategories?.includes(trimmed)) {
         let updated = false;
 
         // 1. Unlink from ent.subcategories
-        if (ent.subcategories?.includes(subcategoryName)) {
-          ent.subcategories = ent.subcategories.filter((s) => s !== subcategoryName);
+        if (ent.subcategories?.includes(trimmed)) {
+          ent.subcategories = ent.subcategories.filter((s) => s !== trimmed);
           updated = true;
         }
 
         // 2. Unlink from ent.spellData.subcategories
-        if (ent.spellData?.subcategories?.includes(subcategoryName)) {
-          ent.spellData.subcategories = ent.spellData.subcategories.filter((s) => s !== subcategoryName);
+        if (ent.spellData?.subcategories?.includes(trimmed)) {
+          ent.spellData.subcategories = ent.spellData.subcategories.filter((s) => s !== trimmed);
           updated = true;
         }
 
         // 3. Unlink from ent.subcategory field
-        if (ent.subcategory === subcategoryName) {
+        if (ent.subcategory === trimmed) {
           ent.subcategory = (ent.spellData?.subcategories && ent.spellData.subcategories[0]) || (ent.subcategories && ent.subcategories[0]) || '';
           updated = true;
         }
 
         // 4. Unlink from ent.tags if present
-        if (ent.tags?.includes(subcategoryName)) {
-          ent.tags = ent.tags.filter((t) => t !== subcategoryName);
+        if (ent.tags?.includes(trimmed)) {
+          ent.tags = ent.tags.filter((t) => t !== trimmed);
           updated = true;
         }
 
@@ -2725,13 +2874,37 @@ export class HecosStorage {
       }
     });
 
+    // Also clean from Trash
+    const trash = this.getTrashedEntities();
+    let trashChanged = false;
+    trash.forEach((t) => {
+      const ent = t.entity;
+      if (ent.spellData?.subcategories?.includes(trimmed)) {
+        ent.spellData.subcategories = ent.spellData.subcategories.filter((s) => s !== trimmed);
+        trashChanged = true;
+      }
+      if (ent.subcategories?.includes(trimmed)) {
+        ent.subcategories = ent.subcategories.filter((s) => s !== trimmed);
+        trashChanged = true;
+      }
+      if (ent.subcategory === trimmed) {
+        ent.subcategory = (ent.subcategories && ent.subcategories[0]) || '';
+        trashChanged = true;
+      }
+    });
+    if (trashChanged) {
+      this.saveTrashLocal(trash);
+    }
+
     // Remove folder secret flag if no longer present in any category
     const allRemaining = new Set<string>();
     Object.values(config).forEach((list) => (list || []).forEach((s) => allRemaining.add(s)));
-    if (!allRemaining.has(subcategoryName)) {
-      HecosStorage.setFolderSecret(subcategoryName, false);
+    if (!allRemaining.has(trimmed)) {
+      HecosStorage.setFolderSecret(trimmed, false);
     }
 
+    this.notifySpellCategoriesSubscribers();
+    this.notifyEntitySubscribers();
     return true;
   }
 
@@ -2849,28 +3022,37 @@ export class HecosStorage {
   }
 
   static deleteItemSubcategory(categoryKey: string, subcategoryName: string): boolean {
-    if (!categoryKey || !subcategoryName) return false;
-    this.addDeletedFolder(subcategoryName);
+    if (!subcategoryName) return false;
+    const trimmed = subcategoryName.trim();
+    if (!trimmed) return false;
+    this.addDeletedFolder(trimmed);
     const config = this.getAllItemSubcategoriesConfig();
-    if (!config[categoryKey]) return false;
-    config[categoryKey] = config[categoryKey].filter((s) => s !== subcategoryName);
+    Object.keys(config).forEach((cat) => {
+      if (config[cat]?.includes(trimmed)) {
+        config[cat] = config[cat].filter((s) => s !== trimmed);
+      }
+    });
     this.saveAllItemSubcategoriesConfig(config);
 
     const entities = this.getEntities();
     entities.forEach((ent) => {
-      if (ent.category === 'item' || ent.itemData) {
+      if (ent.category === 'item' || ent.itemData || ent.subcategories?.includes(trimmed) || ent.subcategory === trimmed) {
         let updated = false;
         let subcats = ent.subcategories || ent.itemData?.subcategories || [];
-        if (subcats.includes(subcategoryName)) {
-          subcats = subcats.filter((s) => s !== subcategoryName);
+        if (subcats.includes(trimmed)) {
+          subcats = subcats.filter((s) => s !== trimmed);
           ent.subcategories = subcats;
           if (ent.itemData) {
             ent.itemData.subcategories = subcats;
           }
           updated = true;
         }
-        if (ent.subcategory === subcategoryName) {
+        if (ent.subcategory === trimmed) {
           ent.subcategory = (subcats && subcats[0]) || '';
+          updated = true;
+        }
+        if (ent.tags?.includes(trimmed)) {
+          ent.tags = ent.tags.filter((t) => t !== trimmed);
           updated = true;
         }
         if (updated) {
@@ -2878,6 +3060,31 @@ export class HecosStorage {
         }
       }
     });
+
+    // Also clean from Trash
+    const trash = this.getTrashedEntities();
+    let trashChanged = false;
+    trash.forEach((t) => {
+      const ent = t.entity;
+      if (ent.itemData?.subcategories?.includes(trimmed)) {
+        ent.itemData.subcategories = ent.itemData.subcategories.filter((s) => s !== trimmed);
+        trashChanged = true;
+      }
+      if (ent.subcategories?.includes(trimmed)) {
+        ent.subcategories = ent.subcategories.filter((s) => s !== trimmed);
+        trashChanged = true;
+      }
+      if (ent.subcategory === trimmed) {
+        ent.subcategory = (ent.subcategories && ent.subcategories[0]) || '';
+        trashChanged = true;
+      }
+    });
+    if (trashChanged) {
+      this.saveTrashLocal(trash);
+    }
+
+    this.notifyItemCategoriesSubscribers();
+    this.notifyEntitySubscribers();
     return true;
   }
 
@@ -3008,64 +3215,69 @@ export class HecosStorage {
   }
 
   static deleteScopeSubcategory(scope: string, categoryKey: string, subcategoryName: string): boolean {
-    if (!categoryKey || !subcategoryName) return false;
-    this.addDeletedFolder(subcategoryName);
+    if (!subcategoryName) return false;
+    const trimmed = subcategoryName.trim();
+    if (!trimmed) return false;
+    this.addDeletedFolder(trimmed);
     if (scope === 'spell') {
-      return this.deleteSpellSubcategory(categoryKey, subcategoryName);
+      return this.deleteSpellSubcategory(categoryKey, trimmed);
     }
     if (scope === 'feat') {
-      return this.deleteFeatSubcategory(categoryKey, subcategoryName);
+      return this.deleteFeatSubcategory(categoryKey, trimmed);
     }
     if (scope === 'item') {
-      return this.deleteItemSubcategory(categoryKey, subcategoryName);
+      return this.deleteItemSubcategory(categoryKey, trimmed);
     }
 
     const config = this.getScopeSubcategoriesConfig(scope);
-    if (!config[categoryKey]) return false;
-    config[categoryKey] = config[categoryKey].filter((s) => s !== subcategoryName);
+    Object.keys(config).forEach((cat) => {
+      if (config[cat]?.includes(trimmed)) {
+        config[cat] = config[cat].filter((s) => s !== trimmed);
+      }
+    });
     this.saveScopeSubcategoriesConfig(scope, config);
 
     const entities = this.getEntities();
     entities.forEach((ent) => {
       let updated = false;
-      if (ent.subcategories?.includes(subcategoryName)) {
-        ent.subcategories = ent.subcategories.filter((s) => s !== subcategoryName);
+      if (ent.subcategories?.includes(trimmed)) {
+        ent.subcategories = ent.subcategories.filter((s) => s !== trimmed);
         updated = true;
       }
-      if (ent.subcategory === subcategoryName) {
+      if (ent.subcategory === trimmed) {
         ent.subcategory = (ent.subcategories && ent.subcategories[0]) || '';
         updated = true;
       }
-      if (ent.featData?.subcategories?.includes(subcategoryName)) {
-        ent.featData.subcategories = ent.featData.subcategories.filter((s) => s !== subcategoryName);
+      if (ent.featData?.subcategories?.includes(trimmed)) {
+        ent.featData.subcategories = ent.featData.subcategories.filter((s) => s !== trimmed);
         updated = true;
       }
-      if (ent.spellData?.subcategories?.includes(subcategoryName)) {
-        ent.spellData.subcategories = ent.spellData.subcategories.filter((s) => s !== subcategoryName);
+      if (ent.spellData?.subcategories?.includes(trimmed)) {
+        ent.spellData.subcategories = ent.spellData.subcategories.filter((s) => s !== trimmed);
         updated = true;
       }
-      if (ent.itemData?.subcategories?.includes(subcategoryName)) {
-        ent.itemData.subcategories = ent.itemData.subcategories.filter((s) => s !== subcategoryName);
+      if (ent.itemData?.subcategories?.includes(trimmed)) {
+        ent.itemData.subcategories = ent.itemData.subcategories.filter((s) => s !== trimmed);
         updated = true;
       }
-      if (ent.perilData?.subcategories?.includes(subcategoryName)) {
-        ent.perilData.subcategories = ent.perilData.subcategories.filter((s) => s !== subcategoryName);
+      if (ent.perilData?.subcategories?.includes(trimmed)) {
+        ent.perilData.subcategories = ent.perilData.subcategories.filter((s) => s !== trimmed);
         updated = true;
       }
-      if (ent.classData?.subcategories?.includes(subcategoryName)) {
-        ent.classData.subcategories = ent.classData.subcategories.filter((s) => s !== subcategoryName);
+      if (ent.classData?.subcategories?.includes(trimmed)) {
+        ent.classData.subcategories = ent.classData.subcategories.filter((s) => s !== trimmed);
         updated = true;
       }
-      if (ent.ancestryData?.subcategories?.includes(subcategoryName)) {
-        ent.ancestryData.subcategories = ent.ancestryData.subcategories.filter((s) => s !== subcategoryName);
+      if (ent.ancestryData?.subcategories?.includes(trimmed)) {
+        ent.ancestryData.subcategories = ent.ancestryData.subcategories.filter((s) => s !== trimmed);
         updated = true;
       }
-      if (ent.npcData?.subcategories?.includes(subcategoryName)) {
-        ent.npcData.subcategories = ent.npcData.subcategories.filter((s) => s !== subcategoryName);
+      if (ent.npcData?.subcategories?.includes(trimmed)) {
+        ent.npcData.subcategories = ent.npcData.subcategories.filter((s) => s !== trimmed);
         updated = true;
       }
-      if (ent.tags?.includes(subcategoryName)) {
-        ent.tags = ent.tags.filter((t) => t !== subcategoryName);
+      if (ent.tags?.includes(trimmed)) {
+        ent.tags = ent.tags.filter((t) => t !== trimmed);
         updated = true;
       }
       if (updated) {
@@ -3073,12 +3285,31 @@ export class HecosStorage {
       }
     });
 
-    const allRemaining = new Set<string>();
-    Object.values(config).forEach((list) => (list || []).forEach((s) => allRemaining.add(s)));
-    if (!allRemaining.has(subcategoryName)) {
-      HecosStorage.setFolderSecret(subcategoryName, false);
+    // Also clean from Trash
+    const trash = this.getTrashedEntities();
+    let trashChanged = false;
+    trash.forEach((t) => {
+      const ent = t.entity;
+      if (ent.subcategories?.includes(trimmed)) {
+        ent.subcategories = ent.subcategories.filter((s) => s !== trimmed);
+        trashChanged = true;
+      }
+      if (ent.subcategory === trimmed) {
+        ent.subcategory = (ent.subcategories && ent.subcategories[0]) || '';
+        trashChanged = true;
+      }
+    });
+    if (trashChanged) {
+      this.saveTrashLocal(trash);
     }
 
+    const allRemaining = new Set<string>();
+    Object.values(config).forEach((list) => (list || []).forEach((s) => allRemaining.add(s)));
+    if (!allRemaining.has(trimmed)) {
+      HecosStorage.setFolderSecret(trimmed, false);
+    }
+
+    this.notifyEntitySubscribers();
     return true;
   }
 

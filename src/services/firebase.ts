@@ -450,6 +450,8 @@ export function subscribeToFeatCategoriesRealtime(
         const val = snapshot.val();
         if (val && typeof val === 'object') {
           onUpdate(val);
+        } else {
+          onUpdate({});
         }
       },
       (error) => {
@@ -499,6 +501,8 @@ export function subscribeToSpellCategoriesRealtime(
         const val = snapshot.val();
         if (val && typeof val === 'object') {
           onUpdate(val);
+        } else {
+          onUpdate({});
         }
       },
       (error) => {
@@ -549,6 +553,8 @@ export function subscribeToScopeCategoriesRealtime(
         const val = snapshot.val();
         if (val && typeof val === 'object') {
           onUpdate(val);
+        } else {
+          onUpdate({});
         }
       },
       (error) => {
@@ -600,6 +606,8 @@ export function subscribeToPublicFoldersRealtime(
           onUpdate(val);
         } else if (val && typeof val === 'object') {
           onUpdate(Object.keys(val));
+        } else {
+          onUpdate([]);
         }
       },
       (error) => {
@@ -648,6 +656,8 @@ export function subscribeToSecretFoldersRealtime(
           onUpdate(val);
         } else if (val && typeof val === 'object') {
           onUpdate(Object.keys(val));
+        } else {
+          onUpdate([]);
         }
       },
       (error) => {
@@ -675,6 +685,107 @@ export async function syncSecretFoldersToFirebase(folders: string[]): Promise<bo
       console.warn("Sync secret folders notice:", err?.message || err);
     }
     return false;
+  }
+}
+
+/**
+ * Real-time listener for 'hecos_deleted_folders'
+ */
+export function subscribeToDeletedFoldersRealtime(
+  onUpdate: (deletedMap: Record<string, { name: string; deletedAt?: string } | boolean>) => void
+): Unsubscribe | null {
+  if (!isFirebaseAvailable || !db) return null;
+
+  try {
+    const deletedRef = ref(db, 'hecos_deleted_folders');
+    return onValue(
+      deletedRef,
+      (snapshot) => {
+        const val = snapshot.val();
+        if (val && typeof val === 'object') {
+          onUpdate(val);
+        } else {
+          onUpdate({});
+        }
+      },
+      (error) => {
+        if (!isPermissionDeniedError(error)) {
+          console.warn("Real-time deleted folders error:", error);
+        }
+      }
+    );
+  } catch (err) {
+    return null;
+  }
+}
+
+/**
+ * Records a deleted folder in Firebase Realtime Database
+ */
+export async function syncDeletedFolderToFirebase(folderName: string): Promise<boolean> {
+  if (!isFirebaseAvailable || !db || !folderName) return false;
+  try {
+    const trimmed = folderName.trim();
+    if (!trimmed) return false;
+    const safeKey = toSafeKey(trimmed);
+    const folderRef = ref(db, `hecos_deleted_folders/${safeKey}`);
+    await withTimeout(set(folderRef, {
+      name: trimmed,
+      deletedAt: new Date().toISOString()
+    }), 15000);
+    return true;
+  } catch (err: any) {
+    if (!isPermissionDeniedError(err)) {
+      console.warn("Sync deleted folder to RTDB notice:", err?.message || err);
+    }
+    return false;
+  }
+}
+
+/**
+ * Removes a folder from the deleted list in Firebase Realtime Database (e.g. when user explicitly recreates it)
+ */
+export async function deleteDeletedFolderFromFirebase(folderName: string): Promise<boolean> {
+  if (!isFirebaseAvailable || !db || !folderName) return false;
+  try {
+    const trimmed = folderName.trim();
+    if (!trimmed) return false;
+    const safeKey = toSafeKey(trimmed);
+    const folderRef = ref(db, `hecos_deleted_folders/${safeKey}`);
+    await withTimeout(remove(folderRef), 15000);
+    return true;
+  } catch (err: any) {
+    if (!isPermissionDeniedError(err)) {
+      console.warn("Remove deleted folder from RTDB notice:", err?.message || err);
+    }
+    return false;
+  }
+}
+
+/**
+ * Fetches deleted folders once from Firebase Realtime Database
+ */
+export async function loadDeletedFoldersFromFirebase(): Promise<string[]> {
+  if (!isFirebaseAvailable || !db) return [];
+  try {
+    const deletedRef = ref(db, 'hecos_deleted_folders');
+    const snap = await withTimeout(get(deletedRef), 15000);
+    if (snap.exists()) {
+      const val = snap.val();
+      if (val && typeof val === 'object') {
+        const names: string[] = [];
+        Object.entries(val).forEach(([key, info]: [string, any]) => {
+          const name = (typeof info === 'object' && info && 'name' in info) ? info.name : key;
+          if (name && typeof name === 'string' && name.trim()) {
+            names.push(name.trim());
+          }
+        });
+        return names;
+      }
+    }
+    return [];
+  } catch {
+    return [];
   }
 }
 
