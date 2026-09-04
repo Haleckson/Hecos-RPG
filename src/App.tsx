@@ -985,7 +985,7 @@ export function App() {
               <div className="absolute -inset-1.5 rounded-full bg-gradient-to-tr from-cyan-500/25 via-purple-500/30 to-rose-500/25 blur-md opacity-40 group-hover:opacity-100 group-hover:scale-125 transition-all duration-300 pointer-events-none" />
               
               {/* Unboxed D20 Die: crisp geometric facets, luminous edges, and glowing 'H' */}
-              <HecosLogoD20 className="w-10 h-10 relative z-10 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3 drop-shadow-[0_0_10px_rgba(168,85,247,0.35)] group-hover:drop-shadow-[0_0_16px_rgba(34,211,238,0.6)]" />
+              <HecosLogoD20 className="w-11 h-11 relative z-10 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3 drop-shadow-[0_0_12px_rgba(168,85,247,0.4)] group-hover:drop-shadow-[0_0_18px_rgba(34,211,238,0.7)]" />
             </div>
             <div>
               <h1 className="text-xl font-black tracking-widest bg-gradient-to-r from-zinc-100 via-cyan-300 to-purple-300 bg-clip-text text-transparent group-hover:from-white group-hover:via-cyan-200 group-hover:to-purple-200 transition-all">

@@ -97,45 +97,37 @@ function getHecosD20Svg(isTransparent = false) {
   <circle cx="349.5" cy="315.4" r="5" fill="#fb7185" />
   <circle cx="162.5" cy="315.4" r="5" fill="#c084fc" />
 
-  <!-- The Iconic 'H' in the Central D20 Face -->
+  <!-- The Iconic 'H' in the Center of the D20 Face - Enlarged & Bold -->
   <g filter="url(#d20HDrop)">
     <path
-      d="M 204 204
-         L 242 204
-         L 238 214
-         L 234 214
-         L 234 238
-         L 278 238
-         L 278 214
-         L 274 214
-         L 270 204
-         L 308 204
-         L 304 214
-         L 300 214
-         L 300 286
-         L 304 286
-         L 308 296
-         L 270 296
-         L 274 286
-         L 278 286
-         L 278 262
-         L 234 262
-         L 234 286
-         L 238 286
-         L 242 296
-         L 204 296
-         L 208 286
-         L 212 286
-         L 212 214
-         L 208 214
+      d="M 164 156
+         L 226 156
+         L 214 172
+         L 214 236
+         L 298 236
+         L 298 172
+         L 286 156
+         L 348 156
+         L 336 172
+         L 336 340
+         L 348 356
+         L 286 356
+         L 298 340
+         L 298 276
+         L 214 276
+         L 214 340
+         L 226 356
+         L 164 356
+         L 176 340
+         L 176 172
          Z"
       fill="url(#hNeonGrad)"
       stroke="#ffffff"
-      stroke-width="1.2"
-      stroke-opacity="0.45"
+      stroke-width="2.2"
+      stroke-opacity="0.6"
     />
   </g>
-  <line x1="236" y1="250" x2="276" y2="250" stroke="#ffffff" stroke-width="1.5" stroke-opacity="0.5" stroke-linecap="round" />
+  <line x1="220" y1="256" x2="292" y2="256" stroke="#ffffff" stroke-width="3" stroke-opacity="0.65" stroke-linecap="round" />
 </svg>`;
 }
 
