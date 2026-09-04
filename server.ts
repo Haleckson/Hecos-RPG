@@ -148,6 +148,10 @@ app.post('/api/gemini/stream', async (req, res) => {
 // ----------------------------------------------------
 
 async function bootstrap() {
+  // Always serve public static assets directly (favicons, icons, manifest)
+  app.use(express.static(path.join(process.cwd(), 'public')));
+  app.use('/Hecos-RPG', express.static(path.join(process.cwd(), 'public')));
+
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },

@@ -57,6 +57,7 @@ import { EntityDrawer } from './components/EntityDrawer';
 import { FeatDrawer } from './components/FeatDrawer';
 import { ItemDrawer } from './components/ItemDrawer';
 import { HomePage } from './components/HomePage';
+import { HecosLogoD20 } from './components/HecosLogoD20';
 import { setupGlobalTextFormattingShortcuts } from './utils/keyboardShortcuts';
 import { getEmptyAncestryData, serializeAncestryToHTML } from './utils/ancestrySerializer';
 import { getEmptyFeatData, serializeFeatToHTML } from './utils/featSerializer';
@@ -977,20 +978,20 @@ export function App() {
               setActiveView('entities');
               setSelectedEntityId(null);
             }}
-            className="flex items-center gap-3 cursor-pointer group"
+            className="flex items-center gap-3.5 cursor-pointer group"
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-700 via-purple-600 to-cyan-500 p-0.5 shadow-[0_0_20px_rgba(190,18,60,0.4)] group-hover:shadow-[0_0_25px_rgba(0,240,255,0.5)] transition-all">
-              <div className="w-full h-full bg-[#09080e] rounded-[10px] flex items-center justify-center">
-                <span className="font-black text-lg bg-gradient-to-r from-cyan-400 via-purple-300 to-rose-400 bg-clip-text text-transparent">
-                  H
-                </span>
-              </div>
+            <div className="relative flex items-center justify-center shrink-0">
+              {/* Soft ambient cosmic glow that diffuses seamlessly into the dark sidebar */}
+              <div className="absolute -inset-1.5 rounded-full bg-gradient-to-tr from-cyan-500/25 via-purple-500/30 to-rose-500/25 blur-md opacity-40 group-hover:opacity-100 group-hover:scale-125 transition-all duration-300 pointer-events-none" />
+              
+              {/* Unboxed D20 Die: crisp geometric facets, luminous edges, and glowing 'H' */}
+              <HecosLogoD20 className="w-10 h-10 relative z-10 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3 drop-shadow-[0_0_10px_rgba(168,85,247,0.35)] group-hover:drop-shadow-[0_0_16px_rgba(34,211,238,0.6)]" />
             </div>
             <div>
-              <h1 className="text-xl font-black tracking-widest bg-gradient-to-r from-zinc-100 via-cyan-300 to-purple-300 bg-clip-text text-transparent">
+              <h1 className="text-xl font-black tracking-widest bg-gradient-to-r from-zinc-100 via-cyan-300 to-purple-300 bg-clip-text text-transparent group-hover:from-white group-hover:via-cyan-200 group-hover:to-purple-200 transition-all">
                 HECOS
               </h1>
-              <p className="text-[10px] text-zinc-400 font-semibold tracking-wider uppercase">
+              <p className="text-[10px] text-zinc-400 group-hover:text-zinc-300 font-semibold tracking-wider uppercase transition-colors">
                 Pathfinder 2e Setting
               </p>
             </div>
