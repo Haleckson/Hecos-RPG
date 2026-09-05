@@ -148,6 +148,25 @@ app.post('/api/gemini/stream', async (req, res) => {
 // ----------------------------------------------------
 
 async function bootstrap() {
+  // Prevent aggressive browser caching of favicons, icons and web manifests
+  app.use((req, res, next) => {
+    const p = req.path.toLowerCase();
+    if (
+      p.includes('favicon') ||
+      p.includes('apple-touch-icon') ||
+      p.includes('manifest.json') ||
+      p.endsWith('.ico') ||
+      p.includes('pwa-') ||
+      p.includes('icon.png') ||
+      p.includes('icon.svg')
+    ) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+    next();
+  });
+
   // Always serve public static assets directly (favicons, icons, manifest)
   app.use(express.static(path.join(process.cwd(), 'public')));
   app.use('/Hecos-RPG', express.static(path.join(process.cwd(), 'public')));
